@@ -42,11 +42,17 @@ jobs:
           version: 3.48.0
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6.0.8
+        with:
+          version: 10.18.0
+          run_install: false
+
       - name: Setup Node.js
         uses: actions/setup-node@v6.4.0
         with:
           node-version-file: 'package.json'
-          cache: 'npm'
+          cache: 'pnpm'
 
       - name: Install additional dependencies
         run: npm install -g markdownlint-cli
