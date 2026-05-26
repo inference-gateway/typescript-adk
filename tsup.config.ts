@@ -6,7 +6,7 @@ export default defineConfig({
   outDir: 'dist',
   target: 'es2024',
   platform: 'node',
-  dts: { resolve: true },
+  dts: true,
   sourcemap: true,
   clean: true,
   treeshake: true,

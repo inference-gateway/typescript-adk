@@ -49,7 +49,10 @@ jobs:
 
       - name: Typecheck
         id: typecheck
-        run: pnpm typecheck 2>&1 | tee typecheck.log
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm typecheck 2>&1 | tee typecheck.log
 
       - name: Surface typecheck output on failure
         if: failure() && steps.typecheck.conclusion == 'failure'
