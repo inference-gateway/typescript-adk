@@ -25,6 +25,9 @@
         "version": "11.1.2"
       }
     },
+    "vars": {
+      "NODE_OPTIONS": "--no-warnings"
+    },
     "hook": {
       "on-activate": "  npm install\n"
     },

@@ -13,6 +13,9 @@ codex.pkg-path = "codex"
 codex.version = "0.133.0"
 codex.pkg-group = "ai"
 
+[vars]
+NODE_OPTIONS = "--no-warnings"
+
 [hook]
 on-activate = """
   npm install
