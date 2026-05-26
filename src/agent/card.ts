@@ -183,7 +183,9 @@ export function loadAgentCardFromJSON(
   }
 
   if (!isPlainObject(parsed)) {
-    throw new AgentCardValidationError('AgentCard JSON must decode to an object');
+    throw new AgentCardValidationError(
+      'AgentCard JSON must decode to an object'
+    );
   }
 
   const env = options.env ?? process.env;
