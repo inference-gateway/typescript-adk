@@ -80,5 +80,9 @@
     "tag": "latest",
     "access": "public"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "dependencies": {
+    "@hono/node-server": "^2.0.4",
+    "hono": "^4.12.23"
+  }
 }
