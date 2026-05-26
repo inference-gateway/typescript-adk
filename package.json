@@ -1,6 +1,6 @@
 {
   "name": "@inference-gateway/adk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Agent Development Kit (ADK) for the Inference Gateway, written in TypeScript.",
   "type": "module",
   "exports": {

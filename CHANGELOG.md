@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0](https://github.com/inference-gateway/typescript-adk/compare/v0.2.0...v0.3.0) (2026-05-26)
+
+### ✨ Features
+
+* implement agent card data model and JSON loading ([#61](https://github.com/inference-gateway/typescript-adk/issues/61)) ([0cc1de1](https://github.com/inference-gateway/typescript-adk/commit/0cc1de1c51f613ee032bd649b789d6234aadf905)), closes [#6](https://github.com/inference-gateway/typescript-adk/issues/6)
+
 ## [0.2.0](https://github.com/inference-gateway/typescript-adk/compare/v0.1.1...v0.2.0) (2026-05-26)
 
 ### ✨ Features
