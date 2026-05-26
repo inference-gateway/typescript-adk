@@ -49,8 +49,7 @@ export class A2AServer {
 
   constructor(config: A2AServerConfig) {
     this.card = config.card;
-    this.cacheControl =
-      config.cacheControl ?? DEFAULT_AGENT_CARD_CACHE_CONTROL;
+    this.cacheControl = config.cacheControl ?? DEFAULT_AGENT_CARD_CACHE_CONTROL;
     this.httpServer = createHttpServer((req, res) => {
       this.handleRequest(req, res);
     });
