@@ -1,0 +1,11 @@
+import pkg from '../package.json' with { type: 'json' };
+
+export interface PackageMetadata {
+  readonly name: string;
+  readonly version: string;
+}
+
+export const packageMetadata: PackageMetadata = Object.freeze({
+  name: pkg.name,
+  version: pkg.version,
+});
