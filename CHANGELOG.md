@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0](https://github.com/inference-gateway/typescript-adk/compare/v0.4.0...v0.5.0) (2026-05-26)
+
+### ✨ Features
+
+* **server:** implement A2A JSON-RPC server core ([#63](https://github.com/inference-gateway/typescript-adk/issues/63)) ([d4a1053](https://github.com/inference-gateway/typescript-adk/commit/d4a10531a476c6c5615dd244b078862e275432b4)), closes [#8](https://github.com/inference-gateway/typescript-adk/issues/8)
+
 ## [0.4.0](https://github.com/inference-gateway/typescript-adk/compare/v0.3.0...v0.4.0) (2026-05-26)
 
 ### ✨ Features
