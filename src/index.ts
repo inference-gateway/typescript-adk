@@ -11,3 +11,4 @@ export const packageMetadata: PackageMetadata = Object.freeze({
 });
 
 export * from './types/index.js';
+export * from './agent/index.js';

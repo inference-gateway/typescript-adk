@@ -1,0 +1,20 @@
+{
+  "name": "recipe-agent",
+  "description": "Agent that helps users with recipes and cooking.",
+  "version": "1.0.0",
+  "protocolVersion": "1.0",
+  "defaultInputModes": ["text/plain"],
+  "defaultOutputModes": ["text/plain"],
+  "capabilities": {
+    "streaming": true,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "skills": [
+    {
+      "id": "suggest-recipe",
+      "name": "Suggest a recipe",
+      "description": "Suggest a recipe based on available ingredients."
+    }
+  ]
+}

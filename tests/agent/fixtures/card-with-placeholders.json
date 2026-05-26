@@ -1,0 +1,22 @@
+{
+  "name": "${AGENT_NAME}",
+  "description": "Agent serving environment ${AGENT_ENV}.",
+  "version": "${AGENT_VERSION}",
+  "protocolVersion": "1.0",
+  "defaultInputModes": ["text/plain"],
+  "defaultOutputModes": ["text/plain"],
+  "capabilities": {
+    "streaming": true
+  },
+  "skills": [
+    {
+      "id": "${AGENT_NAME}-skill",
+      "name": "Primary skill",
+      "description": "Skill bound to ${AGENT_NAME}."
+    }
+  ],
+  "provider": {
+    "organization": "${AGENT_ORG}",
+    "url": "https://example.com/${AGENT_NAME}"
+  }
+}
