@@ -1,0 +1,17 @@
+schema-version = "1.12.0"
+
+[install]
+nodejs.pkg-path = "nodejs_26"
+nodejs.version = "26.2.0"
+infer.flake = "github:inference-gateway/cli/v0.112.1"
+claude-code.pkg-path = "claude-code"
+claude-code.version = "2.1.148"
+claude-code.pkg-group = "ai"
+codex.pkg-path = "codex"
+codex.version = "0.133.0"
+codex.pkg-group = "ai"
+
+[hook]
+on-activate = """
+  npm install
+"""
