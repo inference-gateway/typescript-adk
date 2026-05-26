@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0](https://github.com/inference-gateway/typescript-adk/compare/v0.5.0...v0.6.0) (2026-05-26)
+
+### ✨ Features
+
+* add in-memory task storage backend ([#65](https://github.com/inference-gateway/typescript-adk/issues/65)) ([68d23a7](https://github.com/inference-gateway/typescript-adk/commit/68d23a7829170500034db85b36ed56ba6db70f9d)), closes [#10](https://github.com/inference-gateway/typescript-adk/issues/10)
+* **client:** implement A2A client SDK ([#68](https://github.com/inference-gateway/typescript-adk/issues/68)) ([b1dd331](https://github.com/inference-gateway/typescript-adk/commit/b1dd3313064da1c3a6167d039e8d61b9663f08d9))
+* implement message/send JSON-RPC method ([#66](https://github.com/inference-gateway/typescript-adk/issues/66)) ([885dd96](https://github.com/inference-gateway/typescript-adk/commit/885dd966d87b4fac847752e6fd945a2a5fca355b)), closes [#11](https://github.com/inference-gateway/typescript-adk/issues/11)
+* implement task lifecycle and state machine ([#64](https://github.com/inference-gateway/typescript-adk/issues/64)) ([7fea31d](https://github.com/inference-gateway/typescript-adk/commit/7fea31d767cf56563fec9b742186afb4c1132990)), closes [#9](https://github.com/inference-gateway/typescript-adk/issues/9)
+* implement tasks/get JSON-RPC method ([#67](https://github.com/inference-gateway/typescript-adk/issues/67)) ([113e939](https://github.com/inference-gateway/typescript-adk/commit/113e939acb0e8ded9cb24883b539c84e2b2028c5)), closes [#12](https://github.com/inference-gateway/typescript-adk/issues/12)
+
 ## [0.5.0](https://github.com/inference-gateway/typescript-adk/compare/v0.4.0...v0.5.0) (2026-05-26)
 
 ### ✨ Features
