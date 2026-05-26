@@ -21,6 +21,7 @@ function makeCard(overrides: Partial<AgentCard> = {}): AgentCard {
         id: 'echo',
         name: 'Echo',
         description: 'Echoes input back to the caller.',
+        tags: [],
       },
     ],
     ...overrides,
@@ -135,11 +136,13 @@ describe('A2AServer agent card discovery', () => {
           id: 'summarize',
           name: 'Summarize',
           description: 'Summarize a block of text.',
+          tags: [],
         },
         {
           id: 'translate',
           name: 'Translate',
           description: 'Translate text between languages.',
+          tags: [],
         },
       ],
     });
