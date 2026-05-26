@@ -30,6 +30,17 @@ pnpm lint
 pnpm typecheck
 ```
 
+## Continuous Integration
+
+CI runs on every push to `main` and on every pull request via `.github/workflows/ci.yml`. The workflow installs dependencies, then runs `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm test` across a matrix of Node 22 LTS and Node 24 LTS on `ubuntu-24.04`.
+
+Branch protection on `main` should require the following status checks before merge:
+
+- `ci (22)`
+- `ci (24)`
+
+These names follow GitHub's matrix job naming (`<job-id> (<matrix-value>)`) and must be added under **Settings → Branches → Branch protection rules → Require status checks to pass before merging**.
+
 ## License
 
 Apache-2.0
