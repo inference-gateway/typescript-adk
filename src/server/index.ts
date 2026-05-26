@@ -26,3 +26,11 @@ export type {
 } from './jsonrpc.js';
 export { MethodRegistry } from './method-registry.js';
 export type { MethodContext, MethodHandler } from './method-registry.js';
+export {
+  MESSAGE_SEND_METHOD,
+  createMessageSendHandler,
+} from './message-send.js';
+export type {
+  MessageSendHandlerOptions,
+  MessageSendParams,
+} from './message-send.js';
