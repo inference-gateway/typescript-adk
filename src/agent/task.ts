@@ -2,7 +2,9 @@ import type {
   Artifact,
   Message,
   Struct,
+  Task,
   TaskState,
+  TaskStatus,
   Timestamp,
 } from '../types/generated/a2a.js';
 
@@ -197,6 +199,60 @@ export function transitionTask(
     updatedAt: timestamp,
     ...(isTerminal(nextState) ? { completedAt: timestamp } : {}),
   };
+}
+
+/**
+ * Project a {@link ManagedTask} into the wire-format A2A `Task`.
+ *
+ * The returned object drops lifecycle bookkeeping fields (`createdAt`,
+ * `updatedAt`, `completedAt`, `state` mirror) that are internal to the
+ * managed lifecycle, and copies `messages` into `history` since that's the
+ * field name on the wire.
+ *
+ * Optional fields (`status.message`, `status.timestamp`, `artifacts`,
+ * `metadata`) are only included when present, to satisfy
+ * `exactOptionalPropertyTypes`.
+ *
+ * If `historyLength` is supplied (and >= 0), the returned `history` is
+ * truncated to the last `historyLength` messages. Negative values are
+ * treated as a programming error and rejected upstream; this helper
+ * intentionally clamps at 0 rather than throwing.
+ */
+export function toWireTask(task: ManagedTask, historyLength?: number): Task {
+  const status: TaskStatus = {
+    state: task.status.state,
+    ...(task.status.message !== undefined
+      ? { message: task.status.message }
+      : {}),
+    ...(task.status.timestamp !== undefined
+      ? { timestamp: task.status.timestamp }
+      : {}),
+  };
+
+  const history = truncateHistory(task.messages, historyLength);
+
+  return {
+    id: task.id,
+    contextId: task.contextId,
+    status,
+    history,
+    ...(task.artifacts.length > 0 ? { artifacts: [...task.artifacts] } : {}),
+    ...(task.metadata !== undefined ? { metadata: task.metadata } : {}),
+  };
+}
+
+function truncateHistory(
+  messages: readonly Message[],
+  historyLength: number | undefined
+): Message[] {
+  if (historyLength === undefined) {
+    return [...messages];
+  }
+  const clamped = Math.max(0, historyLength);
+  if (clamped >= messages.length) {
+    return [...messages];
+  }
+  return messages.slice(messages.length - clamped);
 }
 
 function defaultNow(): Date {

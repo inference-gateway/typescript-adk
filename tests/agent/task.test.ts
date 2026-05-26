@@ -6,6 +6,7 @@ import {
   createTask,
   isPaused,
   isTerminal,
+  toWireTask,
   transitionTask,
   type ManagedTask,
   type ManagedTaskState,
@@ -297,5 +298,69 @@ describe('transitionTask - illegal transitions', () => {
         expect(canTransition(terminal, target)).toBe(false);
       }
     }
+  });
+});
+
+describe('toWireTask', () => {
+  const baseMessages: Message[] = [
+    { messageId: 'm-1', role: 'ROLE_USER', parts: [{ text: 'one' }] },
+    { messageId: 'm-2', role: 'ROLE_AGENT', parts: [{ text: 'two' }] },
+    { messageId: 'm-3', role: 'ROLE_USER', parts: [{ text: 'three' }] },
+  ];
+
+  function withMessages(messages: Message[]): ManagedTask {
+    return createTask({
+      id: 'task-1',
+      contextId: 'ctx-1',
+      messages,
+      now: fixedClock('2026-01-01T00:00:00.000Z'),
+    });
+  }
+
+  it('projects the ManagedTask into the wire-format Task with full history', () => {
+    const task = withMessages(baseMessages);
+    const wire = toWireTask(task);
+
+    expect(wire.id).toBe('task-1');
+    expect(wire.contextId).toBe('ctx-1');
+    expect(wire.status.state).toBe(TASK_STATE.PENDING);
+    expect(wire.status.timestamp).toBe('2026-01-01T00:00:00.000Z');
+    expect(wire.history).toEqual(baseMessages);
+  });
+
+  it('truncates history to the last N messages when historyLength is provided', () => {
+    const task = withMessages(baseMessages);
+    const wire = toWireTask(task, 2);
+
+    expect(wire.history).toEqual([baseMessages[1], baseMessages[2]]);
+  });
+
+  it('returns an empty history when historyLength is 0', () => {
+    const task = withMessages(baseMessages);
+    const wire = toWireTask(task, 0);
+
+    expect(wire.history).toEqual([]);
+  });
+
+  it('returns the full history when historyLength exceeds the message count', () => {
+    const task = withMessages(baseMessages);
+    const wire = toWireTask(task, 99);
+
+    expect(wire.history).toEqual(baseMessages);
+  });
+
+  it('omits artifacts when the managed task has none', () => {
+    const task = withMessages(baseMessages);
+    const wire = toWireTask(task);
+
+    expect(wire.artifacts).toBeUndefined();
+  });
+
+  it('returns a fresh copy of history so callers can mutate without affecting storage', () => {
+    const task = withMessages(baseMessages);
+    const wire = toWireTask(task);
+
+    wire.history?.pop();
+    expect(task.messages).toHaveLength(baseMessages.length);
   });
 });
