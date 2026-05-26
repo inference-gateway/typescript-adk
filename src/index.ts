@@ -9,3 +9,5 @@ export const packageMetadata: PackageMetadata = Object.freeze({
   name: pkg.name,
   version: pkg.version,
 });
+
+export * from './types/index.js';

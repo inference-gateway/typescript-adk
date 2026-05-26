@@ -13,3 +13,4 @@
 pnpm-lock.yaml linguist-generated=true
 package-lock.json linguist-generated=true
 dist/** linguist-generated=true
+src/types/generated/** linguist-generated=true
