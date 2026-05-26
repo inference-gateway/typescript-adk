@@ -15,3 +15,20 @@ export {
   buildMetadata,
 } from './build-metadata.js';
 export type { BuildMetadata } from './build-metadata.js';
+
+export {
+  TASK_STATE,
+  TaskTransitionError,
+  canTransition,
+  createTask,
+  isPaused,
+  isTerminal,
+  transitionTask,
+} from './task.js';
+export type {
+  CreateTaskInput,
+  ManagedTask,
+  ManagedTaskState,
+  ManagedTaskStatus,
+  TransitionOptions,
+} from './task.js';
