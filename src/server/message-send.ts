@@ -1,11 +1,10 @@
-import { createTask, type ManagedTask } from '../agent/task.js';
+import { createTask, toWireTask } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
   Message,
   SendMessageConfiguration,
   Struct,
   Task,
-  TaskStatus,
 } from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
 import type { MethodHandler } from './method-registry.js';
@@ -80,7 +79,7 @@ export function createMessageSendHandler(
 
     storage.enqueue(task);
 
-    return managedTaskToWireTask(task);
+    return toWireTask(task);
   };
 }
 
@@ -127,26 +126,6 @@ function enrichMessage(input: Message, newId: () => string): Message {
     ...input,
     messageId,
     contextId,
-  };
-}
-
-function managedTaskToWireTask(task: ManagedTask): Task {
-  const status: TaskStatus = {
-    state: task.status.state,
-    ...(task.status.message !== undefined
-      ? { message: task.status.message }
-      : {}),
-    ...(task.status.timestamp !== undefined
-      ? { timestamp: task.status.timestamp }
-      : {}),
-  };
-  return {
-    id: task.id,
-    contextId: task.contextId,
-    status,
-    history: [...task.messages],
-    ...(task.artifacts.length > 0 ? { artifacts: [...task.artifacts] } : {}),
-    ...(task.metadata !== undefined ? { metadata: task.metadata } : {}),
   };
 }
 

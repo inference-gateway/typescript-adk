@@ -34,3 +34,5 @@ export type {
   MessageSendHandlerOptions,
   MessageSendParams,
 } from './message-send.js';
+export { TASK_GET_METHOD, createTaskGetHandler } from './task-get.js';
+export type { TaskGetHandlerOptions, TaskGetParams } from './task-get.js';

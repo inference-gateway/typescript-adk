@@ -23,6 +23,7 @@ export {
   createTask,
   isPaused,
   isTerminal,
+  toWireTask,
   transitionTask,
 } from './task.js';
 export type {
