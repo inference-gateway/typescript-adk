@@ -571,7 +571,7 @@ export class DefaultBackgroundTaskHandler {
   }
 }
 
-function assistantToChatMessage(message: AssistantMessage): ChatMessage {
+export function assistantToChatMessage(message: AssistantMessage): ChatMessage {
   return {
     role: 'assistant',
     ...(message.content !== undefined ? { content: message.content } : {}),
@@ -581,7 +581,9 @@ function assistantToChatMessage(message: AssistantMessage): ChatMessage {
   };
 }
 
-function a2aMessageToChatMessage(message: Message): ChatMessage | undefined {
+export function a2aMessageToChatMessage(
+  message: Message
+): ChatMessage | undefined {
   const text = extractText(message.parts);
   if (text.length === 0) {
     return undefined;
@@ -605,7 +607,7 @@ function extractText(parts: readonly Part[] | undefined): string {
     .join('\n');
 }
 
-function buildAgentMessage(task: ManagedTask, text: string): Message {
+export function buildAgentMessage(task: ManagedTask, text: string): Message {
   return {
     messageId: crypto.randomUUID(),
     role: 'ROLE_AGENT',
@@ -615,7 +617,7 @@ function buildAgentMessage(task: ManagedTask, text: string): Message {
   };
 }
 
-function extractInputRequiredPrompt(rawArgs: string): string {
+export function extractInputRequiredPrompt(rawArgs: string): string {
   if (typeof rawArgs !== 'string' || rawArgs.length === 0) {
     return 'Additional input required.';
   }
@@ -637,7 +639,7 @@ function extractInputRequiredPrompt(rawArgs: string): string {
   return 'Additional input required.';
 }
 
-function resolveMaxIterations(
+export function resolveMaxIterations(
   env: Readonly<Record<string, string | undefined>>
 ): number {
   const raw = env[MAX_CHAT_COMPLETION_ITERATIONS_ENV];

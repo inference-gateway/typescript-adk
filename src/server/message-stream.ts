@@ -18,6 +18,10 @@ import type {
 import {
   AGENT_EVENT_TYPE,
   type AgentEventType,
+  type AgentIterationCompletedEventData,
+  type AgentToolEventData,
+  type AgentToolFailedEventData,
+  type AgentToolResultEventData,
   type CloudEvent,
 } from './cloudevents.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
@@ -74,6 +78,16 @@ export interface MessageStreamParams {
  *    and end the stream. Equivalent to `{ type: 'statusChanged', state:
  *    INPUT_REQUIRED, message }`, kept separate for ergonomics since this is a
  *    common case in tool-use loops.
+ *  - `inputRequiredNotice`: emit an `adk.agent.input.required` SSE frame
+ *    carrying the prompt message. Does not change task state - typically
+ *    followed by an `inputRequired` event from the same executor that performs
+ *    the actual transition.
+ *  - `iterationCompleted`: emit an `adk.agent.iteration.completed` SSE frame
+ *    marking the end of one LLM iteration in an agentic loop. Carries the
+ *    assistant message returned by the iteration when present.
+ *  - `toolStarted` / `toolCompleted` / `toolFailed` / `toolResult`: emit the
+ *    corresponding `adk.agent.tool.*` SSE frames around a tool dispatch. None
+ *    of these change task state.
  */
 export type StreamingTaskEvent =
   | { readonly type: 'delta'; readonly message: Message }
@@ -82,7 +96,37 @@ export type StreamingTaskEvent =
       readonly state: ManagedTaskState;
       readonly message?: Message;
     }
-  | { readonly type: 'inputRequired'; readonly message: Message };
+  | { readonly type: 'inputRequired'; readonly message: Message }
+  | { readonly type: 'inputRequiredNotice'; readonly message: Message }
+  | {
+      readonly type: 'iterationCompleted';
+      readonly iteration: number;
+      readonly message?: Message;
+    }
+  | {
+      readonly type: 'toolStarted';
+      readonly toolCallId: string;
+      readonly toolName: string;
+      readonly arguments?: string;
+    }
+  | {
+      readonly type: 'toolCompleted';
+      readonly toolCallId: string;
+      readonly toolName: string;
+    }
+  | {
+      readonly type: 'toolFailed';
+      readonly toolCallId: string;
+      readonly toolName: string;
+      readonly error: string;
+    }
+  | {
+      readonly type: 'toolResult';
+      readonly toolCallId: string;
+      readonly toolName: string;
+      readonly result: string;
+      readonly isError: boolean;
+    };
 
 /**
  * Context handed to a {@link StreamingTaskExecutor} on each invocation.
@@ -392,6 +436,30 @@ function handleExecutorEvent(
       emitStatusEvent(writer, next, false, emitOptions);
       return next;
     }
+    case 'inputRequiredNotice': {
+      emitInputRequiredEvent(writer, task, event.message, emitOptions);
+      return task;
+    }
+    case 'iterationCompleted': {
+      emitIterationCompletedEvent(writer, task, event, emitOptions);
+      return task;
+    }
+    case 'toolStarted': {
+      emitToolStartedEvent(writer, task, event, emitOptions);
+      return task;
+    }
+    case 'toolCompleted': {
+      emitToolCompletedEvent(writer, task, event, emitOptions);
+      return task;
+    }
+    case 'toolFailed': {
+      emitToolFailedEvent(writer, task, event, emitOptions);
+      return task;
+    }
+    case 'toolResult': {
+      emitToolResultEvent(writer, task, event, emitOptions);
+      return task;
+    }
   }
 }
 
@@ -425,6 +493,137 @@ function emitDeltaEvent(
   return writer.emit({
     type: AGENT_EVENT_TYPE.DELTA satisfies AgentEventType,
     data: message,
+    subject: task.id,
+    ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
+  });
+}
+
+function emitInputRequiredEvent(
+  writer: SSEStreamWriter,
+  task: ManagedTask,
+  message: Message,
+  emitOptions: EmitOptions
+): CloudEvent<Message> | undefined {
+  return writer.emit({
+    type: AGENT_EVENT_TYPE.INPUT_REQUIRED satisfies AgentEventType,
+    data: message,
+    subject: task.id,
+    ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
+  });
+}
+
+function emitIterationCompletedEvent(
+  writer: SSEStreamWriter,
+  task: ManagedTask,
+  event: { readonly iteration: number; readonly message?: Message },
+  emitOptions: EmitOptions
+): CloudEvent<AgentIterationCompletedEventData> | undefined {
+  const data: AgentIterationCompletedEventData = {
+    iteration: event.iteration,
+    taskId: task.id,
+    contextId: task.contextId,
+    ...(event.message !== undefined ? { message: event.message } : {}),
+  };
+  return writer.emit({
+    type: AGENT_EVENT_TYPE.ITERATION_COMPLETED satisfies AgentEventType,
+    data,
+    subject: task.id,
+    ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
+  });
+}
+
+function emitToolStartedEvent(
+  writer: SSEStreamWriter,
+  task: ManagedTask,
+  event: {
+    readonly toolCallId: string;
+    readonly toolName: string;
+    readonly arguments?: string;
+  },
+  emitOptions: EmitOptions
+): CloudEvent<AgentToolEventData> | undefined {
+  const data: AgentToolEventData = {
+    toolCallId: event.toolCallId,
+    toolName: event.toolName,
+    taskId: task.id,
+    contextId: task.contextId,
+    ...(event.arguments !== undefined ? { arguments: event.arguments } : {}),
+  };
+  return writer.emit({
+    type: AGENT_EVENT_TYPE.TOOL_STARTED satisfies AgentEventType,
+    data,
+    subject: task.id,
+    ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
+  });
+}
+
+function emitToolCompletedEvent(
+  writer: SSEStreamWriter,
+  task: ManagedTask,
+  event: { readonly toolCallId: string; readonly toolName: string },
+  emitOptions: EmitOptions
+): CloudEvent<AgentToolEventData> | undefined {
+  const data: AgentToolEventData = {
+    toolCallId: event.toolCallId,
+    toolName: event.toolName,
+    taskId: task.id,
+    contextId: task.contextId,
+  };
+  return writer.emit({
+    type: AGENT_EVENT_TYPE.TOOL_COMPLETED satisfies AgentEventType,
+    data,
+    subject: task.id,
+    ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
+  });
+}
+
+function emitToolFailedEvent(
+  writer: SSEStreamWriter,
+  task: ManagedTask,
+  event: {
+    readonly toolCallId: string;
+    readonly toolName: string;
+    readonly error: string;
+  },
+  emitOptions: EmitOptions
+): CloudEvent<AgentToolFailedEventData> | undefined {
+  const data: AgentToolFailedEventData = {
+    toolCallId: event.toolCallId,
+    toolName: event.toolName,
+    taskId: task.id,
+    contextId: task.contextId,
+    error: event.error,
+  };
+  return writer.emit({
+    type: AGENT_EVENT_TYPE.TOOL_FAILED satisfies AgentEventType,
+    data,
+    subject: task.id,
+    ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
+  });
+}
+
+function emitToolResultEvent(
+  writer: SSEStreamWriter,
+  task: ManagedTask,
+  event: {
+    readonly toolCallId: string;
+    readonly toolName: string;
+    readonly result: string;
+    readonly isError: boolean;
+  },
+  emitOptions: EmitOptions
+): CloudEvent<AgentToolResultEventData> | undefined {
+  const data: AgentToolResultEventData = {
+    toolCallId: event.toolCallId,
+    toolName: event.toolName,
+    taskId: task.id,
+    contextId: task.contextId,
+    result: event.result,
+    isError: event.isError,
+  };
+  return writer.emit({
+    type: AGENT_EVENT_TYPE.TOOL_RESULT satisfies AgentEventType,
+    data,
     subject: task.id,
     ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
   });

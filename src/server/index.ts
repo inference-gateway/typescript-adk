@@ -61,6 +61,10 @@ export {
 } from './cloudevents.js';
 export type {
   AgentEventType,
+  AgentIterationCompletedEventData,
+  AgentToolEventData,
+  AgentToolFailedEventData,
+  AgentToolResultEventData,
   CloudEvent,
   CloudEventExtensionValue,
   CreateCloudEventInput,
@@ -108,3 +112,5 @@ export type {
   ToolDefinition,
   ToolExecutionContext,
 } from './default-background-task-handler.js';
+export { DefaultStreamingTaskHandler } from './default-streaming-task-handler.js';
+export type { DefaultStreamingTaskHandlerOptions } from './default-streaming-task-handler.js';
