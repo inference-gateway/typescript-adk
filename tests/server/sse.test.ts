@@ -317,8 +317,6 @@ describe('SSEStreamWriter comments and heartbeats', () => {
     expect(first).toBe(': heartbeat\n\n');
 
     writer.close();
-    // Advancing past several intervals must not produce more frames; the
-    // reader should signal completion.
     await vi.advanceTimersByTimeAsync(1_000);
     const next = await nextChunk(reader);
     expect(next).toBeNull();
