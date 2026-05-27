@@ -228,7 +228,6 @@ export class SSEStreamWriter {
     try {
       this.controller.enqueue(textEncoder.encode(frame));
     } catch {
-      // The controller has been torn down by the runtime; treat as a close.
       this.isClosed = true;
       this.cleanup();
       this.controller = null;
@@ -242,7 +241,6 @@ export class SSEStreamWriter {
     this.heartbeatTimer = setInterval(() => {
       this.writeFrame(`: ${this.heartbeatComment}\n\n`);
     }, this.heartbeatMs);
-    // Don't keep the Node event loop alive solely for heartbeats.
     const timer = this.heartbeatTimer as { unref?: () => void };
     if (typeof timer.unref === 'function') {
       timer.unref();
@@ -254,8 +252,6 @@ export class SSEStreamWriter {
       return;
     }
     if (this.signal.aborted) {
-      // Close on the next microtask so that a constructor caller can still
-      // attach a listener to `readable` before the close happens.
       queueMicrotask(() => this.close());
       return;
     }

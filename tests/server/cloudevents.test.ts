@@ -10,8 +10,6 @@ import {
 
 describe('AGENT_EVENT_TYPE constants', () => {
   it('matches the Go ADK adk.agent.* event-type set verbatim', () => {
-    // Asserted as a literal object so a rename of any constant is a test
-    // regression rather than a silent break of cross-language consumers.
     expect(AGENT_EVENT_TYPE).toEqual({
       DELTA: 'adk.agent.delta',
       ITERATION_COMPLETED: 'adk.agent.iteration.completed',
@@ -107,7 +105,6 @@ describe('createCloudEvent', () => {
     const parsed = JSON.parse(JSON.stringify(event)) as Record<string, unknown>;
     expect(parsed['iteration']).toBe(2);
     expect(parsed['taskid']).toBe('task-1');
-    // The standard attributes should still be present alongside extensions.
     expect(parsed['specversion']).toBe('1.0');
     expect(parsed['type']).toBe('adk.agent.iteration.completed');
   });

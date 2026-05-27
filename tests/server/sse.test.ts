@@ -302,7 +302,6 @@ describe('SSEStreamWriter comments and heartbeats', () => {
     const reader = writer.readable.getReader();
 
     await vi.advanceTimersByTimeAsync(1_000_000);
-    // No heartbeat should arrive; close so the read completes promptly.
     writer.close();
     const next = await nextChunk(reader);
     expect(next).toBeNull();
@@ -358,7 +357,6 @@ describe('SSEStreamWriter cancellation', () => {
     });
 
     controller.abort();
-    // Allow the close to propagate.
     await new Promise<void>((resolve) => setImmediate(resolve));
 
     expect(writer.closed).toBe(true);
@@ -415,7 +413,6 @@ describe('SSEStreamWriter cancellation', () => {
     await writer.readable.cancel();
 
     expect(writer.closed).toBe(true);
-    // Subsequent emits should not throw.
     expect(() =>
       writer.emit({
         type: AGENT_EVENT_TYPE.DELTA,
