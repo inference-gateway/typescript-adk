@@ -173,6 +173,9 @@ console.log(task);
 Complete, runnable examples live under [`examples/`](./examples/):
 
 - **[`examples/minimal/`](./examples/minimal/)** - A2A server + client with no LLM. Demonstrates the full task lifecycle, a graceful echo worker with dead-lettering, and `A2AClient` polling. Mirrors the Go ADK's [`examples/minimal/`](https://github.com/inference-gateway/adk/tree/main/examples/minimal).
+- **[`examples/streaming/`](./examples/streaming/)** - A2A server + client over SSE. Boots a server with `capabilities.streaming = true`, registers a custom `message/stream` executor that emits word-by-word `delta` events, and consumes the SSE frames from a plain `fetch`-based client. Mirrors the Go ADK's [`examples/streaming/`](https://github.com/inference-gateway/adk/tree/main/examples/streaming).
+- **[`examples/input-required/`](./examples/input-required/)** - Pause + client-driven resume. The server pauses a task to ask for a missing piece of information (`INPUT_REQUIRED`), and the client detects the pause, sends a follow-up on the same `contextId`, and polls until completion. Mirrors the Go ADK's [`examples/input-required/`](https://github.com/inference-gateway/adk/tree/main/examples/input-required).
+- **[`examples/ai-powered/`](./examples/ai-powered/)** - LLM-backed A2A agent with weather and time tools. Wires `AgentBuilder` + `OpenAICompatibleLLMClient` into `DefaultBackgroundTaskHandler`, dispatches tool calls in a chat-completion loop, and answers natural-language prompts through any OpenAI-compatible provider routed via the Inference Gateway. Mirrors the Go ADK's [`examples/ai-powered/`](https://github.com/inference-gateway/adk/tree/main/examples/ai-powered).
 
 Each example ships its own README with setup instructions.
 
