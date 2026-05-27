@@ -2,7 +2,7 @@
   "name": "@inference-gateway/adk-example-ai-powered-streaming",
   "version": "0.0.0",
   "private": true,
-  "description": "AI-powered streaming A2A server + client example for @inference-gateway/adk — LLM-backed agent streaming deltas over SSE.",
+  "description": "AI-powered streaming A2A server + client example for @inference-gateway/adk - LLM-backed agent streaming deltas over SSE.",
   "type": "module",
   "scripts": {
     "start": "tsx server.ts",

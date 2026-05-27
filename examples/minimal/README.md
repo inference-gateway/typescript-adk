@@ -9,7 +9,7 @@ Mirrors the Go ADK's [`examples/minimal/`](https://github.com/inference-gateway/
 - Boot an `A2AServer` with a hand-written `AgentCard`.
 - Register the `message/send` and `tasks/get` JSON-RPC handlers backed by `InMemoryTaskStorage`.
 - Run a background worker that dequeues each new task and walks it through `PENDING → IN_PROGRESS → COMPLETED`, attaching an `Echo: <input>` response message.
-- Drive it all with `A2AClient` from the same package — no third-party HTTP code, no LLM.
+- Drive it all with `A2AClient` from the same package - no third-party HTTP code, no LLM.
 
 ## Layout
 
@@ -74,7 +74,7 @@ minimal-agent listening on http://127.0.0.1:8080
   rpc:    POST http://127.0.0.1:8080/
 ```
 
-Client (abbreviated — UUIDs and timestamps will differ):
+Client (abbreviated - UUIDs and timestamps will differ):
 
 ```text
 POST http://127.0.0.1:8080/  message/send  "Hello, this is a test message. Please respond with a greeting."

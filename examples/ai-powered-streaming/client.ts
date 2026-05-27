@@ -70,7 +70,7 @@ for await (const event of readSSEEvents(response.body)) {
     case AGENT_EVENT_TYPE.TASK_STATUS_CHANGED: {
       const data = event.data as TaskStatusUpdateEvent;
       if (data.status.state === TASK_STATE.IN_PROGRESS && data.final !== true) {
-        // First IN_PROGRESS frame opens the stream — re-emitted periodically as
+        // First IN_PROGRESS frame opens the stream - re-emitted periodically as
         // a keep-alive. Only log the first one to keep output readable.
         if (finalStatus === null && deltaCount === 0) {
           console.log(

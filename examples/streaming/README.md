@@ -9,7 +9,7 @@ Mirrors the Go ADK's [`examples/streaming/`](https://github.com/inference-gatewa
 - Boot an `A2AServer` with `capabilities.streaming = true` in its `AgentCard`.
 - Register the `message/stream` JSON-RPC method via `createMessageStreamHandler`.
 - Provide a `StreamingTaskExecutor` (an `async function*`) that yields `delta` events for each word and a final `statusChanged` event carrying the full assembled message.
-- Drive it all from a plain `fetch`-based client that decodes the SSE frames and CloudEvents v1.0 envelopes inline — no third-party HTTP code, no LLM. Deltas are pure mock output, simulated with a small sleep between words.
+- Drive it all from a plain `fetch`-based client that decodes the SSE frames and CloudEvents v1.0 envelopes inline - no third-party HTTP code, no LLM. Deltas are pure mock output, simulated with a small sleep between words.
 
 ## Layout
 
@@ -75,7 +75,7 @@ streaming-agent listening on http://127.0.0.1:8080
   rpc:    POST http://127.0.0.1:8080/  method=message/stream
 ```
 
-Client (abbreviated — UUIDs and timestamps will differ, and the response text streams in word-by-word):
+Client (abbreviated - UUIDs and timestamps will differ, and the response text streams in word-by-word):
 
 ```text
 POST http://127.0.0.1:8080/  message/stream  "Please write a short paragraph and stream it to me word by word."
@@ -119,7 +119,7 @@ final status: {
 5. If the request is cancelled (client disconnect, server shutdown), the executor's `signal` aborts, the task transitions to `CANCELLED`, and a final status frame is emitted before the stream closes.
 6. Any error thrown by the executor transitions the task to `FAILED` and embeds the error message in the final status frame.
 
-In this example the executor (`mockStreamingExecutor` in `server.ts`) walks a hard-coded array of words. For each word it builds a `delta` message whose only `part` is the new token (with a leading space for every word after the first) and yields it. Between words it sleeps for `DELTA_DELAY_MS`, observing `context.signal` so cancellation unwinds promptly. After the last word, it explicitly yields a `statusChanged` event with `state: COMPLETED` and the full assembled text as the final assistant message — this makes the final `status.message` on the stored task non-empty, which matches what an LLM-backed executor would produce.
+In this example the executor (`mockStreamingExecutor` in `server.ts`) walks a hard-coded array of words. For each word it builds a `delta` message whose only `part` is the new token (with a leading space for every word after the first) and yields it. Between words it sleeps for `DELTA_DELAY_MS`, observing `context.signal` so cancellation unwinds promptly. After the last word, it explicitly yields a `statusChanged` event with `state: COMPLETED` and the full assembled text as the final assistant message - this makes the final `status.message` on the stored task non-empty, which matches what an LLM-backed executor would produce.
 
 ## How the client reads the stream
 

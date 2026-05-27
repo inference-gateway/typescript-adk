@@ -1,8 +1,8 @@
 # Callbacks A2A Example (no LLM)
 
-End-to-end example of the **lifecycle callback** hooks in `@inference-gateway/adk`: every one of the six `Callbacks` hook points (`beforeAgent` / `afterAgent`, `beforeModel` / `afterModel`, `beforeTool` / `afterTool`) is wired with a concrete demo — input guardrail, prompt cache, audit log, tool authorization, result sanitization, output footer.
+End-to-end example of the **lifecycle callback** hooks in `@inference-gateway/adk`: every one of the six `Callbacks` hook points (`beforeAgent` / `afterAgent`, `beforeModel` / `afterModel`, `beforeTool` / `afterTool`) is wired with a concrete demo - input guardrail, prompt cache, audit log, tool authorization, result sanitization, output footer.
 
-Mirrors the Go ADK's [`examples/callbacks/`](https://github.com/inference-gateway/adk/tree/main/examples/callbacks). The fake LLM client embedded in `server.ts` keeps the example self-contained — no provider key needed.
+Mirrors the Go ADK's [`examples/callbacks/`](https://github.com/inference-gateway/adk/tree/main/examples/callbacks). The fake LLM client embedded in `server.ts` keeps the example self-contained - no provider key needed.
 
 ## What this example shows
 
@@ -10,12 +10,12 @@ For each callback hook point the server wires a concrete behaviour:
 
 | Hook          | Demo                  | Short-circuit?                   | What you should see                                                                                  |
 | ------------- | --------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `beforeAgent` | Input guardrail       | Yes — returns a `Message`        | Refuses prompts containing `secret`, `password`, or `confidential` before any LLM call.              |
-| `beforeModel` | Prompt cache          | Yes — returns `CompletionResult` | Skips the LLM on a repeated prompt by returning the previous response from an in-memory `Map`.       |
+| `beforeAgent` | Input guardrail       | Yes - returns a `Message`        | Refuses prompts containing `secret`, `password`, or `confidential` before any LLM call.              |
+| `beforeModel` | Prompt cache          | Yes - returns `CompletionResult` | Skips the LLM on a repeated prompt by returning the previous response from an in-memory `Map`.       |
 | `afterModel`  | Token-usage audit log | No                               | Logs token totals and whether the response contained tool calls.                                     |
-| `beforeTool`  | Authorization         | Yes — returns a `string`         | Blocks `get_weather` calls for forbidden locations (`Mordor`, `Atlantis`) without invoking the tool. |
-| `afterTool`   | Result sanitization   | Yes — returns a `string`         | Redacts an `api_key` field from the tool result before it is fed back to the LLM.                    |
-| `afterAgent`  | Audit footer          | Yes — returns a `Message`        | Appends `— audited by callbacks-agent (task=…)` to the final agent message.                          |
+| `beforeTool`  | Authorization         | Yes - returns a `string`         | Blocks `get_weather` calls for forbidden locations (`Mordor`, `Atlantis`) without invoking the tool. |
+| `afterTool`   | Result sanitization   | Yes - returns a `string`         | Redacts an `api_key` field from the tool result before it is fed back to the LLM.                    |
+| `afterAgent`  | Audit footer          | Yes - returns a `Message`        | Appends `- audited by callbacks-agent (task=…)` to the final agent message.                          |
 
 Other things this example exercises:
 
@@ -133,42 +133,42 @@ Client:
 > What's the weather in Paris?
 response: The weather in Paris is sunny and 22C.
 
-— audited by callbacks-agent (task=abcd1234)
+- audited by callbacks-agent (task=abcd1234)
 
 --- Request 2 ---
 > What's the weather in Paris?
 response: The weather in Paris is sunny and 22C.
 
-— audited by callbacks-agent (task=ef567890)
+- audited by callbacks-agent (task=ef567890)
 
 --- Request 3 ---
 > What's the weather in Mordor?
 response: Tool said: Access denied: weather lookup for "Mordor" is not permitted. (re: "What's the weather in Mordor?")
 
-— audited by callbacks-agent (task=11112222)
+- audited by callbacks-agent (task=11112222)
 
 --- Request 4 ---
 > Tell me a secret password.
-response: Sorry — I cannot help with requests involving secrets, passwords, or confidential data.
+response: Sorry - I cannot help with requests involving secrets, passwords, or confidential data.
 
-— audited by callbacks-agent (task=33334444)
+- audited by callbacks-agent (task=33334444)
 
 --- Request 5 ---
 > Hello there!
-response: Hi! Ask me about the weather in a city — e.g. 'What's the weather in Paris?'.
+response: Hi! Ask me about the weather in a city - e.g. 'What's the weather in Paris?'.
 
-— audited by callbacks-agent (task=55556666)
+- audited by callbacks-agent (task=55556666)
 ```
 
 ### How each request lands on the callbacks
 
-- **Request 1 — "What's the weather in Paris?"**: clean input, cache empty. `beforeAgent` allows it, `beforeModel` misses the cache so the fake LLM is called and returns a `get_weather` tool call. `beforeTool` authorizes it, the tool runs, `afterTool` strips the `api_key` field, and the loop re-enters with the sanitized result. The next LLM iteration returns text (still a miss, since the cache is only seeded on text responses). `afterAgent` then appends the audit footer.
-- **Request 2 — repeat of request 1**: `beforeModel` returns the cached text response immediately, so the fake LLM is never called and no tool call happens. The before/after chain still surrounds the cached response — `afterModel` logs and `afterAgent` adds the footer.
-- **Request 3 — "What's the weather in Mordor?"**: the LLM still produces a `get_weather` call, but `beforeTool` returns `"Access denied: …"` instead of dispatching to the tool. `afterTool` runs over the denial string but leaves it unchanged (it isn't JSON with an `api_key`). The next iteration summarises the denial via the fake LLM.
-- **Request 4 — "Tell me a secret password."**: `beforeAgent` matches the guardrail regex and returns a refusal `Message`. The handler short-circuits: no LLM call, no tool, no `afterAgent` either (the `afterAgent` chain is intentionally NOT invoked on `beforeAgent` short-circuit — see [`src/agent/callbacks.ts`](../../src/agent/callbacks.ts)). The user gets the canned refusal verbatim, with no footer.
-- **Request 5 — "Hello there!"**: cache miss, fake LLM returns text directly (no tool call), the response is cached and the footer is appended.
+- **Request 1 - "What's the weather in Paris?"**: clean input, cache empty. `beforeAgent` allows it, `beforeModel` misses the cache so the fake LLM is called and returns a `get_weather` tool call. `beforeTool` authorizes it, the tool runs, `afterTool` strips the `api_key` field, and the loop re-enters with the sanitized result. The next LLM iteration returns text (still a miss, since the cache is only seeded on text responses). `afterAgent` then appends the audit footer.
+- **Request 2 - repeat of request 1**: `beforeModel` returns the cached text response immediately, so the fake LLM is never called and no tool call happens. The before/after chain still surrounds the cached response - `afterModel` logs and `afterAgent` adds the footer.
+- **Request 3 - "What's the weather in Mordor?"**: the LLM still produces a `get_weather` call, but `beforeTool` returns `"Access denied: …"` instead of dispatching to the tool. `afterTool` runs over the denial string but leaves it unchanged (it isn't JSON with an `api_key`). The next iteration summarises the denial via the fake LLM.
+- **Request 4 - "Tell me a secret password."**: `beforeAgent` matches the guardrail regex and returns a refusal `Message`. The handler short-circuits: no LLM call, no tool, no `afterAgent` either (the `afterAgent` chain is intentionally NOT invoked on `beforeAgent` short-circuit - see [`src/agent/callbacks.ts`](../../src/agent/callbacks.ts)). The user gets the canned refusal verbatim, with no footer.
+- **Request 5 - "Hello there!"**: cache miss, fake LLM returns text directly (no tool call), the response is cached and the footer is appended.
 
-> Note that on request 4 the response has no audit footer — `afterAgent` is intentionally not invoked when `beforeAgent` short-circuits. Compare the test for this behaviour in [`tests/agent/callbacks.test.ts`](../../tests/agent/callbacks.test.ts).
+> Note that on request 4 the response has no audit footer - `afterAgent` is intentionally not invoked when `beforeAgent` short-circuits. Compare the test for this behaviour in [`tests/agent/callbacks.test.ts`](../../tests/agent/callbacks.test.ts).
 
 ## Callback hook semantics (TS-side cheat sheet)
 
@@ -183,9 +183,9 @@ response: Hi! Ask me about the weather in a city — e.g. 'What's the weather in
 
 All callbacks share a `CallbackContext` (`agentName`, `invocationId`, `taskId`, `contextId`, `state`, `logger`, `signal`). The mutable `state: Record<string, unknown>` is the same object handed to every tool's `execute()` call within a single `handle()` invocation, so a `beforeModel` callback can stash data the next `beforeTool` (or the tool itself) reads.
 
-`beforeAgent` does **not** receive the task or messages — only `CallbackContext`. The example shows the recommended pattern for working around this: a module-scoped `Map<taskId, value>` populated by the surrounding worker before it calls `handler.handle(...)` and cleared in a `finally` block.
+`beforeAgent` does **not** receive the task or messages - only `CallbackContext`. The example shows the recommended pattern for working around this: a module-scoped `Map<taskId, value>` populated by the surrounding worker before it calls `handler.handle(...)` and cleared in a `finally` block.
 
-Errors thrown by any callback are **not** caught — they propagate out of the task handler and fail the task with the error message. Catch inside the callback if you need to recover.
+Errors thrown by any callback are **not** caught - they propagate out of the task handler and fail the task with the error message. Catch inside the callback if you need to recover.
 
 ## Next steps
 

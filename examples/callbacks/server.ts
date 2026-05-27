@@ -102,7 +102,7 @@ toolBox.addTool(
   })
 );
 
-// 1. beforeAgent — guardrail: refuse inputs containing forbidden keywords and
+// 1. beforeAgent - guardrail: refuse inputs containing forbidden keywords and
 //    return a canned `Message` so the surrounding handler short-circuits the
 //    entire LLM loop and the after-agent chain.
 const guardrailBeforeAgent: BeforeAgentCallback = (context) => {
@@ -119,7 +119,7 @@ const guardrailBeforeAgent: BeforeAgentCallback = (context) => {
       taskId: context.taskId,
       parts: [
         {
-          text: 'Sorry — I cannot help with requests involving secrets, passwords, or confidential data.',
+          text: 'Sorry - I cannot help with requests involving secrets, passwords, or confidential data.',
         },
       ],
     };
@@ -128,7 +128,7 @@ const guardrailBeforeAgent: BeforeAgentCallback = (context) => {
   return undefined;
 };
 
-// 2. beforeModel — cache: serve a known prompt straight from memory and skip
+// 2. beforeModel - cache: serve a known prompt straight from memory and skip
 //    the LLM call entirely.
 const cacheBeforeModel: BeforeModelCallback = (_context, request) => {
   const key = cacheKey(request.messages);
@@ -141,7 +141,7 @@ const cacheBeforeModel: BeforeModelCallback = (_context, request) => {
   return undefined;
 };
 
-// 3. afterModel — audit log: log token usage and shape of the response.
+// 3. afterModel - audit log: log token usage and shape of the response.
 const auditAfterModel: AfterModelCallback = (_context, response) => {
   const usage = response.usage;
   const usageText =
@@ -155,7 +155,7 @@ const auditAfterModel: AfterModelCallback = (_context, response) => {
   return undefined;
 };
 
-// 4. beforeTool — authorization: short-circuit blocked locations without
+// 4. beforeTool - authorization: short-circuit blocked locations without
 //    invoking the underlying tool. The returned string is fed back to the LLM
 //    as the tool result.
 const authorizationBeforeTool: BeforeToolCallback = (context, toolCall) => {
@@ -172,7 +172,7 @@ const authorizationBeforeTool: BeforeToolCallback = (context, toolCall) => {
   return undefined;
 };
 
-// 5. afterTool — sanitization: redact a sensitive field from the tool result
+// 5. afterTool - sanitization: redact a sensitive field from the tool result
 //    before it is fed back to the LLM.
 const sanitizationAfterTool: AfterToolCallback = (
   _context,
@@ -197,11 +197,11 @@ const sanitizationAfterTool: AfterToolCallback = (
   return undefined;
 };
 
-// 6. afterAgent — audit footer: append a trailing line to the final agent
+// 6. afterAgent - audit footer: append a trailing line to the final agent
 //    message so callers can see the after-agent chain replaced the output.
 const footerAfterAgent: AfterAgentCallback = (context, output) => {
   const original = extractText(output);
-  const footer = `\n\n— audited by ${AGENT_NAME} (task=${context.taskId.slice(0, 8)})`;
+  const footer = `\n\n- audited by ${AGENT_NAME} (task=${context.taskId.slice(0, 8)})`;
   console.log('[audit] appending footer to agent output');
   return {
     messageId: crypto.randomUUID(),
@@ -353,7 +353,7 @@ function createFakeLLMClient(cache: Map<string, CompletionResult>): LLMClient {
       const toolResult = lastToolText(opts.messages);
 
       // If a tool result is already in the conversation, this is the
-      // second-pass call — produce the final text reply.
+      // second-pass call - produce the final text reply.
       if (toolResult !== undefined) {
         const text = summarizeWeather(toolResult, userText);
         const result: CompletionResult = {
@@ -385,7 +385,7 @@ function createFakeLLMClient(cache: Map<string, CompletionResult>): LLMClient {
       const result: CompletionResult = {
         message: {
           content:
-            "Hi! Ask me about the weather in a city — e.g. 'What's the weather in Paris?'.",
+            "Hi! Ask me about the weather in a city - e.g. 'What's the weather in Paris?'.",
         },
         usage: { promptTokens: 20, completionTokens: 24, totalTokens: 44 },
       };

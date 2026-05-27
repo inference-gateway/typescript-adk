@@ -30,13 +30,13 @@ export const MAX_TASK_LIST_LIMIT = 100;
  * JSON-RPC params accepted by the A2A `tasks/list` method.
  *
  * Mirrors the Go ADK's `types.TaskListParams` in spirit but swaps offset+limit
- * for keyset pagination — `cursor` is the opaque continuation token returned
+ * for keyset pagination - `cursor` is the opaque continuation token returned
  * as `nextCursor` on the previous page. Stable under inserts/deletes because
  * the cursor encodes the `(createdAt, id)` of the last item on the previous
  * page; subsequent pages start at the first task strictly after that point.
  *
  * Field names are deliberately simpler than the A2A wire schema
- * (`ListTasksRequest`) — `limit`/`cursor` rather than `pageSize`/`pageToken` —
+ * (`ListTasksRequest`) - `limit`/`cursor` rather than `pageSize`/`pageToken` -
  * to match the issue's stated API shape and stay terse for callers.
  */
 export interface TaskListParams {
@@ -51,7 +51,7 @@ export interface TaskListParams {
   readonly limit?: number;
   /**
    * Opaque continuation token from the `nextCursor` field of a previous
-   * response. Treat it as a black box on the client side — the encoding is an
+   * response. Treat it as a black box on the client side - the encoding is an
    * implementation detail and may change.
    */
   readonly cursor?: string;
@@ -130,7 +130,7 @@ export function createTaskListHandler(
         : defaultLimit;
 
     // `state` from A2A `TaskState` is a superset of `ManagedTaskState`. Pass
-    // it through verbatim — non-managed values just yield zero matches against
+    // it through verbatim - non-managed values just yield zero matches against
     // tasks created by this server, which is the right behaviour.
     const filter = {
       ...(validated.contextId !== undefined

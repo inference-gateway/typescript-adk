@@ -276,7 +276,7 @@ describe('createTaskListHandler', () => {
       const page1 = handler({ limit: 2 }, ctx) as TaskListResult;
       expect(page1.tasks.map((t) => t.id)).toEqual(['t-001', 't-002']);
 
-      // Insert a new task whose createdAt is AFTER the cursor — should show
+      // Insert a new task whose createdAt is AFTER the cursor - should show
       // up on the next page since (createdAt, id) > cursor.
       makeTask(storage, 99, { id: 't-099' });
 

@@ -17,7 +17,7 @@ interface DequeueWaiter {
  *
  * Concurrency model: JavaScript is single-threaded, so operations that don't
  * `await` are already atomic. The only awaiting operation is {@link dequeue},
- * which uses a FIFO waiter list rather than a lock — handoffs from `enqueue`
+ * which uses a FIFO waiter list rather than a lock - handoffs from `enqueue`
  * to the oldest waiting `dequeue` are O(1) and preserve queue ordering.
  *
  * Memory model: tasks are stored by reference. `ManagedTask` is fully

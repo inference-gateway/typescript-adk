@@ -2,7 +2,7 @@
   "name": "@inference-gateway/adk-example-minimal",
   "version": "0.0.0",
   "private": true,
-  "description": "Minimal A2A server + client example for @inference-gateway/adk — no LLM, just echo.",
+  "description": "Minimal A2A server + client example for @inference-gateway/adk - no LLM, just echo.",
   "type": "module",
   "scripts": {
     "start": "tsx server.ts",

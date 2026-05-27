@@ -27,7 +27,7 @@ export const MESSAGE_SEND_METHOD = 'message/send';
  * JSON-RPC params accepted by the A2A `message/send` method.
  *
  * Mirrors `types.MessageSendParams` in the Go ADK (see
- * https://github.com/inference-gateway/adk/blob/main/types/types.go) — the
+ * https://github.com/inference-gateway/adk/blob/main/types/types.go) - the
  * generated A2A schema models the HTTP-level `SendMessageRequest` envelope,
  * which is a different shape from the JSON-RPC `params` payload.
  */

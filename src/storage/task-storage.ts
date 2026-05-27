@@ -33,15 +33,15 @@ export interface TaskStorageStats {
  * Queue-centric task storage contract.
  *
  * Tasks flow through three locations:
- *   1. **Queue** — enqueued, waiting to be dequeued by a worker.
- *   2. **Active** — enqueued or in-flight (after `dequeue`, before terminal).
- *   3. **Dead letter** — terminal tasks (`COMPLETED`/`FAILED`/`CANCELLED`)
+ *   1. **Queue** - enqueued, waiting to be dequeued by a worker.
+ *   2. **Active** - enqueued or in-flight (after `dequeue`, before terminal).
+ *   3. **Dead letter** - terminal tasks (`COMPLETED`/`FAILED`/`CANCELLED`)
  *      kept for audit and lookup.
  *
  * An enqueued task lives in both the queue and the active map; once dequeued
  * it stays in active until `storeDeadLetter` moves it to the dead-letter map.
  *
- * Returned `ManagedTask` values are live references — implementations do not
+ * Returned `ManagedTask` values are live references - implementations do not
  * deep-clone on read. Because `ManagedTask` is fully `readonly`, callers
  * cannot mutate; state changes must be produced via `transitionTask` and
  * persisted with {@link TaskStorage.updateActive}.
@@ -57,7 +57,7 @@ export interface TaskStorage {
   /**
    * Remove and return the head of the FIFO queue. If the queue is empty, the
    * returned promise resolves when the next task is enqueued. Pass `signal`
-   * to abort the wait — the promise then rejects with `signal.reason`.
+   * to abort the wait - the promise then rejects with `signal.reason`.
    *
    * The dequeued task stays in active storage; the worker is expected to
    * eventually call {@link TaskStorage.storeDeadLetter} to release it.
@@ -117,7 +117,7 @@ export interface TaskStorage {
    * Return tasks matching `filter`, FIFO-ordered by `createdAt` and sliced
    * by `offset`/`limit`. Includes both active and dead-letter tasks.
    *
-   * The result is a fresh array — callers can sort or slice it further
+   * The result is a fresh array - callers can sort or slice it further
    * without affecting storage state.
    */
   listTasks(filter?: TaskListFilter): ManagedTask[];
@@ -129,7 +129,7 @@ export interface TaskStorage {
   getContexts(): string[];
 
   /**
-   * Cascade-delete every task in `contextId` — from the queue, from active
+   * Cascade-delete every task in `contextId` - from the queue, from active
    * storage, and from the dead-letter store. No-op if `contextId` is unknown.
    *
    * Returns the number of tasks deleted.

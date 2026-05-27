@@ -55,7 +55,7 @@ const card: AgentCard = {
       id: 'weather',
       name: 'Weather lookup',
       description:
-        'Reports current weather for a named location. Returns canned data — no real weather service is contacted.',
+        'Reports current weather for a named location. Returns canned data - no real weather service is contacted.',
       tags: ['weather', 'demo'],
     },
     {

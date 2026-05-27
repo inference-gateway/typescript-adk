@@ -2,7 +2,7 @@
   "name": "@inference-gateway/adk-example-streaming",
   "version": "0.0.0",
   "private": true,
-  "description": "Streaming A2A server + client example for @inference-gateway/adk — no LLM, simulated word-by-word deltas.",
+  "description": "Streaming A2A server + client example for @inference-gateway/adk - no LLM, simulated word-by-word deltas.",
   "type": "module",
   "scripts": {
     "start": "tsx server.ts",

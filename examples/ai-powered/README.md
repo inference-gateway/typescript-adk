@@ -9,7 +9,7 @@ Mirrors the Go ADK's [`examples/ai-powered/`](https://github.com/inference-gatew
 - Build an `OpenAICompatibleAgent` with `AgentBuilder` (provider/model/system prompt) backed by `OpenAICompatibleLLMClient`.
 - Register a `DefaultToolBox` with two `createTool(...)` definitions (`get_weather`, `get_current_time`). The reserved `input_required` tool is registered automatically.
 - Drive the chat-completion loop with `DefaultBackgroundTaskHandler`, which iterates LLM calls, dispatches tool calls, accumulates token usage, and terminates the task in `COMPLETED` / `FAILED` / `INPUT_REQUIRED`.
-- Plug a tiny adapter between `OpenAICompatibleLLMClient.chatCompletion` (wire-shaped, snake_case) and `DefaultBackgroundTaskHandler`'s structural `LLMClient.createCompletion` (camelCase). The TS ADK does not yet ship this bridge built-in — the Go ADK plumbs it internally via `OpenAICompatibleAgent.RunWithStream`.
+- Plug a tiny adapter between `OpenAICompatibleLLMClient.chatCompletion` (wire-shaped, snake_case) and `DefaultBackgroundTaskHandler`'s structural `LLMClient.createCompletion` (camelCase). The TS ADK does not yet ship this bridge built-in - the Go ADK plumbs it internally via `OpenAICompatibleAgent.RunWithStream`.
 - Run a small background worker (mirrors the other examples) that dequeues each `message/send`-created task and hands it to the handler.
 
 ## Layout
@@ -68,11 +68,11 @@ Server (`server.ts`):
 
 | Env var                          | Required | Default                                                                                            | Description                                                                                                                            |
 | -------------------------------- | -------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `A2A_AGENT_CLIENT_PROVIDER`      | yes      | —                                                                                                  | LLM provider id understood by the Inference Gateway / OpenAI-compatible endpoint (e.g. `openai`, `anthropic`, `groq`, `ollama`).       |
-| `A2A_AGENT_CLIENT_MODEL`         | yes      | —                                                                                                  | Model identifier (e.g. `gpt-4o-mini`, `claude-3-5-sonnet-latest`).                                                                     |
+| `A2A_AGENT_CLIENT_PROVIDER`      | yes      | -                                                                                                  | LLM provider id understood by the Inference Gateway / OpenAI-compatible endpoint (e.g. `openai`, `anthropic`, `groq`, `ollama`).       |
+| `A2A_AGENT_CLIENT_MODEL`         | yes      | -                                                                                                  | Model identifier (e.g. `gpt-4o-mini`, `claude-3-5-sonnet-latest`).                                                                     |
 | `A2A_AGENT_CLIENT_BASE_URL`      | no       | SDK default (`http://localhost:8080/v1`)                                                           | Base URL of the OpenAI-compatible endpoint. Set to your Inference Gateway, Ollama (`http://localhost:11434/v1`), or any other gateway. |
 | `A2A_AGENT_CLIENT_API_KEY`       | no       | `${PROVIDER}_API_KEY` lookup (e.g. `OPENAI_API_KEY`)                                               | Explicit API key. Overrides the per-provider lookup.                                                                                   |
-| `OPENAI_API_KEY` (and peers)     | no       | —                                                                                                  | Per-provider keys. Used when `A2A_AGENT_CLIENT_API_KEY` is unset and the corresponding provider is selected.                           |
+| `OPENAI_API_KEY` (and peers)     | no       | -                                                                                                  | Per-provider keys. Used when `A2A_AGENT_CLIENT_API_KEY` is unset and the corresponding provider is selected.                           |
 | `A2A_AGENT_NAME`                 | no       | `ai-powered-agent`                                                                                 | Agent card `name`.                                                                                                                     |
 | `A2A_AGENT_DESCRIPTION`          | no       | `An LLM-backed A2A agent with weather and time tools.`                                             | Agent card `description`.                                                                                                              |
 | `A2A_AGENT_VERSION`              | no       | `0.0.0`                                                                                            | Agent card `version`.                                                                                                                  |
@@ -131,26 +131,26 @@ task <task-id> completed.
 response: It is currently 2026-05-27T17:42:11.123Z (UTC).
 ```
 
-The exact wording will vary by model. The first request exercises the `get_weather` tool, the second exercises `get_current_time`, and the third exercises both in a single conversation — proving the iteration loop dispatches multiple tool calls and feeds their results back to the model before producing the final answer.
+The exact wording will vary by model. The first request exercises the `get_weather` tool, the second exercises `get_current_time`, and the third exercises both in a single conversation - proving the iteration loop dispatches multiple tool calls and feeds their results back to the model before producing the final answer.
 
 ## How the pieces fit together
 
-1. `OpenAICompatibleLLMClient` — wraps `@inference-gateway/sdk`'s `InferenceGatewayClient`. Talks to any OpenAI-compatible endpoint via `chatCompletion(messages, opts)`. Configured with provider/model/baseURL/apiKey.
-2. `AgentBuilder` — fluent builder that bundles the LLM client + system prompt + sampling parameters into an `OpenAICompatibleAgentImpl`. The TS variant is currently a configuration container; the iteration loop lives in the handler (mirrors the Go ADK at present).
-3. `DefaultToolBox` — registry of tools the LLM can invoke. Auto-registers the reserved `input_required` tool so the model can pause for user input; the handler intercepts that call before dispatching.
-4. `DefaultBackgroundTaskHandler` — drives the chat-completion loop. Per iteration: build the conversation from `task.messages`, advertise the toolbox, call the LLM, dispatch any tool calls, feed results back. Terminates the task in `COMPLETED` (no tool calls), `INPUT_REQUIRED` (reserved tool called), or `FAILED` (iteration cap / error).
-5. **Adapter (`adaptLLMClient`)** — converts between the wire-shaped `chatCompletion` API and the structural `createCompletion` interface the handler depends on. Reusable as-is in your own code until the TS ADK ships the bridge built-in.
-6. **Worker loop** — `await storage.dequeue(signal)` blocks until a `message/send` enqueues a new task, then hands it to `handler.handle({ task, message, signal })`. Terminal tasks are dead-lettered so `tasks/get` can still serve them.
+1. `OpenAICompatibleLLMClient` - wraps `@inference-gateway/sdk`'s `InferenceGatewayClient`. Talks to any OpenAI-compatible endpoint via `chatCompletion(messages, opts)`. Configured with provider/model/baseURL/apiKey.
+2. `AgentBuilder` - fluent builder that bundles the LLM client + system prompt + sampling parameters into an `OpenAICompatibleAgentImpl`. The TS variant is currently a configuration container; the iteration loop lives in the handler (mirrors the Go ADK at present).
+3. `DefaultToolBox` - registry of tools the LLM can invoke. Auto-registers the reserved `input_required` tool so the model can pause for user input; the handler intercepts that call before dispatching.
+4. `DefaultBackgroundTaskHandler` - drives the chat-completion loop. Per iteration: build the conversation from `task.messages`, advertise the toolbox, call the LLM, dispatch any tool calls, feed results back. Terminates the task in `COMPLETED` (no tool calls), `INPUT_REQUIRED` (reserved tool called), or `FAILED` (iteration cap / error).
+5. **Adapter (`adaptLLMClient`)** - converts between the wire-shaped `chatCompletion` API and the structural `createCompletion` interface the handler depends on. Reusable as-is in your own code until the TS ADK ships the bridge built-in.
+6. **Worker loop** - `await storage.dequeue(signal)` blocks until a `message/send` enqueues a new task, then hands it to `handler.handle({ task, message, signal })`. Terminal tasks are dead-lettered so `tasks/get` can still serve them.
 
 ## Troubleshooting
 
-- **`missing required environment variable: A2A_AGENT_CLIENT_PROVIDER`** — set `A2A_AGENT_CLIENT_PROVIDER` and `A2A_AGENT_CLIENT_MODEL` in your environment (or source `.env`). The server refuses to boot without them.
-- **`LLMRequestError: llm request failed after 2 retries`** — the configured `baseURL`/`apiKey` is wrong, or the provider rejected the request. Check the gateway logs, the key spelling, and that the provider you selected actually serves the model id you asked for.
-- **Tasks stay in `TASK_STATE_WORKING` forever** — the worker died (check server stderr for `worker crashed:` log) or the LLM looped past the iteration cap. Lower `MAX_CHAT_COMPLETION_ITERATIONS` to see the failure surfaced as `TASK_STATE_FAILED` faster.
-- **Tool returns `Tool "x" is not available: no toolBox configured.`** — you instantiated `DefaultBackgroundTaskHandler` without passing `toolBox`. The handler accepts tool calls but refuses to dispatch them without a toolbox.
+- **`missing required environment variable: A2A_AGENT_CLIENT_PROVIDER`** - set `A2A_AGENT_CLIENT_PROVIDER` and `A2A_AGENT_CLIENT_MODEL` in your environment (or source `.env`). The server refuses to boot without them.
+- **`LLMRequestError: llm request failed after 2 retries`** - the configured `baseURL`/`apiKey` is wrong, or the provider rejected the request. Check the gateway logs, the key spelling, and that the provider you selected actually serves the model id you asked for.
+- **Tasks stay in `TASK_STATE_WORKING` forever** - the worker died (check server stderr for `worker crashed:` log) or the LLM looped past the iteration cap. Lower `MAX_CHAT_COMPLETION_ITERATIONS` to see the failure surfaced as `TASK_STATE_FAILED` faster.
+- **Tool returns `Tool "x" is not available: no toolBox configured.`** - you instantiated `DefaultBackgroundTaskHandler` without passing `toolBox`. The handler accepts tool calls but refuses to dispatch them without a toolbox.
 
 ## Next steps
 
 - Try [`examples/minimal/`](../minimal/) for the smallest end-to-end A2A loop with no LLM.
 - Try [`examples/streaming/`](../streaming/) for the SSE-based `message/stream` flow.
-- Try [`examples/input-required/`](../input-required/) for the pause / client-driven resume flow — the LLM-side version is what fires when the model calls the reserved `input_required` tool.
+- Try [`examples/input-required/`](../input-required/) for the pause / client-driven resume flow - the LLM-side version is what fires when the model calls the reserved `input_required` tool.

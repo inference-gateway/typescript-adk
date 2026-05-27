@@ -173,7 +173,7 @@ export class A2AServerBuilder<
   HasCard extends boolean = false,
   HasHandler extends boolean = false,
 > {
-  // Phantom field — declare-only so it doesn't exist at runtime. Forces the
+  // Phantom field - declare-only so it doesn't exist at runtime. Forces the
   // generic parameters to participate in structural compatibility checks,
   // without which `A2AServerBuilder<false, false>` and
   // `A2AServerBuilder<true, true>` collapse into the same type and the
