@@ -72,3 +72,18 @@ export {
   SSEStreamWriter,
 } from './sse.js';
 export type { SSEStreamOptions } from './sse.js';
+export {
+  A2AServerBuilder,
+  A2AServerBuilderError,
+  NOOP_LOGGER,
+} from './server-builder.js';
+export type {
+  A2AServerBuilderConfig,
+  ArtifactService,
+  BackgroundTaskContext,
+  BackgroundTaskHandler,
+  Logger,
+  OpenAICompatibleAgent,
+  StreamingTaskHandler,
+  TaskResultProcessor,
+} from './server-builder.js';
