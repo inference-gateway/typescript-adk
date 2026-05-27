@@ -18,5 +18,5 @@ NODE_OPTIONS = "--no-warnings"
 
 [hook]
 on-activate = """
-  npm install
+  pnpm install
 """
