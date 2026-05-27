@@ -83,16 +83,18 @@ Requires **Node.js 24 LTS or newer**. The package is ESM-only.
 
 A minimal A2A agent that echoes every message it receives, plus a client that sends one message and waits for the task to complete. This is the smallest end-to-end usage of the ADK - the full runnable version with shutdown handling, message extraction, and dead-lettering lives in [`examples/minimal/`](./examples/minimal/).
 
-**`server.ts`** - boot an A2A server with built-in `message/send` + `tasks/get` handlers, plus an inline echo worker:
+**`server.ts`** - boot an A2A server with built-in `message/send`, `tasks/get`, and `tasks/list` handlers, plus an inline echo worker:
 
 ```ts
 import {
   createA2AServer,
   createMessageSendHandler,
   createTaskGetHandler,
+  createTaskListHandler,
   InMemoryTaskStorage,
   MESSAGE_SEND_METHOD,
   TASK_GET_METHOD,
+  TASK_LIST_METHOD,
   TASK_STATE,
   transitionTask,
   type AgentCard,
@@ -106,14 +108,24 @@ const card: AgentCard = {
   url: 'http://127.0.0.1:8080',
   defaultInputModes: ['text/plain'],
   defaultOutputModes: ['text/plain'],
-  capabilities: { streaming: false, pushNotifications: false, stateTransitionHistory: false },
-  skills: [{ id: 'echo', name: 'Echo', description: 'Echo input.', tags: ['echo'] }],
+  capabilities: {
+    streaming: false,
+    pushNotifications: false,
+    stateTransitionHistory: false,
+  },
+  skills: [
+    { id: 'echo', name: 'Echo', description: 'Echo input.', tags: ['echo'] },
+  ],
 };
 
 const storage = new InMemoryTaskStorage();
 const server = createA2AServer({ card });
-server.registerMethod(MESSAGE_SEND_METHOD, createMessageSendHandler({ storage }));
+server.registerMethod(
+  MESSAGE_SEND_METHOD,
+  createMessageSendHandler({ storage })
+);
 server.registerMethod(TASK_GET_METHOD, createTaskGetHandler({ storage }));
+server.registerMethod(TASK_LIST_METHOD, createTaskListHandler({ storage }));
 
 void runWorker();
 await server.listen(8080, '127.0.0.1');
@@ -169,7 +181,7 @@ Each example ships its own README with setup instructions.
 ### Core Capabilities
 
 - 🤖 **A2A Protocol Compliance** - JSON-RPC 2.0 endpoint, agent-card discovery at `/.well-known/agent-card.json`, and `/health` liveness probe
-- 📬 **Built-in Handlers** - Drop-in `message/send` and `tasks/get` JSON-RPC handlers backed by any `TaskStorage`
+- 📬 **Built-in Handlers** - Drop-in `message/send`, `tasks/get`, and `tasks/list` JSON-RPC handlers backed by any `TaskStorage`
 - 🔌 **Extensible JSON-RPC** - Register custom methods on the per-server `MethodRegistry`
 - 🔁 **Task Lifecycle** - Strict state machine (`SUBMITTED → WORKING → {INPUT_REQUIRED | COMPLETED | FAILED | CANCELLED}`) with `TaskTransitionError` on invalid transitions
 - 🗄️ **Pluggable Storage** - Small `TaskStorage` interface with `InMemoryTaskStorage` included; queue / active / dead-letter semantics out of the box
@@ -189,7 +201,7 @@ Each example ships its own README with setup instructions.
 
 ### Status & Roadmap
 
-The TypeScript ADK currently focuses on the core A2A protocol surface: `message/send`, `tasks/get`, AgentCard discovery, the task lifecycle state machine, in-memory storage, the retrying client, CloudEvents, and SSE. Capabilities that exist in the [Go ADK](https://github.com/inference-gateway/adk) but are **not yet implemented** here include: LLM client / multi-provider chat completion, streaming task handlers, additional JSON-RPC methods (`tasks/cancel`, `tasks/list`, `tasks/resubscribe`, `tasks/pushNotificationConfig/*`, `agent/getAuthenticatedExtendedCard`), Redis-backed storage, file artifacts (filesystem & MinIO), OIDC/OAuth authentication, TLS configuration, push notifications, and OpenTelemetry-based observability. The TS ADK tracks the Go ADK as the long-term feature target - contributions toward parity are welcome.
+The TypeScript ADK currently focuses on the core A2A protocol surface: `message/send`, `tasks/get`, `tasks/list`, AgentCard discovery, the task lifecycle state machine, in-memory storage, the retrying client, CloudEvents, and SSE. Capabilities that exist in the [Go ADK](https://github.com/inference-gateway/adk) but are **not yet implemented** here include: LLM client / multi-provider chat completion, streaming task handlers, additional JSON-RPC methods (`tasks/cancel`, `tasks/resubscribe`, `tasks/pushNotificationConfig/*`, `agent/getAuthenticatedExtendedCard`), Redis-backed storage, file artifacts (filesystem & MinIO), OIDC/OAuth authentication, TLS configuration, push notifications, and OpenTelemetry-based observability. The TS ADK tracks the Go ADK as the long-term feature target - contributions toward parity are welcome.
 
 ## 📖 API Reference
 
@@ -216,8 +228,9 @@ JSON-RPC methods are registered on a per-server `MethodRegistry`. Call `server.r
 
 - **`createMessageSendHandler({ storage })`** registers as `MESSAGE_SEND_METHOD` (`message/send`). It accepts a JSON-RPC `message/send` request, creates a `SUBMITTED` task, enqueues it on the supplied `TaskStorage`, and returns the wire `Task` immediately. Your worker code dequeues and progresses the task.
 - **`createTaskGetHandler({ storage })`** registers as `TASK_GET_METHOD` (`tasks/get`). It looks up the requested task across active and dead-letter storage and returns whatever it finds.
+- **`createTaskListHandler({ storage })`** registers as `TASK_LIST_METHOD` (`tasks/list`). It returns tasks filtered by optional `state` / `contextId`, paginated with an opaque `cursor` and a `limit` clamped to `maxLimit` (default `100`). The response shape is `{ tasks, nextCursor? }`; `nextCursor` is omitted on the final page. Pagination is stable under concurrent inserts and deletes because the cursor is keyset-encoded on `(createdAt, id)`.
 
-Both handlers are pure adapters between the JSON-RPC surface and a `TaskStorage` - no business logic lives in them.
+These handlers are pure adapters between the JSON-RPC surface and a `TaskStorage` - no business logic lives in them.
 
 #### Task lifecycle
 
@@ -256,10 +269,10 @@ A typed client for calling A2A servers:
 ```ts
 const client = createA2AClient({ baseURL: 'http://localhost:8080' });
 
-const task    = await client.sendMessage({ message });
+const task = await client.sendMessage({ message });
 const refresh = await client.getTask(task.id, { historyLength: 10 });
-const card    = await client.getAgentCard();
-const health  = await client.getHealth();
+const card = await client.getAgentCard();
+const health = await client.getHealth();
 ```
 
 The client supports configurable per-attempt timeouts (`DEFAULT_TIMEOUT_MS`), exponential-backoff retries (`withRetry`, `DEFAULT_RETRY_CONFIG`, `isRetryableError`), custom headers, a pluggable `fetch` implementation, and a configurable `User-Agent`. Pass `retry: false` to disable retries entirely.
@@ -327,11 +340,11 @@ Most of the ADK is configured **programmatically** - via `A2AServerConfig`, `A2A
 
 The ADK supports injecting agent `name` / `description` / `version` at build time, mirroring the Go ADK's `BuildAgentName` / `BuildAgentDescription` / `BuildAgentVersion` LD flags. Values are read from `process.env` **once at first import** and frozen into `buildMetadata`. An empty string means "not injected" - `applyBuildMetadata(card)` treats empty values as no-ops, so it is safe to call unconditionally.
 
-| Variable                  | Default     | Description                                                                  |
-| ------------------------- | ----------- | ---------------------------------------------------------------------------- |
-| `BUILD_AGENT_NAME`        | _(empty)_   | Overrides `card.name` when non-empty (read once at module load)              |
-| `BUILD_AGENT_DESCRIPTION` | _(empty)_   | Overrides `card.description` when non-empty (read once at module load)       |
-| `BUILD_AGENT_VERSION`     | _(empty)_   | Overrides `card.version` when non-empty (read once at module load)           |
+| Variable                  | Default   | Description                                                            |
+| ------------------------- | --------- | ---------------------------------------------------------------------- |
+| `BUILD_AGENT_NAME`        | _(empty)_ | Overrides `card.name` when non-empty (read once at module load)        |
+| `BUILD_AGENT_DESCRIPTION` | _(empty)_ | Overrides `card.description` when non-empty (read once at module load) |
+| `BUILD_AGENT_VERSION`     | _(empty)_ | Overrides `card.version` when non-empty (read once at module load)     |
 
 Two injection options:
 
@@ -369,7 +382,11 @@ const baseCard: AgentCard = {
   url: 'http://127.0.0.1:8080',
   defaultInputModes: ['text/plain'],
   defaultOutputModes: ['text/plain'],
-  capabilities: { streaming: false, pushNotifications: false, stateTransitionHistory: false },
+  capabilities: {
+    streaming: false,
+    pushNotifications: false,
+    stateTransitionHistory: false,
+  },
   skills: [],
 };
 
@@ -392,7 +409,11 @@ Inside an agent-card JSON file passed to `loadAgentCardFromFile` / `loadAgentCar
   "url": "${A2A_AGENT_URL}",
   "defaultInputModes": ["text/plain"],
   "defaultOutputModes": ["text/plain"],
-  "capabilities": { "streaming": false, "pushNotifications": false, "stateTransitionHistory": false },
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
   "skills": []
 }
 ```
@@ -401,9 +422,9 @@ For everything else - port, host, JSON-RPC path, agent-card cache-control, handl
 
 ## 🔧 Advanced Usage
 
-- **Custom JSON-RPC methods** - call `server.registerMethod(name, handler)` with any `MethodHandler` to extend the server beyond the built-in `message/send` + `tasks/get`. The `MethodContext` passed to handlers carries the JSON-RPC request id and an `AbortSignal` tied to the HTTP connection.
+- **Custom JSON-RPC methods** - call `server.registerMethod(name, handler)` with any `MethodHandler` to extend the server beyond the built-in `message/send`, `tasks/get`, and `tasks/list`. The `MethodContext` passed to handlers carries the JSON-RPC request id and an `AbortSignal` tied to the HTTP connection.
 - **Custom task handlers** - implement the `TaskHandler` (background) or `StreamableTaskHandler` (streaming) interface to ship arbitrary agent logic. See [Custom task handlers](#custom-task-handlers) below.
-- **Custom storage backends** - implement the `TaskStorage` interface and pass your implementation into `createMessageSendHandler({ storage })` and `createTaskGetHandler({ storage })`. Anything that satisfies the interface - Redis, Postgres, S3-backed - drops in.
+- **Custom storage backends** - implement the `TaskStorage` interface and pass your implementation into `createMessageSendHandler({ storage })`, `createTaskGetHandler({ storage })`, and `createTaskListHandler({ storage })`. Anything that satisfies the interface - Redis, Postgres, S3-backed - drops in.
 - **Tuning client behavior** - `A2AClientConfig` exposes `timeoutMs`, `retry` (a partial `RetryConfig` or `false`), `headers`, `fetch`, `userAgent`, and overrides for `jsonRpcPath` / `agentCardPath` / `healthPath`. Call `withRetry` directly when you want to apply the same retry policy outside the client.
 - **Bundle-time metadata injection** - use `tsup`'s `define` option to bake `BUILD_AGENT_NAME` / `_DESCRIPTION` / `_VERSION` into the bundled output instead of relying on the runtime environment. See [Build-Time Agent Metadata](#build-time-agent-metadata) above.
 - **CloudEvents forwarding** - wrap your task-state transitions in `createCloudEvent` and POST them to a webhook or message bus for downstream subscribers, using the spec-compliant `CLOUDEVENTS_CONTENT_TYPE`.
@@ -481,7 +502,7 @@ Handler contracts:
 
 - Both interfaces receive a `TaskHandlerContext` whose `signal` aborts when the originating request is cancelled (client disconnect, deadline, shutdown). Propagate it to LLM calls, tool dispatches, and fetches so cancellation actually unwinds.
 - `TaskHandler.handleTask` returns the updated `ManagedTask`. Use `transitionTask` to advance the state machine; terminal states (`COMPLETED` / `FAILED` / `CANCELLED`) tell the worker the task is done.
-- `StreamableTaskHandler.handleStreamingTask` yields raw CloudEvents that the framework forwards to the SSE response verbatim. The pipeline emits the initial `IN_PROGRESS` `task.status.changed` frame *before* your handler runs and the terminal status frame *after* it returns, so you only need to yield the in-flight payload events (`AGENT_EVENT_TYPE.DELTA`, `TOOL_*`, `ITERATION_COMPLETED`, etc.).
+- `StreamableTaskHandler.handleStreamingTask` yields raw CloudEvents that the framework forwards to the SSE response verbatim. The pipeline emits the initial `IN_PROGRESS` `task.status.changed` frame _before_ your handler runs and the terminal status frame _after_ it returns, so you only need to yield the in-flight payload events (`AGENT_EVENT_TYPE.DELTA`, `TOOL_*`, `ITERATION_COMPLETED`, etc.).
 - `setAgent(agent)` is called by the builder when an `OpenAICompatibleAgent` has been registered via `withAgent(...)` (now or later). `BaseTaskHandler` / `BaseStreamableTaskHandler` give you free `setAgent` / `getAgent` accessors so concrete subclasses only need to implement the `handle*Task` method.
 
 ## 🌐 A2A Ecosystem

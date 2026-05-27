@@ -52,6 +52,17 @@ export type {
 export { TASK_GET_METHOD, createTaskGetHandler } from './task-get.js';
 export type { TaskGetHandlerOptions, TaskGetParams } from './task-get.js';
 export {
+  DEFAULT_TASK_LIST_LIMIT,
+  MAX_TASK_LIST_LIMIT,
+  TASK_LIST_METHOD,
+  createTaskListHandler,
+} from './task-list.js';
+export type {
+  TaskListHandlerOptions,
+  TaskListParams,
+  TaskListResult,
+} from './task-list.js';
+export {
   AGENT_EVENT_TYPE,
   CLOUDEVENTS_CONTENT_TYPE,
   CLOUDEVENTS_SPEC_VERSION,
