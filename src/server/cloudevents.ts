@@ -57,6 +57,49 @@ export const AGENT_EVENT_TYPE = {
 export type AgentEventType =
   (typeof AGENT_EVENT_TYPE)[keyof typeof AGENT_EVENT_TYPE];
 
+/**
+ * Payload of an {@link AGENT_EVENT_TYPE.ITERATION_COMPLETED} CloudEvent. Emitted
+ * once per LLM iteration by the default streaming handler; mirrors the Go ADK
+ * `NewIterationCompletedEvent` in `types/types.go`.
+ */
+export interface AgentIterationCompletedEventData {
+  readonly iteration: number;
+  readonly taskId: string;
+  readonly contextId: string;
+  readonly message?: import('../types/generated/a2a.js').Message;
+}
+
+/**
+ * Payload of {@link AGENT_EVENT_TYPE.TOOL_STARTED} /
+ * {@link AGENT_EVENT_TYPE.TOOL_COMPLETED} CloudEvents. Mirrors the Go ADK's
+ * tool lifecycle events.
+ */
+export interface AgentToolEventData {
+  readonly toolCallId: string;
+  readonly toolName: string;
+  readonly taskId: string;
+  readonly contextId: string;
+  /** Raw JSON arguments string supplied by the model. Set on `tool.started`. */
+  readonly arguments?: string;
+}
+
+/**
+ * Payload of an {@link AGENT_EVENT_TYPE.TOOL_FAILED} CloudEvent.
+ */
+export interface AgentToolFailedEventData extends AgentToolEventData {
+  readonly error: string;
+}
+
+/**
+ * Payload of an {@link AGENT_EVENT_TYPE.TOOL_RESULT} CloudEvent. Carries the
+ * string returned by the toolbox after a successful or failed execution; the
+ * `isError` flag distinguishes the two.
+ */
+export interface AgentToolResultEventData extends AgentToolEventData {
+  readonly result: string;
+  readonly isError: boolean;
+}
+
 /** JSON-representable value for a CloudEvents extension attribute. */
 export type CloudEventExtensionValue = string | number | boolean;
 
