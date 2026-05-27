@@ -27,6 +27,14 @@ export type {
 export { MethodRegistry } from './method-registry.js';
 export type { MethodContext, MethodHandler } from './method-registry.js';
 export {
+  GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
+  createGetAuthenticatedExtendedCardHandler,
+} from './agent-extended-card.js';
+export type {
+  GetAuthenticatedExtendedCardHandlerOptions,
+  GetAuthenticatedExtendedCardParams,
+} from './agent-extended-card.js';
+export {
   MESSAGE_SEND_METHOD,
   createMessageSendHandler,
 } from './message-send.js';

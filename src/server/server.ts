@@ -5,6 +5,10 @@ import type { AddressInfo } from 'node:net';
 import type { Authenticator } from '../auth/index.js';
 import type { AgentCard } from '../types/generated/a2a.js';
 import {
+  GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
+  createGetAuthenticatedExtendedCardHandler,
+} from './agent-extended-card.js';
+import {
   JSONRPC_ERROR_CODES,
   JSONRPC_VERSION,
   JSONRPCError,
@@ -50,6 +54,19 @@ export interface A2AServerConfig {
    * extended card.
    */
   readonly card: AgentCard;
+  /**
+   * Optional extended agent card returned to authenticated callers via the
+   * `agent/getAuthenticatedExtendedCard` JSON-RPC method. When provided, the
+   * server auto-registers that method; when omitted, the method is not
+   * registered and calls receive `-32601 method not found`.
+   *
+   * The extended card typically wraps {@link card} and adds auth schemes plus
+   * any capabilities the agent only exposes after authentication. Pair this
+   * with an enabled {@link authenticator} so the method is actually gated -
+   * registering it with no authenticator allows anonymous callers to fetch
+   * the extended card.
+   */
+  readonly extendedCard?: AgentCard;
   /**
    * Value for the `Cache-Control` header on the agent card response. Defaults
    * to {@link DEFAULT_AGENT_CARD_CACHE_CONTROL}.
@@ -103,6 +120,15 @@ export class A2AServer {
     this.cacheControl = config.cacheControl ?? DEFAULT_AGENT_CARD_CACHE_CONTROL;
     this.jsonRpcPath = config.jsonRpcPath ?? DEFAULT_JSONRPC_PATH;
     this.authenticator = config.authenticator;
+
+    if (config.extendedCard !== undefined) {
+      this.registry.register(
+        GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
+        createGetAuthenticatedExtendedCardHandler({
+          card: config.extendedCard,
+        })
+      );
+    }
 
     this.app = this.buildApp();
     this.httpServer = createAdaptorServer({
