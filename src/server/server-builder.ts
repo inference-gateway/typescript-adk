@@ -22,11 +22,16 @@ import {
 import { A2AServer, type A2AServerConfig } from './server.js';
 import { TASK_CANCEL_METHOD, createTaskCancelHandler } from './task-cancel.js';
 import { TaskCancellationRegistry } from './task-cancellation.js';
+import { TaskEventBusRegistry } from './task-event-bus.js';
 import type {
   StreamableTaskHandler,
   TaskHandler,
   TaskHandlerContext,
 } from './task-handler.js';
+import {
+  TASK_RESUBSCRIBE_METHOD,
+  createTaskResubscribeHandler,
+} from './task-resubscribe.js';
 
 /**
  * Structural logger interface. Compatible with `console`, `pino`, the standard
@@ -430,6 +435,7 @@ export class A2AServerBuilder<
 
     const storage = this.builderConfig.storage ?? new InMemoryTaskStorage();
     const cancellationRegistry = new TaskCancellationRegistry();
+    const eventBusRegistry = new TaskEventBusRegistry();
 
     const serverConfig: A2AServerConfig = {
       card,
@@ -457,6 +463,14 @@ export class A2AServerBuilder<
           storage,
           executor: this.streamingTaskHandler,
           cancellationRegistry,
+          eventBusRegistry,
+        })
+      );
+      server.registerStreamingMethod(
+        TASK_RESUBSCRIBE_METHOD,
+        createTaskResubscribeHandler({
+          storage,
+          eventBusRegistry,
         })
       );
     }
