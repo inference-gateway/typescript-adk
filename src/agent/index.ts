@@ -33,3 +33,26 @@ export type {
   ManagedTaskStatus,
   TransitionOptions,
 } from './task.js';
+
+export {
+  DEFAULT_AGENT_SYSTEM_PROMPT,
+  OpenAICompatibleAgentImpl,
+} from './agent.js';
+export type {
+  OpenAICompatibleAgent,
+  OpenAICompatibleAgentImplOptions,
+} from './agent.js';
+
+export { AgentBuilder, AgentBuilderError } from './agent-builder.js';
+
+export type {
+  AfterAgentCallback,
+  AfterModelCallback,
+  AfterToolCallback,
+  BeforeAgentCallback,
+  BeforeModelCallback,
+  BeforeToolCallback,
+  CallbackContext,
+  Callbacks,
+  LLMRequest,
+} from './callbacks.js';

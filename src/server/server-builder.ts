@@ -1,3 +1,4 @@
+import type { OpenAICompatibleAgent } from '../agent/agent.js';
 import { loadAgentCardFromFile } from '../agent/card.js';
 import {
   TASK_STATE,
@@ -61,16 +62,7 @@ function noop(): void {
   // intentionally empty
 }
 
-/**
- * Marker interface for an OpenAI-compatible LLM agent. The concrete agent
- * implementation lives in a future iteration (mirrors the Go ADK's
- * `OpenAICompatibleAgent`); the builder accepts and stores an instance but
- * does not invoke it yet.
- */
-export interface OpenAICompatibleAgent {
-  /** Stable identifier (model name, etc.). Used for diagnostics only. */
-  readonly id: string;
-}
+export type { OpenAICompatibleAgent };
 
 /**
  * Marker interface for an artifact-storage service. Concrete service
