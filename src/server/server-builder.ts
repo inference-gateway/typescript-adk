@@ -360,9 +360,11 @@ export class A2AServerBuilder<
    * pass-through and the agent card is left untouched.
    *
    * When the `authConfig` is also supplied (via {@link withAuthConfig}), the
-   * builder additionally decorates the agent card with the OIDC security
-   * scheme at `build()` time so callers don't have to remember to do it
-   * manually.
+   * builder additionally produces an extended agent card decorated with the
+   * OIDC security scheme and registers `agent/getAuthenticatedExtendedCard`
+   * so authenticated callers can retrieve it. The public well-known card is
+   * left undecorated (no auth schemes) and gets `supportsExtendedAgentCard:
+   * true` to signal availability.
    */
   withAuthenticator(authenticator: Authenticator): this {
     this.authenticator = authenticator;
@@ -371,9 +373,11 @@ export class A2AServerBuilder<
 
   /**
    * Provide the auth configuration the {@link withAuthenticator} above was
-   * built from. Used solely to decorate the agent card with OIDC security
-   * metadata at `build()` time; if omitted, the card is left untouched
-   * regardless of whether the authenticator is enabled.
+   * built from. Used at `build()` time to produce the extended agent card
+   * served via `agent/getAuthenticatedExtendedCard`. The public well-known
+   * card is left undecorated; auth schemes appear only on the extended card.
+   * If omitted, no extended card is produced and the method is not
+   * registered.
    */
   withAuthConfig(config: AuthConfig): this {
     this.authConfig = config;
@@ -468,13 +472,19 @@ export class A2AServerBuilder<
     const cancellationRegistry = new TaskCancellationRegistry();
     const eventBusRegistry = new TaskEventBusRegistry();
 
-    const advertisedCard =
+    const extendedCard =
       this.authConfig !== undefined
         ? decorateAgentCardWithAuth(card, this.authConfig)
+        : undefined;
+
+    const publicCard: AgentCard =
+      extendedCard !== undefined
+        ? { ...card, supportsExtendedAgentCard: true }
         : card;
 
     const serverConfig: A2AServerConfig = {
-      card: advertisedCard,
+      card: publicCard,
+      ...(extendedCard !== undefined ? { extendedCard } : {}),
       ...(this.builderConfig.cacheControl !== undefined
         ? { cacheControl: this.builderConfig.cacheControl }
         : {}),
