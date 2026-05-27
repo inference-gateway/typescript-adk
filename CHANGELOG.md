@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0](https://github.com/inference-gateway/typescript-adk/compare/v0.8.0...v0.9.0) (2026-05-27)
+
+### ✨ Features
+
+* **callbacks:** wire lifecycle hooks into default task handlers ([#87](https://github.com/inference-gateway/typescript-adk/issues/87)) ([f33ae90](https://github.com/inference-gateway/typescript-adk/commit/f33ae902e32b7130de3070c12aa2effa4b00c084)), closes [#32](https://github.com/inference-gateway/typescript-adk/issues/32)
+* **examples:** add ai-powered LLM agent example ([#84](https://github.com/inference-gateway/typescript-adk/issues/84)) ([6334633](https://github.com/inference-gateway/typescript-adk/commit/63346333673cea26db672d0e9ad1ab6561374176))
+* **examples:** add ai-powered streaming agent example ([#85](https://github.com/inference-gateway/typescript-adk/issues/85)) ([7c0c08c](https://github.com/inference-gateway/typescript-adk/commit/7c0c08c7fbb0b12f16b9212e07732f5f61af0a9d)), closes [#30](https://github.com/inference-gateway/typescript-adk/issues/30)
+* **examples:** add callbacks example with guardrail, cache, and audit hooks ([#88](https://github.com/inference-gateway/typescript-adk/issues/88)) ([edbc76d](https://github.com/inference-gateway/typescript-adk/commit/edbc76dbbbeeec371e95c4cf82a14cab06d14c0a)), closes [#33](https://github.com/inference-gateway/typescript-adk/issues/33)
+* **examples:** add default-handlers example using A2AServerBuilder.withDefaultTaskHandlers ([#89](https://github.com/inference-gateway/typescript-adk/issues/89)) ([ddb2804](https://github.com/inference-gateway/typescript-adk/commit/ddb28045932fbcca8c2a1d1322b579f67e3a1bcb)), closes [#34](https://github.com/inference-gateway/typescript-adk/issues/34)
+* implement OIDC/OAuth2 authentication middleware ([#90](https://github.com/inference-gateway/typescript-adk/issues/90)) ([43d43ba](https://github.com/inference-gateway/typescript-adk/commit/43d43baaa71dc2d27044f124852585d31985a8e5)), closes [#35](https://github.com/inference-gateway/typescript-adk/issues/35)
+* **toolbox:** custom Tool + ToolBox API with schema validation and parallel dispatch ([#86](https://github.com/inference-gateway/typescript-adk/issues/86)) ([0e83473](https://github.com/inference-gateway/typescript-adk/commit/0e83473f81ad2be63522c556c15d654015c1e280))
+
+### 🔧 Miscellaneous
+
+* remove package-lock.json ([82c1c9d](https://github.com/inference-gateway/typescript-adk/commit/82c1c9d0784c1fe1379821a165ee3c3f0362a4dd))
+* use normal dashes instead of em dashes ([3320097](https://github.com/inference-gateway/typescript-adk/commit/3320097bcf5ab25623709453eee2eae59346ce47))
+* use normal dashes instead of em dashes ([37d8efe](https://github.com/inference-gateway/typescript-adk/commit/37d8efe6caa03c874058fc87f7a7eba382bd3e4b))
+
 ## [0.8.0](https://github.com/inference-gateway/typescript-adk/compare/v0.7.0...v0.8.0) (2026-05-27)
 
 ### ✨ Features
