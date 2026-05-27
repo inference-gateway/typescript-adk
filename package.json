@@ -83,6 +83,7 @@
   "sideEffects": false,
   "dependencies": {
     "@hono/node-server": "^2.0.4",
+    "@inference-gateway/sdk": "^0.8.6",
     "hono": "^4.12.23"
   }
 }
