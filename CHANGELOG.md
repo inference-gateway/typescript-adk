@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.0](https://github.com/inference-gateway/typescript-adk/compare/v0.7.0...v0.8.0) (2026-05-27)
+
+### ✨ Features
+
+* **agent:** add AgentBuilder for LLM-powered handlers ([#83](https://github.com/inference-gateway/typescript-adk/issues/83)) ([12ea3b3](https://github.com/inference-gateway/typescript-adk/commit/12ea3b311c94448bcf1d14d3d021a9253f5c02ef)), closes [#28](https://github.com/inference-gateway/typescript-adk/issues/28)
+* **examples:** add input-required pause/resume example ([#81](https://github.com/inference-gateway/typescript-adk/issues/81)) ([035bd7f](https://github.com/inference-gateway/typescript-adk/commit/035bd7f6bff535267f209530eb5687dcf79aaa58)), closes [#26](https://github.com/inference-gateway/typescript-adk/issues/26)
+* **llm:** add OpenAI-compatible LLM client backed by Inference Gateway SDK ([#82](https://github.com/inference-gateway/typescript-adk/issues/82)) ([f59a5ed](https://github.com/inference-gateway/typescript-adk/commit/f59a5ede0a99cd3e7356e907a844e4a74635f306)), closes [#27](https://github.com/inference-gateway/typescript-adk/issues/27)
+* **server:** implement DefaultBackgroundTaskHandler ([#74](https://github.com/inference-gateway/typescript-adk/issues/74)) ([b6e9afc](https://github.com/inference-gateway/typescript-adk/commit/b6e9afc1e926be5e8cbe0acd44e012585a2bf75a)), closes [27/#31](https://github.com/27/typescript-adk/issues/31) [#19](https://github.com/inference-gateway/typescript-adk/issues/19)
+* **server:** implement DefaultStreamingTaskHandler ([#75](https://github.com/inference-gateway/typescript-adk/issues/75)) ([9ae65c7](https://github.com/inference-gateway/typescript-adk/commit/9ae65c793c6c8f11a1748e140049c377541b8e59)), closes [#20](https://github.com/inference-gateway/typescript-adk/issues/20)
+* **server:** implement input-required reserved tool and pause/resume flow ([#80](https://github.com/inference-gateway/typescript-adk/issues/80)) ([3f47a89](https://github.com/inference-gateway/typescript-adk/commit/3f47a89dda9b5ddacf9b3021a2769c0c20627186)), closes [#25](https://github.com/inference-gateway/typescript-adk/issues/25)
+* **server:** implement tasks/cancel JSON-RPC method ([#78](https://github.com/inference-gateway/typescript-adk/issues/78)) ([f4a4d32](https://github.com/inference-gateway/typescript-adk/commit/f4a4d322036937dafb92153a3b8599d2bce8b16d))
+* **server:** implement tasks/list JSON-RPC method with cursor pagination ([#77](https://github.com/inference-gateway/typescript-adk/issues/77)) ([604e3b5](https://github.com/inference-gateway/typescript-adk/commit/604e3b530434b4239f6f32ecf7626e2bacf3b889)), closes [#22](https://github.com/inference-gateway/typescript-adk/issues/22)
+* **server:** implement tasks/resubscribe JSON-RPC method ([#79](https://github.com/inference-gateway/typescript-adk/issues/79)) ([c4ee6a2](https://github.com/inference-gateway/typescript-adk/commit/c4ee6a2d86cccde720d40b108ba749afb98746d6)), closes [#24](https://github.com/inference-gateway/typescript-adk/issues/24)
+* **server:** support custom task handlers via TaskHandler / StreamableTaskHandler interfaces ([#76](https://github.com/inference-gateway/typescript-adk/issues/76)) ([9a09599](https://github.com/inference-gateway/typescript-adk/commit/9a09599c7bc4e9b097e3da5847b148e498f5a0d1)), closes [#21](https://github.com/inference-gateway/typescript-adk/issues/21)
+
 ## [0.7.0](https://github.com/inference-gateway/typescript-adk/compare/v0.6.0...v0.7.0) (2026-05-27)
 
 ### ✨ Features
