@@ -435,9 +435,6 @@ describe('InMemoryTaskStorage - removeFromQueue', () => {
 
     storage.removeFromQueue('queued');
 
-    // `enqueue` registers as active too — removing from the queue should not
-    // unregister the active entry; callers handle that separately via
-    // storeDeadLetter.
     expect(storage.getActive('queued')).toBe(task);
   });
 

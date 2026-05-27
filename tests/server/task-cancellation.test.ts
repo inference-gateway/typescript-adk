@@ -27,8 +27,6 @@ describe('TaskCancellationRegistry', () => {
     expect(registry.size()).toBe(1);
     registry.cancel('task-1');
 
-    // Only the second controller should have been aborted; the first stays
-    // intact because it was orphaned by the second registration.
     expect(second.signal.aborted).toBe(true);
     expect(first.signal.aborted).toBe(false);
   });

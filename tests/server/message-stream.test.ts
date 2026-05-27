@@ -736,8 +736,6 @@ describe('createMessageStreamHandler + tasks/cancel integration', () => {
       { signal: requestController.signal }
     );
 
-    // Drain the stream in the background so the executor can progress past
-    // its first yield and park on the abort signal.
     const drain = drainFrames(streamResult.readable);
 
     await executorParked;
@@ -759,8 +757,6 @@ describe('createMessageStreamHandler + tasks/cancel integration', () => {
     expect(observedSignal?.aborted).toBe(true);
     expect(executorObservedAbort).toBe(true);
     expect(registry.has('id-1')).toBe(false);
-    // The stream's finally must respect the dead-letter entry written by
-    // `tasks/cancel` rather than overwriting it with a stale local task.
     expect(storage.getTask('id-1')?.state).toBe(TASK_STATE.CANCELLED);
   });
 });
