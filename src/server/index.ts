@@ -34,6 +34,21 @@ export type {
   MessageSendHandlerOptions,
   MessageSendParams,
 } from './message-send.js';
+export {
+  DEFAULT_STREAMING_STATUS_UPDATE_INTERVAL_MS,
+  MESSAGE_STREAM_METHOD,
+  STREAMING_STATUS_UPDATE_INTERVAL_ENV,
+  createMessageStreamHandler,
+} from './message-stream.js';
+export type {
+  MessageStreamHandlerOptions,
+  MessageStreamParams,
+  StreamingExecutorContext,
+  StreamingMethodHandler,
+  StreamingMethodResult,
+  StreamingTaskEvent,
+  StreamingTaskExecutor,
+} from './message-stream.js';
 export { TASK_GET_METHOD, createTaskGetHandler } from './task-get.js';
 export type { TaskGetHandlerOptions, TaskGetParams } from './task-get.js';
 export {

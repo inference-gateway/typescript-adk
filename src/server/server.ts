@@ -3,8 +3,18 @@ import { Hono } from 'hono';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { AgentCard } from '../types/generated/a2a.js';
-import { dispatch, type JSONRPCResponse } from './jsonrpc.js';
+import {
+  JSONRPC_ERROR_CODES,
+  JSONRPC_VERSION,
+  JSONRPCError,
+  createErrorResponse,
+  dispatch,
+  type JSONRPCId,
+  type JSONRPCResponse,
+} from './jsonrpc.js';
 import { MethodRegistry, type MethodHandler } from './method-registry.js';
+import type { StreamingMethodHandler } from './message-stream.js';
+import { SSE_HEADERS } from './sse.js';
 
 /**
  * Path of the unauthenticated agent card discovery endpoint, per the A2A
@@ -69,6 +79,10 @@ export class A2AServer {
   private readonly cacheControl: string;
   private readonly jsonRpcPath: string;
   private readonly registry = new MethodRegistry();
+  private readonly streamingRegistry = new Map<
+    string,
+    StreamingMethodHandler
+  >();
   private readonly app: Hono;
   private readonly httpServer: NodeServer;
 
@@ -101,6 +115,12 @@ export class A2AServer {
     app.post(this.jsonRpcPath, async (c) => {
       const body = await c.req.text();
       const signal = c.req.raw.signal;
+
+      const streamingResponse = this.tryDispatchStreaming(body, signal);
+      if (streamingResponse !== null) {
+        return streamingResponse;
+      }
+
       const result = await dispatch(body, this.registry, signal);
       if (result === null) {
         return new Response(null, { status: 204 });
@@ -125,26 +145,109 @@ export class A2AServer {
   }
 
   /**
-   * Remove a previously registered handler. Returns `true` if one was
-   * removed, `false` if no handler existed for that name.
+   * Register a handler for a JSON-RPC method whose response is an SSE event
+   * stream rather than a single JSON-RPC result envelope. The server detects
+   * streaming methods by name and routes them through an SSE response (status
+   * 200, `Content-Type: text/event-stream`), bypassing the regular dispatch
+   * pipeline.
+   *
+   * A streaming method may not share a name with a regular method registered
+   * via {@link registerMethod} - if both exist, the streaming path wins.
    */
-  unregisterMethod(name: string): boolean {
-    return this.registry.unregister(name);
+  registerStreamingMethod(name: string, handler: StreamingMethodHandler): void {
+    if (typeof name !== 'string' || name.length === 0) {
+      throw new Error('method name must be a non-empty string');
+    }
+    this.streamingRegistry.set(name, handler);
   }
 
   /**
-   * Whether a handler is currently registered for `name`.
+   * Remove a previously registered handler. Returns `true` if one was
+   * removed, `false` if no handler existed for that name. Removes the handler
+   * regardless of whether it was registered via {@link registerMethod} or
+   * {@link registerStreamingMethod}.
+   */
+  unregisterMethod(name: string): boolean {
+    const streamingRemoved = this.streamingRegistry.delete(name);
+    const standardRemoved = this.registry.unregister(name);
+    return streamingRemoved || standardRemoved;
+  }
+
+  /**
+   * Whether a handler is currently registered for `name`. Includes both
+   * regular and streaming methods.
    */
   hasMethod(name: string): boolean {
-    return this.registry.has(name);
+    return this.registry.has(name) || this.streamingRegistry.has(name);
   }
 
   /**
    * Names of all currently registered methods. Useful for diagnostics and
-   * tests; do not depend on iteration order.
+   * tests; do not depend on iteration order. Includes both regular and
+   * streaming methods.
    */
   registeredMethods(): string[] {
-    return this.registry.list();
+    const names = new Set<string>(this.registry.list());
+    for (const name of this.streamingRegistry.keys()) {
+      names.add(name);
+    }
+    return [...names];
+  }
+
+  private tryDispatchStreaming(
+    rawBody: string,
+    signal: AbortSignal
+  ): Response | null {
+    if (this.streamingRegistry.size === 0) {
+      return null;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawBody);
+    } catch {
+      return null;
+    }
+    if (
+      parsed === null ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed)
+    ) {
+      return null;
+    }
+    const reqObj = parsed as Record<string, unknown>;
+    const method = reqObj['method'];
+    if (typeof method !== 'string' || !this.streamingRegistry.has(method)) {
+      return null;
+    }
+    const handler = this.streamingRegistry.get(method);
+    if (handler === undefined) {
+      return null;
+    }
+    if (reqObj['jsonrpc'] !== JSONRPC_VERSION) {
+      return null;
+    }
+    const id = extractStreamingId(reqObj);
+    const params = 'params' in reqObj ? reqObj['params'] : undefined;
+    try {
+      const { readable } = handler(params, { signal });
+      return new Response(readable, {
+        status: 200,
+        headers: { ...SSE_HEADERS },
+      });
+    } catch (err) {
+      if (err instanceof JSONRPCError) {
+        return jsonResponse(
+          createErrorResponse(id, err.code, err.message, err.data)
+        );
+      }
+      return jsonResponse(
+        createErrorResponse(
+          id,
+          JSONRPC_ERROR_CODES.INTERNAL_ERROR,
+          'internal error'
+        )
+      );
+    }
   }
 
   /**
@@ -206,4 +309,22 @@ export class A2AServer {
  */
 export function createA2AServer(config: A2AServerConfig): A2AServer {
   return new A2AServer(config);
+}
+
+function extractStreamingId(reqObj: Record<string, unknown>): JSONRPCId {
+  if (!('id' in reqObj)) {
+    return null;
+  }
+  const raw = reqObj['id'];
+  if (raw === null || typeof raw === 'string' || typeof raw === 'number') {
+    return raw;
+  }
+  return null;
+}
+
+function jsonResponse(body: JSONRPCResponse): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json; charset=utf-8' },
+  });
 }
