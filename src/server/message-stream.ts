@@ -28,6 +28,7 @@ import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
 import type { MethodContext } from './method-registry.js';
 import { SSEStreamWriter } from './sse.js';
 import type { TaskCancellationRegistry } from './task-cancellation.js';
+import type { TaskEventBus, TaskEventBusRegistry } from './task-event-bus.js';
 
 /**
  * Canonical JSON-RPC method name for the A2A `message/stream` operation.
@@ -211,6 +212,15 @@ export interface MessageStreamHandlerOptions {
    */
   readonly cancellationRegistry?: TaskCancellationRegistry;
   /**
+   * Shared per-task event bus registry. When provided, every CloudEvent the
+   * handler emits to the SSE writer is also published to the per-task bus so
+   * `tasks/resubscribe` subscribers receive the same stream. The bus is
+   * registered at startup and closed + removed once the task terminates.
+   * Without a registry, fan-out is unavailable and `tasks/resubscribe` can
+   * only replay the current state from storage.
+   */
+  readonly eventBusRegistry?: TaskEventBusRegistry;
+  /**
    * Read environment variables from this object instead of `process.env`.
    * Mainly a test seam.
    */
@@ -280,7 +290,7 @@ export type StreamingMethodHandler = (
 export function createMessageStreamHandler(
   options: MessageStreamHandlerOptions
 ): StreamingMethodHandler {
-  const { storage, executor, cancellationRegistry } = options;
+  const { storage, executor, cancellationRegistry, eventBusRegistry } = options;
   const newId = options.idGenerator ?? (() => crypto.randomUUID());
   const clock = options.now ?? defaultNow;
   const env = options.env ?? process.env;
@@ -320,7 +330,9 @@ export function createMessageStreamHandler(
         : {}),
     });
 
-    const emitOptions = pickEmitOptions(options);
+    const eventBus: TaskEventBus | undefined =
+      eventBusRegistry?.getOrCreate(taskId);
+    const emitOptions = pickEmitOptions(options, eventBus);
 
     const done = (async (): Promise<void> => {
       let periodicTimer: ReturnType<typeof setInterval> | null = null;
@@ -414,6 +426,10 @@ export function createMessageStreamHandler(
           storage.storeDeadLetter(task);
         }
         writer.close();
+        if (eventBus !== undefined) {
+          eventBus.close();
+          eventBusRegistry?.delete(taskId);
+        }
       }
     })();
 
@@ -423,10 +439,14 @@ export function createMessageStreamHandler(
 
 interface EmitOptions {
   readonly source: string | undefined;
+  readonly bus: TaskEventBus | undefined;
 }
 
-function pickEmitOptions(options: MessageStreamHandlerOptions): EmitOptions {
-  return { source: options.eventSource };
+function pickEmitOptions(
+  options: MessageStreamHandlerOptions,
+  bus: TaskEventBus | undefined
+): EmitOptions {
+  return { source: options.eventSource, bus };
 }
 
 function handleExecutorEvent(
@@ -486,6 +506,7 @@ function handleExecutorEvent(
     }
     case 'rawCloudEvent': {
       writer.emitCloudEvent(event.event);
+      emitOptions.bus?.publish(event.event);
       return task;
     }
   }
@@ -504,12 +525,16 @@ function emitStatusEvent(
     status,
     final,
   };
-  return writer.emit({
+  const emitted = writer.emit({
     type: AGENT_EVENT_TYPE.TASK_STATUS_CHANGED satisfies AgentEventType,
     data,
     subject: task.id,
     ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
   });
+  if (emitted !== undefined) {
+    emitOptions.bus?.publish(emitted);
+  }
+  return emitted;
 }
 
 function emitDeltaEvent(
@@ -518,12 +543,16 @@ function emitDeltaEvent(
   message: Message,
   emitOptions: EmitOptions
 ): CloudEvent<Message> | undefined {
-  return writer.emit({
+  const emitted = writer.emit({
     type: AGENT_EVENT_TYPE.DELTA satisfies AgentEventType,
     data: message,
     subject: task.id,
     ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
   });
+  if (emitted !== undefined) {
+    emitOptions.bus?.publish(emitted);
+  }
+  return emitted;
 }
 
 function emitInputRequiredEvent(
@@ -532,12 +561,16 @@ function emitInputRequiredEvent(
   message: Message,
   emitOptions: EmitOptions
 ): CloudEvent<Message> | undefined {
-  return writer.emit({
+  const emitted = writer.emit({
     type: AGENT_EVENT_TYPE.INPUT_REQUIRED satisfies AgentEventType,
     data: message,
     subject: task.id,
     ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
   });
+  if (emitted !== undefined) {
+    emitOptions.bus?.publish(emitted);
+  }
+  return emitted;
 }
 
 function emitIterationCompletedEvent(
@@ -552,12 +585,16 @@ function emitIterationCompletedEvent(
     contextId: task.contextId,
     ...(event.message !== undefined ? { message: event.message } : {}),
   };
-  return writer.emit({
+  const emitted = writer.emit({
     type: AGENT_EVENT_TYPE.ITERATION_COMPLETED satisfies AgentEventType,
     data,
     subject: task.id,
     ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
   });
+  if (emitted !== undefined) {
+    emitOptions.bus?.publish(emitted);
+  }
+  return emitted;
 }
 
 function emitToolStartedEvent(
@@ -577,12 +614,16 @@ function emitToolStartedEvent(
     contextId: task.contextId,
     ...(event.arguments !== undefined ? { arguments: event.arguments } : {}),
   };
-  return writer.emit({
+  const emitted = writer.emit({
     type: AGENT_EVENT_TYPE.TOOL_STARTED satisfies AgentEventType,
     data,
     subject: task.id,
     ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
   });
+  if (emitted !== undefined) {
+    emitOptions.bus?.publish(emitted);
+  }
+  return emitted;
 }
 
 function emitToolCompletedEvent(
@@ -597,12 +638,16 @@ function emitToolCompletedEvent(
     taskId: task.id,
     contextId: task.contextId,
   };
-  return writer.emit({
+  const emitted = writer.emit({
     type: AGENT_EVENT_TYPE.TOOL_COMPLETED satisfies AgentEventType,
     data,
     subject: task.id,
     ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
   });
+  if (emitted !== undefined) {
+    emitOptions.bus?.publish(emitted);
+  }
+  return emitted;
 }
 
 function emitToolFailedEvent(
@@ -622,12 +667,16 @@ function emitToolFailedEvent(
     contextId: task.contextId,
     error: event.error,
   };
-  return writer.emit({
+  const emitted = writer.emit({
     type: AGENT_EVENT_TYPE.TOOL_FAILED satisfies AgentEventType,
     data,
     subject: task.id,
     ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
   });
+  if (emitted !== undefined) {
+    emitOptions.bus?.publish(emitted);
+  }
+  return emitted;
 }
 
 function emitToolResultEvent(
@@ -649,12 +698,16 @@ function emitToolResultEvent(
     result: event.result,
     isError: event.isError,
   };
-  return writer.emit({
+  const emitted = writer.emit({
     type: AGENT_EVENT_TYPE.TOOL_RESULT satisfies AgentEventType,
     data,
     subject: task.id,
     ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
   });
+  if (emitted !== undefined) {
+    emitOptions.bus?.publish(emitted);
+  }
+  return emitted;
 }
 
 function toWireStatus(status: ManagedTaskStatus): TaskStatus {

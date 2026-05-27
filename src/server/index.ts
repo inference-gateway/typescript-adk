@@ -58,6 +58,20 @@ export type {
 } from './task-cancel.js';
 export { TaskCancellationRegistry } from './task-cancellation.js';
 export {
+  TASK_RESUBSCRIBE_METHOD,
+  createTaskResubscribeHandler,
+} from './task-resubscribe.js';
+export type {
+  TaskResubscribeHandlerOptions,
+  TaskResubscribeParams,
+} from './task-resubscribe.js';
+export { TaskEventBus, TaskEventBusRegistry } from './task-event-bus.js';
+export type {
+  TaskEventCloseListener,
+  TaskEventListener,
+  TaskEventSubscription,
+} from './task-event-bus.js';
+export {
   DEFAULT_TASK_LIST_LIMIT,
   MAX_TASK_LIST_LIMIT,
   TASK_LIST_METHOD,
