@@ -402,10 +402,87 @@ For everything else - port, host, JSON-RPC path, agent-card cache-control, handl
 ## 🔧 Advanced Usage
 
 - **Custom JSON-RPC methods** - call `server.registerMethod(name, handler)` with any `MethodHandler` to extend the server beyond the built-in `message/send` + `tasks/get`. The `MethodContext` passed to handlers carries the JSON-RPC request id and an `AbortSignal` tied to the HTTP connection.
+- **Custom task handlers** - implement the `TaskHandler` (background) or `StreamableTaskHandler` (streaming) interface to ship arbitrary agent logic. See [Custom task handlers](#custom-task-handlers) below.
 - **Custom storage backends** - implement the `TaskStorage` interface and pass your implementation into `createMessageSendHandler({ storage })` and `createTaskGetHandler({ storage })`. Anything that satisfies the interface - Redis, Postgres, S3-backed - drops in.
 - **Tuning client behavior** - `A2AClientConfig` exposes `timeoutMs`, `retry` (a partial `RetryConfig` or `false`), `headers`, `fetch`, `userAgent`, and overrides for `jsonRpcPath` / `agentCardPath` / `healthPath`. Call `withRetry` directly when you want to apply the same retry policy outside the client.
 - **Bundle-time metadata injection** - use `tsup`'s `define` option to bake `BUILD_AGENT_NAME` / `_DESCRIPTION` / `_VERSION` into the bundled output instead of relying on the runtime environment. See [Build-Time Agent Metadata](#build-time-agent-metadata) above.
 - **CloudEvents forwarding** - wrap your task-state transitions in `createCloudEvent` and POST them to a webhook or message bus for downstream subscribers, using the spec-compliant `CLOUDEVENTS_CONTENT_TYPE`.
+
+### Custom task handlers
+
+`TaskHandler` and `StreamableTaskHandler` let you plug arbitrary agent logic into the server via `A2AServerBuilder`. Both mirror the [Go ADK's `server/task_handler.go`](https://github.com/inference-gateway/adk/blob/main/server/task_handler.go) interfaces; the TypeScript variant uses an `AbortSignal` on the context for cancellation instead of Go's `context.Context`.
+
+```ts
+import {
+  A2AServerBuilder,
+  AGENT_EVENT_TYPE,
+  BaseStreamableTaskHandler,
+  BaseTaskHandler,
+  TASK_STATE,
+  createCloudEvent,
+  transitionTask,
+  type AgentCard,
+  type CloudEvent,
+  type ManagedTask,
+  type Message,
+  type TaskHandlerContext,
+} from '@inference-gateway/adk';
+
+// Background handler - return the updated task once processing finishes.
+class EchoTaskHandler extends BaseTaskHandler {
+  async handleTask(
+    _ctx: TaskHandlerContext,
+    task: ManagedTask,
+    _message: Message
+  ): Promise<ManagedTask> {
+    let next = task;
+    if (next.state === TASK_STATE.PENDING) {
+      next = transitionTask(next, TASK_STATE.IN_PROGRESS);
+    }
+    return transitionTask(next, TASK_STATE.COMPLETED);
+  }
+}
+
+// Streaming handler - yield CloudEvents as the task progresses.
+class EchoStreamHandler extends BaseStreamableTaskHandler {
+  async *handleStreamingTask(
+    ctx: TaskHandlerContext,
+    task: ManagedTask,
+    message: Message
+  ): AsyncIterable<CloudEvent> {
+    if (ctx.signal.aborted) return;
+    yield createCloudEvent({
+      type: AGENT_EVENT_TYPE.DELTA,
+      subject: task.id,
+      data: {
+        messageId: crypto.randomUUID(),
+        role: 'ROLE_AGENT',
+        contextId: task.contextId,
+        taskId: task.id,
+        parts: [{ text: 'echo: ' + (message.parts[0]?.text ?? '') }],
+      },
+    });
+  }
+}
+
+const card: AgentCard = /* ... */;
+
+const server = new A2AServerBuilder({})
+  .withAgentCard(card)
+  .withTaskHandler(new EchoTaskHandler())
+  // Or, for a streaming agent card (capabilities.streaming === true):
+  // .withStreamableTaskHandler(new EchoStreamHandler())
+  .build();
+
+await server.listen(8080, '127.0.0.1');
+```
+
+Handler contracts:
+
+- Both interfaces receive a `TaskHandlerContext` whose `signal` aborts when the originating request is cancelled (client disconnect, deadline, shutdown). Propagate it to LLM calls, tool dispatches, and fetches so cancellation actually unwinds.
+- `TaskHandler.handleTask` returns the updated `ManagedTask`. Use `transitionTask` to advance the state machine; terminal states (`COMPLETED` / `FAILED` / `CANCELLED`) tell the worker the task is done.
+- `StreamableTaskHandler.handleStreamingTask` yields raw CloudEvents that the framework forwards to the SSE response verbatim. The pipeline emits the initial `IN_PROGRESS` `task.status.changed` frame *before* your handler runs and the terminal status frame *after* it returns, so you only need to yield the in-flight payload events (`AGENT_EVENT_TYPE.DELTA`, `TOOL_*`, `ITERATION_COMPLETED`, etc.).
+- `setAgent(agent)` is called by the builder when an `OpenAICompatibleAgent` has been registered via `withAgent(...)` (now or later). `BaseTaskHandler` / `BaseStreamableTaskHandler` give you free `setAgent` / `getAgent` accessors so concrete subclasses only need to implement the `handle*Task` method.
 
 ## 🌐 A2A Ecosystem
 

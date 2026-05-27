@@ -20,6 +20,11 @@ import {
   type StreamingTaskExecutor,
 } from './message-stream.js';
 import { A2AServer, type A2AServerConfig } from './server.js';
+import type {
+  StreamableTaskHandler,
+  TaskHandler,
+  TaskHandlerContext,
+} from './task-handler.js';
 
 /**
  * Structural logger interface. Compatible with `console`, `pino`, the standard
@@ -183,6 +188,8 @@ export class A2AServerBuilder<
   private agentCard: AgentCard | undefined;
   private backgroundTaskHandler: BackgroundTaskHandler | undefined;
   private streamingTaskHandler: StreamingTaskHandler | undefined;
+  private taskHandler: TaskHandler | undefined;
+  private streamableTaskHandler: StreamableTaskHandler | undefined;
   private taskResultProcessor: TaskResultProcessor | undefined;
   private agent: OpenAICompatibleAgent | undefined;
   private artifactService: ArtifactService | undefined;
@@ -208,6 +215,61 @@ export class A2AServerBuilder<
     handler: StreamingTaskHandler
   ): A2AServerBuilder<HasCard, true> {
     this.streamingTaskHandler = handler;
+    return this as unknown as A2AServerBuilder<HasCard, true>;
+  }
+
+  /**
+   * Set a custom interface-based background {@link TaskHandler}. The builder
+   * adapts it to the lower-level {@link BackgroundTaskHandler} function and
+   * forwards the {@link TaskHandlerContext.signal} on every invocation. If an
+   * agent has already been registered via {@link withAgent}, it is injected
+   * into the handler via `setAgent` at registration time; an agent registered
+   * later will overwrite the binding.
+   *
+   * Mirrors the Go ADK's `WithTaskHandler` builder method.
+   */
+  withTaskHandler(handler: TaskHandler): A2AServerBuilder<HasCard, true> {
+    if (this.agent !== undefined) {
+      handler.setAgent(this.agent);
+    }
+    this.taskHandler = handler;
+    this.backgroundTaskHandler = (context) =>
+      handler.handleTask(
+        { signal: context.signal } satisfies TaskHandlerContext,
+        context.task,
+        context.message
+      );
+    return this as unknown as A2AServerBuilder<HasCard, true>;
+  }
+
+  /**
+   * Set a custom interface-based {@link StreamableTaskHandler}. The builder
+   * adapts it to the lower-level {@link StreamingTaskHandler} function by
+   * forwarding each yielded CloudEvent verbatim to the SSE response (wrapped
+   * in a `rawCloudEvent` {@link StreamingTaskEvent} the message-stream
+   * pipeline knows how to emit). If an agent has already been registered via
+   * {@link withAgent}, it is injected into the handler via `setAgent` at
+   * registration time.
+   *
+   * Mirrors the Go ADK's `WithStreamableTaskHandler` builder method.
+   */
+  withStreamableTaskHandler(
+    handler: StreamableTaskHandler
+  ): A2AServerBuilder<HasCard, true> {
+    if (this.agent !== undefined) {
+      handler.setAgent(this.agent);
+    }
+    this.streamableTaskHandler = handler;
+    this.streamingTaskHandler = async function* (context) {
+      const taskCtx: TaskHandlerContext = { signal: context.signal };
+      for await (const event of handler.handleStreamingTask(
+        taskCtx,
+        context.task,
+        context.message
+      )) {
+        yield { type: 'rawCloudEvent', event } satisfies StreamingTaskEvent;
+      }
+    };
     return this as unknown as A2AServerBuilder<HasCard, true>;
   }
 
@@ -245,6 +307,12 @@ export class A2AServerBuilder<
 
   withAgent(agent: OpenAICompatibleAgent): this {
     this.agent = agent;
+    if (this.taskHandler !== undefined) {
+      this.taskHandler.setAgent(agent);
+    }
+    if (this.streamableTaskHandler !== undefined) {
+      this.streamableTaskHandler.setAgent(agent);
+    }
     return this;
   }
 
@@ -307,6 +375,12 @@ export class A2AServerBuilder<
   }
   getStreamingTaskHandler(): StreamingTaskHandler | undefined {
     return this.streamingTaskHandler;
+  }
+  getTaskHandler(): TaskHandler | undefined {
+    return this.taskHandler;
+  }
+  getStreamableTaskHandler(): StreamableTaskHandler | undefined {
+    return this.streamableTaskHandler;
   }
   getTaskResultProcessor(): TaskResultProcessor | undefined {
     return this.taskResultProcessor;

@@ -114,3 +114,9 @@ export type {
 } from './default-background-task-handler.js';
 export { DefaultStreamingTaskHandler } from './default-streaming-task-handler.js';
 export type { DefaultStreamingTaskHandlerOptions } from './default-streaming-task-handler.js';
+export { BaseStreamableTaskHandler, BaseTaskHandler } from './task-handler.js';
+export type {
+  StreamableTaskHandler,
+  TaskHandler,
+  TaskHandlerContext,
+} from './task-handler.js';
