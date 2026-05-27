@@ -15,10 +15,10 @@ import {
 const SERVER_URL = process.env['SERVER_URL'] ?? 'http://127.0.0.1:8080';
 const SEND_PROMPT =
   process.env['SEND_PROMPT'] ??
-  'Hello via message/send — please walk this task to COMPLETED.';
+  'Hello via message/send - please walk this task to COMPLETED.';
 const STREAM_PROMPT =
   process.env['STREAM_PROMPT'] ??
-  'Hello via message/stream — please walk this task to COMPLETED.';
+  'Hello via message/stream - please walk this task to COMPLETED.';
 const POLL_INTERVAL_MS = 300;
 const POLL_MAX_ATTEMPTS = 60;
 

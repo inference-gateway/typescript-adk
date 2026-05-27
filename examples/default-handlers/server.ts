@@ -15,7 +15,7 @@ import {
 const AGENT_NAME = process.env['A2A_AGENT_NAME'] ?? 'default-handlers-agent';
 const AGENT_DESCRIPTION =
   process.env['A2A_AGENT_DESCRIPTION'] ??
-  'A2A server wired up with A2AServerBuilder.withDefaultTaskHandlers() — exposes both message/send and message/stream with the built-in stub handlers.';
+  'A2A server wired up with A2AServerBuilder.withDefaultTaskHandlers() - exposes both message/send and message/stream with the built-in stub handlers.';
 const AGENT_VERSION = process.env['A2A_AGENT_VERSION'] ?? '0.0.0';
 const HOST = process.env['A2A_SERVER_HOST'] ?? '127.0.0.1';
 const PORT = Number.parseInt(process.env['A2A_SERVER_PORT'] ?? '8080', 10);
