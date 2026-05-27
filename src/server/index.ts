@@ -145,6 +145,16 @@ export type {
 } from './default-background-task-handler.js';
 export { DefaultStreamingTaskHandler } from './default-streaming-task-handler.js';
 export type { DefaultStreamingTaskHandlerOptions } from './default-streaming-task-handler.js';
+export {
+  DefaultToolBox,
+  INPUT_REQUIRED_TOOL_DESCRIPTION,
+  INPUT_REQUIRED_TOOL_PARAMETERS,
+  RESERVED_TOOL_NAMES,
+  ReservedToolNameError,
+  ToolNotFoundError,
+  createTool,
+} from './toolbox.js';
+export type { Tool } from './toolbox.js';
 export { BaseStreamableTaskHandler, BaseTaskHandler } from './task-handler.js';
 export type {
   StreamableTaskHandler,

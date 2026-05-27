@@ -1,4 +1,10 @@
-import { createTask, toWireTask } from '../agent/task.js';
+import {
+  TASK_STATE,
+  createTask,
+  transitionTask,
+  toWireTask,
+  type ManagedTask,
+} from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
   Message,
@@ -67,6 +73,26 @@ export function createMessageSendHandler(
 
   return (params: unknown): Task => {
     const validated = validateMessageSendParams(params);
+    const inboundContextId =
+      typeof validated.message.contextId === 'string' &&
+      validated.message.contextId.length > 0
+        ? validated.message.contextId
+        : undefined;
+
+    if (inboundContextId !== undefined) {
+      const paused = findResumableTask(storage, inboundContextId);
+      if (paused !== undefined) {
+        const enrichedMessage = enrichMessage(
+          validated.message,
+          newId,
+          paused.contextId
+        );
+        const resumed = appendAndResume(paused, enrichedMessage, clock);
+        storage.enqueue(resumed);
+        return toWireTask(resumed);
+      }
+    }
+
     const taskId = newId();
     const enrichedMessage = enrichMessage(validated.message, newId);
 
@@ -82,6 +108,54 @@ export function createMessageSendHandler(
     return toWireTask(task);
   };
 }
+
+/**
+ * Locate an active task in `INPUT_REQUIRED` state on the given `contextId`,
+ * or `undefined` when no such task exists. When more than one paused task
+ * matches (a malformed state on the caller's side - the framework only ever
+ * pauses one task per context at a time), the most recently updated one wins
+ * so a stray older paused task can't permanently block resume.
+ */
+function findResumableTask(
+  storage: TaskStorage,
+  contextId: string
+): ManagedTask | undefined {
+  const matches = storage.listTasks({
+    contextId,
+    state: TASK_STATE.INPUT_REQUIRED,
+  });
+  if (matches.length === 0) {
+    return undefined;
+  }
+  let best = matches[0] as ManagedTask;
+  for (let i = 1; i < matches.length; i++) {
+    const candidate = matches[i] as ManagedTask;
+    if (candidate.updatedAt > best.updatedAt) {
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+/**
+ * Append the resume message to the paused task and transition it from
+ * `INPUT_REQUIRED` to `IN_PROGRESS`. The caller is responsible for persisting
+ * (via `storage.enqueue` for the background flow, or `storage.updateActive`
+ * for the streaming flow).
+ */
+function appendAndResume(
+  paused: ManagedTask,
+  message: Message,
+  clock: () => Date
+): ManagedTask {
+  const withMessage: ManagedTask = {
+    ...paused,
+    messages: [...paused.messages, message],
+  };
+  return transitionTask(withMessage, TASK_STATE.IN_PROGRESS, { now: clock });
+}
+
+export { appendAndResume, findResumableTask };
 
 function validateMessageSendParams(params: unknown): MessageSendParams {
   if (params === null || typeof params !== 'object' || Array.isArray(params)) {
@@ -113,15 +187,20 @@ function validateMessageSendParams(params: unknown): MessageSendParams {
   return params as MessageSendParams;
 }
 
-function enrichMessage(input: Message, newId: () => string): Message {
+function enrichMessage(
+  input: Message,
+  newId: () => string,
+  resumeContextId?: string
+): Message {
   const messageId =
     typeof input.messageId === 'string' && input.messageId.length > 0
       ? input.messageId
       : newId();
   const contextId =
-    typeof input.contextId === 'string' && input.contextId.length > 0
+    resumeContextId ??
+    (typeof input.contextId === 'string' && input.contextId.length > 0
       ? input.contextId
-      : newId();
+      : newId());
   return {
     ...input,
     messageId,
