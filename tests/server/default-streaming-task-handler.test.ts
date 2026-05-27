@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { CallbackContext, Callbacks } from '../../src/agent/callbacks.js';
 import { createTask, TASK_STATE } from '../../src/agent/task.js';
 import {
   DEFAULT_MAX_CHAT_COMPLETION_ITERATIONS,
@@ -575,5 +576,220 @@ describe('DefaultStreamingTaskHandler usage metadata', () => {
     expect(handler.isUsageMetadataEnabled()).toBe(false);
     handler.setEnableUsageMetadata(true);
     expect(handler.isUsageMetadataEnabled()).toBe(true);
+  });
+});
+
+describe('DefaultStreamingTaskHandler callbacks', () => {
+  it('runs callbacks with a context carrying agent/task/context/state/logger', async () => {
+    const { client } = scriptedClient([assistantText('done')]);
+    const seen: CallbackContext[] = [];
+    const callbacks: Callbacks = {
+      beforeAgent: [
+        (ctx) => {
+          seen.push(ctx);
+          return undefined;
+        },
+      ],
+      afterAgent: [
+        (ctx) => {
+          seen.push(ctx);
+          return undefined;
+        },
+      ],
+    };
+    const logger = silentLogger();
+    const handler = new DefaultStreamingTaskHandler({
+      llmClient: client,
+      logger,
+      agentName: 'my-agent',
+      callbacks,
+    });
+    await drain(handler.handle(buildContext()));
+    expect(seen).toHaveLength(2);
+    expect(seen[0]?.agentName).toBe('my-agent');
+    expect(seen[0]?.taskId).toBe('t-1');
+    expect(seen[0]?.contextId).toBe('c-1');
+    expect(seen[0]?.logger).toBe(logger);
+    expect(typeof seen[0]?.invocationId).toBe('string');
+    expect(seen[1]?.invocationId).toBe(seen[0]?.invocationId);
+  });
+
+  it('beforeAgent override skips the LLM loop and emits a terminal statusChanged', async () => {
+    const { client, calls } = scriptedClient([]);
+    const handler = new DefaultStreamingTaskHandler({
+      llmClient: client,
+      callbacks: {
+        beforeAgent: [
+          () => ({
+            messageId: 'm-override',
+            role: 'ROLE_AGENT',
+            parts: [{ text: 'cached' }],
+          }),
+        ],
+        afterAgent: [
+          () => {
+            throw new Error(
+              'afterAgent must not run when beforeAgent overrides'
+            );
+          },
+        ],
+      },
+    });
+    const events = await drain(handler.handle(buildContext()));
+    expect(calls).toHaveLength(0);
+    expect(events.map((e) => e.type)).toEqual(['delta', 'statusChanged']);
+    const status = events[1];
+    if (status?.type === 'statusChanged') {
+      expect(status.state).toBe(TASK_STATE.COMPLETED);
+      expect(status.message?.parts[0]?.text).toBe('cached');
+    }
+  });
+
+  it('afterAgent override replaces the iterationCompleted message and emits a final delta', async () => {
+    const { client } = scriptedClient([assistantText('raw')]);
+    const handler = new DefaultStreamingTaskHandler({
+      llmClient: client,
+      callbacks: {
+        afterAgent: [
+          (_ctx, output) => ({
+            ...output,
+            parts: [{ text: `[censored] ${output.parts[0]?.text}` }],
+          }),
+        ],
+      },
+    });
+    const events = await drain(handler.handle(buildContext()));
+    // Original LLM delta, then the after-agent replacement delta, then iterationCompleted.
+    expect(events.map((e) => e.type)).toEqual([
+      'delta',
+      'delta',
+      'iterationCompleted',
+    ]);
+    const last = events[2];
+    if (last?.type === 'iterationCompleted') {
+      expect(last.message?.parts[0]?.text).toBe('[censored] raw');
+    }
+  });
+
+  it('beforeModel override skips the LLM call and synthesizes the completion', async () => {
+    const { client, calls } = scriptedClient([]);
+    const handler = new DefaultStreamingTaskHandler({
+      llmClient: client,
+      callbacks: {
+        beforeModel: [() => ({ message: { content: 'cached by guardrail' } })],
+      },
+    });
+    const events = await drain(handler.handle(buildContext()));
+    expect(calls).toHaveLength(0);
+    const types = events.map((e) => e.type);
+    expect(types).toEqual(['delta', 'iterationCompleted']);
+  });
+
+  it('afterModel override replaces the upstream completion before tool dispatch', async () => {
+    const { client } = scriptedClient([assistantText('original')]);
+    const handler = new DefaultStreamingTaskHandler({
+      llmClient: client,
+      callbacks: {
+        afterModel: [() => ({ message: { content: 'replaced' } })],
+      },
+    });
+    const events = await drain(handler.handle(buildContext()));
+    const delta = events[0];
+    if (delta?.type === 'delta') {
+      expect(delta.message.parts[0]?.text).toBe('replaced');
+    }
+  });
+
+  it('beforeTool override skips dispatch; the synthetic result flows back into the conversation', async () => {
+    const { client, calls } = scriptedClient([
+      assistantToolCalls([{ id: 'a', name: 'lookup', arguments: '{}' }]),
+      assistantText('done'),
+    ]);
+    const executed = vi.fn().mockResolvedValue('real');
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'lookup', description: 'lookup', parameters: {} }],
+      executeTool: executed,
+    });
+    const handler = new DefaultStreamingTaskHandler({
+      llmClient: client,
+      toolBox,
+      callbacks: {
+        beforeTool: [() => 'cached'],
+      },
+    });
+    const events = await drain(handler.handle(buildContext()));
+    expect(executed).not.toHaveBeenCalled();
+    const toolResult = events.find((e) => e.type === 'toolResult');
+    if (toolResult?.type === 'toolResult') {
+      expect(toolResult.result).toBe('cached');
+    }
+    // Second iteration sees the synthetic tool message.
+    expect(calls[1]?.messages.at(-1)).toEqual({
+      role: 'tool',
+      toolCallId: 'a',
+      content: 'cached',
+    });
+  });
+
+  it('afterTool rewrites the tool result before the next iteration sees it', async () => {
+    const { client, calls } = scriptedClient([
+      assistantToolCalls([{ id: 'a', name: 'lookup', arguments: '{}' }]),
+      assistantText('done'),
+    ]);
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'lookup', description: 'lookup', parameters: {} }],
+      executeTool: async () => 'raw',
+    });
+    const handler = new DefaultStreamingTaskHandler({
+      llmClient: client,
+      toolBox,
+      callbacks: {
+        afterTool: [(_ctx, _call, r) => `[after] ${r}`],
+      },
+    });
+    await drain(handler.handle(buildContext()));
+    expect(calls[1]?.messages.at(-1)).toEqual({
+      role: 'tool',
+      toolCallId: 'a',
+      content: '[after] raw',
+    });
+  });
+
+  it('callback errors propagate and the stream throws', async () => {
+    const { client } = scriptedClient([assistantText('done')]);
+    const handler = new DefaultStreamingTaskHandler({
+      llmClient: client,
+      logger: silentLogger(),
+      callbacks: {
+        afterModel: [
+          () => {
+            throw new Error('guardrail tripped');
+          },
+        ],
+      },
+    });
+    await expect(drain(handler.handle(buildContext()))).rejects.toThrow(
+      'guardrail tripped'
+    );
+  });
+
+  it('supports async callbacks', async () => {
+    const { client } = scriptedClient([assistantText('sync')]);
+    const handler = new DefaultStreamingTaskHandler({
+      llmClient: client,
+      callbacks: {
+        afterAgent: [
+          async (_ctx, output) => {
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            return { ...output, parts: [{ text: 'async-replaced' }] };
+          },
+        ],
+      },
+    });
+    const events = await drain(handler.handle(buildContext()));
+    const last = events.find((e) => e.type === 'iterationCompleted');
+    if (last?.type === 'iterationCompleted') {
+      expect(last.message?.parts[0]?.text).toBe('async-replaced');
+    }
   });
 });

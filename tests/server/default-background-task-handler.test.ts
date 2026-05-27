@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { CallbackContext, Callbacks } from '../../src/agent/callbacks.js';
 import { createTask, TASK_STATE } from '../../src/agent/task.js';
 import {
   DEFAULT_MAX_CHAT_COMPLETION_ITERATIONS,
@@ -805,5 +806,299 @@ describe('UsageTracker', () => {
       completion_tokens: 2,
       total_tokens: 99,
     });
+  });
+});
+
+describe('DefaultBackgroundTaskHandler callbacks', () => {
+  it('runs every callback with a context carrying agent/task/context/state/logger', async () => {
+    const { client } = scriptedClient([assistantText('done')]);
+    const seen: CallbackContext[] = [];
+    const callbacks: Callbacks = {
+      beforeAgent: [
+        (ctx) => {
+          seen.push(ctx);
+          return undefined;
+        },
+      ],
+      afterAgent: [
+        (ctx) => {
+          seen.push(ctx);
+          return undefined;
+        },
+      ],
+    };
+    const logger = silentLogger();
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      logger,
+      agentName: 'my-agent',
+      callbacks,
+    });
+    await handler.handle(buildContext());
+    expect(seen).toHaveLength(2);
+    expect(seen[0]?.agentName).toBe('my-agent');
+    expect(seen[0]?.taskId).toBe('t-1');
+    expect(seen[0]?.contextId).toBe('c-1');
+    expect(seen[0]?.logger).toBe(logger);
+    expect(typeof seen[0]?.invocationId).toBe('string');
+    expect(seen[0]?.invocationId.length).toBeGreaterThan(0);
+    // Same invocationId and same state reference across hooks for one handle().
+    expect(seen[1]?.invocationId).toBe(seen[0]?.invocationId);
+    expect(seen[1]?.state).toBe(seen[0]?.state);
+  });
+
+  it('beforeAgent override skips the LLM loop and uses the returned message', async () => {
+    const { client, calls } = scriptedClient([]);
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      callbacks: {
+        beforeAgent: [
+          () => ({
+            messageId: 'm-override',
+            role: 'ROLE_AGENT',
+            parts: [{ text: 'cached response' }],
+          }),
+        ],
+        afterAgent: [
+          () => {
+            throw new Error(
+              'afterAgent must not run when beforeAgent overrides'
+            );
+          },
+        ],
+      },
+    });
+    const result = await handler.handle(buildContext());
+    expect(result.state).toBe(TASK_STATE.COMPLETED);
+    expect(result.status.message?.parts[0]?.text).toBe('cached response');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('afterAgent override replaces the agent output', async () => {
+    const { client } = scriptedClient([assistantText('raw')]);
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      callbacks: {
+        afterAgent: [
+          (_ctx, output) => ({
+            ...output,
+            parts: [{ text: `[censored] ${output.parts[0]?.text ?? ''}` }],
+          }),
+        ],
+      },
+    });
+    const result = await handler.handle(buildContext());
+    expect(result.state).toBe(TASK_STATE.COMPLETED);
+    expect(result.status.message?.parts[0]?.text).toBe('[censored] raw');
+  });
+
+  it('beforeModel override skips the LLM call and uses the synthetic completion', async () => {
+    const { client, calls } = scriptedClient([]);
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      callbacks: {
+        beforeModel: [() => ({ message: { content: 'cached by guardrail' } })],
+      },
+    });
+    const result = await handler.handle(buildContext());
+    expect(result.state).toBe(TASK_STATE.COMPLETED);
+    expect(result.status.message?.parts[0]?.text).toBe('cached by guardrail');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('afterModel override replaces the upstream completion', async () => {
+    const { client, calls } = scriptedClient([assistantText('original')]);
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      callbacks: {
+        afterModel: [() => ({ message: { content: 'replaced' } })],
+      },
+    });
+    const result = await handler.handle(buildContext());
+    expect(calls).toHaveLength(1);
+    expect(result.status.message?.parts[0]?.text).toBe('replaced');
+  });
+
+  it('beforeTool override skips dispatch and afterTool can still rewrite the result', async () => {
+    const { client } = scriptedClient([
+      assistantToolCalls([{ id: 'a', name: 'lookup', arguments: '{}' }]),
+      assistantText('done'),
+    ]);
+    const executed = vi.fn().mockResolvedValue('real result');
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'lookup', description: 'lookup', parameters: {} }],
+      executeTool: executed,
+    });
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      toolBox,
+      callbacks: {
+        beforeTool: [() => 'cached'],
+        afterTool: [(_ctx, _call, result) => `[after] ${result}`],
+      },
+    });
+    const { calls } = scriptedClient([]);
+    void calls;
+    const result = await handler.handle(buildContext());
+    expect(result.state).toBe(TASK_STATE.COMPLETED);
+    expect(executed).not.toHaveBeenCalled();
+  });
+
+  it('afterTool rewrites the tool result before the next LLM iteration sees it', async () => {
+    const { client, calls } = scriptedClient([
+      assistantToolCalls([{ id: 'a', name: 'lookup', arguments: '{}' }]),
+      assistantText('done'),
+    ]);
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'lookup', description: 'lookup', parameters: {} }],
+      executeTool: async () => 'raw',
+    });
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      toolBox,
+      callbacks: {
+        afterTool: [(_ctx, _call, result) => `[after] ${result}`],
+      },
+    });
+    await handler.handle(buildContext());
+    expect(calls[1]?.messages.at(-1)).toEqual({
+      role: 'tool',
+      toolCallId: 'a',
+      content: '[after] raw',
+    });
+  });
+
+  it('runs callbacks in order; first non-undefined return short-circuits the rest', async () => {
+    const order: string[] = [];
+    const { client, calls } = scriptedClient([]);
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      callbacks: {
+        beforeAgent: [
+          () => {
+            order.push('a');
+            return undefined;
+          },
+          () => {
+            order.push('b');
+            return {
+              messageId: 'm-b',
+              role: 'ROLE_AGENT',
+              parts: [{ text: 'short-circuit at b' }],
+            };
+          },
+          () => {
+            order.push('c');
+            return undefined;
+          },
+        ],
+      },
+    });
+    const result = await handler.handle(buildContext());
+    expect(order).toEqual(['a', 'b']);
+    expect(result.status.message?.parts[0]?.text).toBe('short-circuit at b');
+    expect(calls).toHaveLength(0);
+  });
+
+  it('chains after-hooks: each callback sees the previous callback’s replacement', async () => {
+    const { client } = scriptedClient([assistantText('seed')]);
+    const seen: string[] = [];
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      callbacks: {
+        afterAgent: [
+          (_ctx, output) => {
+            seen.push(output.parts[0]?.text ?? '');
+            return {
+              ...output,
+              parts: [{ text: `${output.parts[0]?.text}-1` }],
+            };
+          },
+          (_ctx, output) => {
+            seen.push(output.parts[0]?.text ?? '');
+            return {
+              ...output,
+              parts: [{ text: `${output.parts[0]?.text}-2` }],
+            };
+          },
+        ],
+      },
+    });
+    const result = await handler.handle(buildContext());
+    expect(seen).toEqual(['seed', 'seed-1']);
+    expect(result.status.message?.parts[0]?.text).toBe('seed-1-2');
+  });
+
+  it('supports async callbacks', async () => {
+    const { client } = scriptedClient([assistantText('sync')]);
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      callbacks: {
+        afterAgent: [
+          async (_ctx, output) => {
+            await new Promise((resolve) => setTimeout(resolve, 5));
+            return { ...output, parts: [{ text: 'async-replaced' }] };
+          },
+        ],
+      },
+    });
+    const result = await handler.handle(buildContext());
+    expect(result.status.message?.parts[0]?.text).toBe('async-replaced');
+  });
+
+  it('callback errors propagate as task failures', async () => {
+    const { client } = scriptedClient([assistantText('done')]);
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      logger: silentLogger(),
+      callbacks: {
+        afterModel: [
+          () => {
+            throw new Error('guardrail tripped');
+          },
+        ],
+      },
+    });
+    const result = await handler.handle(buildContext());
+    expect(result.state).toBe(TASK_STATE.FAILED);
+    expect(result.status.message?.parts[0]?.text).toBe('guardrail tripped');
+  });
+
+  it('shares the same state bag across model, tool, and agent callbacks', async () => {
+    const { client } = scriptedClient([
+      assistantToolCalls([{ id: 'a', name: 't', arguments: '{}' }]),
+      assistantText('done'),
+    ]);
+    const toolBox = fakeToolBox({
+      tools: [{ name: 't', description: 't', parameters: {} }],
+      executeTool: async () => 'ok',
+    });
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      toolBox,
+      callbacks: {
+        beforeModel: [
+          (ctx) => {
+            ctx.state['hits'] = ((ctx.state['hits'] as number) ?? 0) + 1;
+            return undefined;
+          },
+        ],
+        beforeTool: [
+          (ctx) => {
+            ctx.state['hits'] = ((ctx.state['hits'] as number) ?? 0) + 1;
+            return undefined;
+          },
+        ],
+        afterAgent: [
+          (ctx, output) => ({
+            ...output,
+            parts: [{ text: `hits=${ctx.state['hits']}` }],
+          }),
+        ],
+      },
+    });
+    const result = await handler.handle(buildContext());
+    // 2 iterations × 1 beforeModel + 1 beforeTool = 3 hits.
+    expect(result.status.message?.parts[0]?.text).toBe('hits=3');
   });
 });

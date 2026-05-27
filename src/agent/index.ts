@@ -45,6 +45,14 @@ export type {
 
 export { AgentBuilder, AgentBuilderError } from './agent-builder.js';
 
+export {
+  runAfterAgent,
+  runAfterModel,
+  runAfterTool,
+  runBeforeAgent,
+  runBeforeModel,
+  runBeforeTool,
+} from './callbacks.js';
 export type {
   AfterAgentCallback,
   AfterModelCallback,

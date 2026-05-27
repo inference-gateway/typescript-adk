@@ -1,4 +1,14 @@
 import {
+  runAfterAgent,
+  runAfterModel,
+  runAfterTool,
+  runBeforeAgent,
+  runBeforeModel,
+  runBeforeTool,
+  type CallbackContext,
+  type Callbacks,
+} from '../agent/callbacks.js';
+import {
   TASK_STATE,
   isTerminal,
   transitionTask,
@@ -217,6 +227,12 @@ export interface DefaultBackgroundTaskHandlerOptions {
    */
   readonly agentName?: string;
   /**
+   * Optional lifecycle callbacks invoked around the agent run, every LLM call,
+   * and every tool dispatch. See {@link import('../agent/callbacks.js').Callbacks}
+   * for the hook points and short-circuit semantics.
+   */
+  readonly callbacks?: Callbacks;
+  /**
    * Read environment variables from this object instead of `process.env`.
    * Test seam.
    */
@@ -263,6 +279,7 @@ export class DefaultBackgroundTaskHandler {
   private readonly maxConversationHistory: number;
   private readonly systemPrompt: string | undefined;
   private readonly agentName: string;
+  private readonly callbacks: Callbacks | undefined;
   private enableUsageMetadata = false;
 
   constructor(options: DefaultBackgroundTaskHandlerOptions) {
@@ -288,6 +305,7 @@ export class DefaultBackgroundTaskHandler {
     }
     this.systemPrompt = options.systemPrompt;
     this.agentName = options.agentName ?? '';
+    this.callbacks = options.callbacks;
   }
 
   /**
@@ -339,8 +357,18 @@ export class DefaultBackgroundTaskHandler {
     const tracker = new UsageTracker();
     const conversation: ChatMessage[] = this.buildInitialConversation(task);
     const toolState: Record<string, unknown> = {};
+    const callbackContext = this.buildCallbackContext(
+      task,
+      context.signal,
+      toolState
+    );
 
     try {
+      const override = await runBeforeAgent(this.callbacks, callbackContext);
+      if (override !== undefined) {
+        return this.finalizeWithMessage(task, override, tracker);
+      }
+
       for (let iteration = 0; iteration < this.maxIterations; iteration++) {
         if (context.signal.aborted) {
           return this.finalizeCancelled(task, tracker);
@@ -355,12 +383,34 @@ export class DefaultBackgroundTaskHandler {
           tools: tools?.length ?? 0,
         });
 
-        const completionOpts: CreateCompletionOptions = {
+        const request = {
           messages: truncated,
-          signal: context.signal,
           ...(tools !== undefined && tools.length > 0 ? { tools } : {}),
         };
-        const result = await this.llmClient.createCompletion(completionOpts);
+        const beforeModelOverride = await runBeforeModel(
+          this.callbacks,
+          callbackContext,
+          request
+        );
+        let result: CompletionResult;
+        if (beforeModelOverride !== undefined) {
+          result = beforeModelOverride;
+        } else {
+          const completionOpts: CreateCompletionOptions = {
+            messages: truncated,
+            signal: context.signal,
+            ...(tools !== undefined && tools.length > 0 ? { tools } : {}),
+          };
+          result = await this.llmClient.createCompletion(completionOpts);
+        }
+        const afterModelOverride = await runAfterModel(
+          this.callbacks,
+          callbackContext,
+          result
+        );
+        if (afterModelOverride !== undefined) {
+          result = afterModelOverride;
+        }
         if (result.usage !== undefined) {
           tracker.addUsage(result.usage);
         }
@@ -369,7 +419,12 @@ export class DefaultBackgroundTaskHandler {
 
         const toolCalls = assistant.toolCalls ?? [];
         if (toolCalls.length === 0) {
-          return this.finalizeCompleted(task, assistant, tracker);
+          return await this.finalizeCompletedWithCallbacks(
+            task,
+            assistant,
+            tracker,
+            callbackContext
+          );
         }
 
         const inputRequired = toolCalls.find(
@@ -400,7 +455,13 @@ export class DefaultBackgroundTaskHandler {
         // are awaited in submission order so the assistant sees them in the
         // same order it produced the calls.
         const dispatches = toolCalls.map((call) =>
-          this.executeTool(call, task, context.signal, toolState)
+          this.executeToolWithCallbacks(
+            call,
+            task,
+            context.signal,
+            toolState,
+            callbackContext
+          )
         );
         const results = await Promise.all(dispatches);
         if (context.signal.aborted) {
@@ -436,6 +497,78 @@ export class DefaultBackgroundTaskHandler {
       this.logger.error('background task failed', { error: message });
       return this.finalizeFailed(task, message, tracker);
     }
+  }
+
+  private buildCallbackContext(
+    task: ManagedTask,
+    signal: AbortSignal,
+    state: Record<string, unknown>
+  ): CallbackContext {
+    return {
+      agentName: this.agentName,
+      invocationId: crypto.randomUUID(),
+      taskId: task.id,
+      contextId: task.contextId,
+      state,
+      logger: this.logger,
+      signal,
+    };
+  }
+
+  private async finalizeCompletedWithCallbacks(
+    task: ManagedTask,
+    assistant: AssistantMessage,
+    tracker: UsageTracker,
+    callbackContext: CallbackContext
+  ): Promise<ManagedTask> {
+    const text = assistant.content ?? '';
+    const message = buildAgentMessage(task, text.length > 0 ? text : 'Done.');
+    const override = await runAfterAgent(
+      this.callbacks,
+      callbackContext,
+      message
+    );
+    const finalMessage = override ?? message;
+    return this.finalizeWithMessage(task, finalMessage, tracker);
+  }
+
+  private finalizeWithMessage(
+    task: ManagedTask,
+    message: Message,
+    tracker: UsageTracker
+  ): ManagedTask {
+    const withMessage: ManagedTask = {
+      ...task,
+      messages: [...task.messages, message],
+    };
+    const next = transitionTask(withMessage, TASK_STATE.COMPLETED, { message });
+    return this.attachMetadata(next, tracker);
+  }
+
+  private async executeToolWithCallbacks(
+    call: ToolCall,
+    task: ManagedTask,
+    signal: AbortSignal,
+    state: Record<string, unknown>,
+    callbackContext: CallbackContext
+  ): Promise<{ readonly ok: boolean; readonly content: string }> {
+    const before = await runBeforeTool(this.callbacks, callbackContext, call);
+    let result: { readonly ok: boolean; readonly content: string };
+    if (before !== undefined) {
+      result = { ok: true, content: before };
+    } else {
+      result = await this.executeTool(call, task, signal, state);
+    }
+    const after = await runAfterTool(
+      this.callbacks,
+      callbackContext,
+      call,
+      result.content
+    );
+    if (after !== undefined) {
+      return { ok: result.ok, content: after };
+    }
+    return result;
   }
 
   private buildInitialConversation(task: ManagedTask): ChatMessage[] {
@@ -505,21 +638,6 @@ export class DefaultBackgroundTaskHandler {
         content: `Error executing tool "${call.name}": ${message}`,
       };
     }
-  }
-
-  private finalizeCompleted(
-    task: ManagedTask,
-    assistant: AssistantMessage,
-    tracker: UsageTracker
-  ): ManagedTask {
-    const text = assistant.content ?? '';
-    const message = buildAgentMessage(task, text.length > 0 ? text : 'Done.');
-    const withMessage: ManagedTask = {
-      ...task,
-      messages: [...task.messages, message],
-    };
-    const next = transitionTask(withMessage, TASK_STATE.COMPLETED, { message });
-    return this.attachMetadata(next, tracker);
   }
 
   private finalizeInputRequired(
