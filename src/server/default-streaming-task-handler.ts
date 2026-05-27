@@ -1,3 +1,13 @@
+import {
+  runAfterAgent,
+  runAfterModel,
+  runAfterTool,
+  runBeforeAgent,
+  runBeforeModel,
+  runBeforeTool,
+  type CallbackContext,
+  type Callbacks,
+} from '../agent/callbacks.js';
 import { TASK_STATE, isTerminal, type ManagedTask } from '../agent/task.js';
 import type { Message } from '../types/generated/a2a.js';
 import {
@@ -10,6 +20,7 @@ import {
   extractInputRequiredPrompt,
   resolveMaxIterations,
   type ChatMessage,
+  type CompletionResult,
   type CreateCompletionOptions,
   type LLMClient,
   type ToolBox,
@@ -58,6 +69,12 @@ export interface DefaultStreamingTaskHandlerOptions {
    * work. Defaults to the empty string.
    */
   readonly agentName?: string;
+  /**
+   * Optional lifecycle callbacks invoked around the agent run, every LLM call,
+   * and every tool dispatch. See {@link import('../agent/callbacks.js').Callbacks}
+   * for the hook points and short-circuit semantics.
+   */
+  readonly callbacks?: Callbacks;
   /**
    * Read environment variables from this object instead of `process.env`.
    * Test seam.
@@ -111,6 +128,7 @@ export class DefaultStreamingTaskHandler {
   private readonly maxConversationHistory: number;
   private readonly systemPrompt: string | undefined;
   private readonly agentName: string;
+  private readonly callbacks: Callbacks | undefined;
   private enableUsageMetadata = false;
 
   constructor(options: DefaultStreamingTaskHandlerOptions) {
@@ -136,6 +154,7 @@ export class DefaultStreamingTaskHandler {
     }
     this.systemPrompt = options.systemPrompt;
     this.agentName = options.agentName ?? '';
+    this.callbacks = options.callbacks;
   }
 
   /**
@@ -190,6 +209,29 @@ export class DefaultStreamingTaskHandler {
       context.task
     );
     const toolState: Record<string, unknown> = {};
+    const callbackContext: CallbackContext = {
+      agentName: this.agentName,
+      invocationId: crypto.randomUUID(),
+      taskId: context.task.id,
+      contextId: context.task.contextId,
+      state: toolState,
+      logger: this.logger,
+      signal: context.signal,
+    };
+
+    const beforeAgentOverride = await runBeforeAgent(
+      this.callbacks,
+      callbackContext
+    );
+    if (beforeAgentOverride !== undefined) {
+      yield { type: 'delta', message: beforeAgentOverride };
+      yield {
+        type: 'statusChanged',
+        state: TASK_STATE.COMPLETED,
+        message: beforeAgentOverride,
+      };
+      return;
+    }
 
     for (let iteration = 0; iteration < this.maxIterations; iteration++) {
       if (context.signal.aborted) {
@@ -205,20 +247,40 @@ export class DefaultStreamingTaskHandler {
         tools: tools?.length ?? 0,
       });
 
-      const completionOpts: CreateCompletionOptions = {
+      const beforeModelRequest = {
         messages: truncated,
-        signal: context.signal,
         ...(tools !== undefined && tools.length > 0 ? { tools } : {}),
       };
-
-      let result;
-      try {
-        result = await this.llmClient.createCompletion(completionOpts);
-      } catch (err) {
-        if (context.signal.aborted) {
-          return;
+      const beforeModelOverride = await runBeforeModel(
+        this.callbacks,
+        callbackContext,
+        beforeModelRequest
+      );
+      let result: CompletionResult;
+      if (beforeModelOverride !== undefined) {
+        result = beforeModelOverride;
+      } else {
+        const completionOpts: CreateCompletionOptions = {
+          messages: truncated,
+          signal: context.signal,
+          ...(tools !== undefined && tools.length > 0 ? { tools } : {}),
+        };
+        try {
+          result = await this.llmClient.createCompletion(completionOpts);
+        } catch (err) {
+          if (context.signal.aborted) {
+            return;
+          }
+          throw err;
         }
-        throw err;
+      }
+      const afterModelOverride = await runAfterModel(
+        this.callbacks,
+        callbackContext,
+        result
+      );
+      if (afterModelOverride !== undefined) {
+        result = afterModelOverride;
       }
 
       if (result.usage !== undefined) {
@@ -240,10 +302,19 @@ export class DefaultStreamingTaskHandler {
           context.task,
           text.length > 0 ? text : 'Done.'
         );
+        const afterAgentOverride = await runAfterAgent(
+          this.callbacks,
+          callbackContext,
+          completionMessage
+        );
+        const finalMessage = afterAgentOverride ?? completionMessage;
+        if (afterAgentOverride !== undefined) {
+          yield { type: 'delta', message: finalMessage };
+        }
         yield {
           type: 'iterationCompleted',
           iteration: iteration + 1,
-          message: completionMessage,
+          message: finalMessage,
         };
         return;
       }
@@ -337,7 +408,13 @@ export class DefaultStreamingTaskHandler {
         };
       }
       const dispatches = toolCalls.map((call) =>
-        this.executeTool(call, context.task, context.signal, toolState)
+        this.executeToolWithCallbacks(
+          call,
+          context.task,
+          context.signal,
+          toolState,
+          callbackContext
+        )
       );
 
       for (let i = 0; i < toolCalls.length; i++) {
@@ -471,5 +548,31 @@ export class DefaultStreamingTaskHandler {
         content: `Error executing tool "${call.name}": ${message}`,
       };
     }
+  }
+
+  private async executeToolWithCallbacks(
+    call: ToolCall,
+    task: ManagedTask,
+    signal: AbortSignal,
+    state: Record<string, unknown>,
+    callbackContext: CallbackContext
+  ): Promise<{ readonly ok: boolean; readonly content: string }> {
+    const before = await runBeforeTool(this.callbacks, callbackContext, call);
+    let result: { readonly ok: boolean; readonly content: string };
+    if (before !== undefined) {
+      result = { ok: true, content: before };
+    } else {
+      result = await this.executeTool(call, task, signal, state);
+    }
+    const after = await runAfterTool(
+      this.callbacks,
+      callbackContext,
+      call,
+      result.content
+    );
+    if (after !== undefined) {
+      return { ok: result.ok, content: after };
+    }
+    return result;
   }
 }
