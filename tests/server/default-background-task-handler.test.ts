@@ -646,8 +646,6 @@ describe('DefaultBackgroundTaskHandler concurrent tool dispatch', () => {
     const elapsed = Date.now() - start;
     expect(result.state).toBe(TASK_STATE.COMPLETED);
     expect(peakConcurrent).toBe(3);
-    // Three 30ms sleeps in parallel should still fit well under the 90ms a
-    // sequential dispatch would need; give a generous CI-friendly margin.
     expect(elapsed).toBeLessThan(85);
   });
 
@@ -759,8 +757,6 @@ describe('DefaultBackgroundTaskHandler concurrent tool dispatch', () => {
     controller.abort();
     const result = await pending;
     expect(result.state).toBe(TASK_STATE.CANCELLED);
-    // Both executors observed an aborted signal (the abort raced ahead of
-    // their sleep).
     expect(aborted.every((flag) => flag)).toBe(true);
   });
 });

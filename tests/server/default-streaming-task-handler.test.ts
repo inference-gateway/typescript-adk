@@ -451,9 +451,6 @@ describe('DefaultStreamingTaskHandler cancellation', () => {
     const events = await drain(
       handler.handle(buildContext({ signal: controller.signal }))
     );
-    // Both toolStarted events are emitted up-front (concurrent dispatch); the
-    // abort fires during the executor body, so both tools start but no
-    // results are awaited.
     expect(events[0]?.type).toBe('toolStarted');
     // No iterationCompleted because we bailed out of the loop.
     expect(events.find((e) => e.type === 'iterationCompleted')).toBeUndefined();

@@ -325,10 +325,6 @@ export class DefaultStreamingTaskHandler {
         lastAssistantMessage = buildAgentMessage(context.task, text);
       }
 
-      // Emit toolStarted for every call up front, then dispatch them in
-      // parallel; results are awaited (and announced) in submission order so
-      // the SSE consumer always sees `started -> result` pairs in the same
-      // order the LLM produced them.
       for (const call of toolCalls) {
         if (context.signal.aborted) {
           return;
