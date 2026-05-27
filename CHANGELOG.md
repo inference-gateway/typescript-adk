@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0](https://github.com/inference-gateway/typescript-adk/compare/v0.6.0...v0.7.0) (2026-05-27)
+
+### ✨ Features
+
+* **examples:** add minimal A2A server + client example without LLM ([#69](https://github.com/inference-gateway/typescript-adk/issues/69)) ([c35c557](https://github.com/inference-gateway/typescript-adk/commit/c35c5574406d6b19ee63d24bf91a7cc0fa6969e8)), closes [#14](https://github.com/inference-gateway/typescript-adk/issues/14)
+* **examples:** add streaming server + client example ([#72](https://github.com/inference-gateway/typescript-adk/issues/72)) ([4d3a463](https://github.com/inference-gateway/typescript-adk/commit/4d3a4637aa536bbaf1a478310b977ad0ffb69b57)), closes [#17](https://github.com/inference-gateway/typescript-adk/issues/17)
+* **server:** add A2AServerBuilder fluent API ([#73](https://github.com/inference-gateway/typescript-adk/issues/73)) ([92d5cc6](https://github.com/inference-gateway/typescript-adk/commit/92d5cc687a79d2a1a11a1fc80ce3ee59c21bf9f7)), closes [#18](https://github.com/inference-gateway/typescript-adk/issues/18)
+* **server:** implement message/stream JSON-RPC method with SSE transport ([#71](https://github.com/inference-gateway/typescript-adk/issues/71)) ([bc084ab](https://github.com/inference-gateway/typescript-adk/commit/bc084ab9b3d8e011a72c1d102781518303989454)), closes [#16](https://github.com/inference-gateway/typescript-adk/issues/16)
+* **server:** implement SSE streaming transport with CloudEvents v1.0 envelope ([#70](https://github.com/inference-gateway/typescript-adk/issues/70)) ([52ddd95](https://github.com/inference-gateway/typescript-adk/commit/52ddd95366796c432d53c6a0da9ea53c9c0d372c)), closes [#15](https://github.com/inference-gateway/typescript-adk/issues/15)
+
+### 📚 Documentation
+
+* improve the readme ([6f0077a](https://github.com/inference-gateway/typescript-adk/commit/6f0077ae47719ad91de078bd99117c943e6a7c00))
+
 ## [0.6.0](https://github.com/inference-gateway/typescript-adk/compare/v0.5.0...v0.6.0) (2026-05-26)
 
 ### ✨ Features
