@@ -85,6 +85,7 @@
     "@hono/node-server": "^2.0.4",
     "@inference-gateway/sdk": "^0.8.6",
     "ajv": "^8.20.0",
-    "hono": "^4.12.23"
+    "hono": "^4.12.23",
+    "jose": "^6.2.3"
   }
 }

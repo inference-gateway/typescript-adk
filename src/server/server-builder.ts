@@ -6,6 +6,9 @@ import {
   transitionTask,
   type ManagedTask,
 } from '../agent/task.js';
+import type { Authenticator } from '../auth/authenticator.js';
+import { decorateAgentCardWithAuth } from '../auth/card-decoration.js';
+import type { AuthConfig } from '../auth/config.js';
 import { InMemoryTaskStorage } from '../storage/in-memory.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type { AgentCard, Message } from '../types/generated/a2a.js';
@@ -192,6 +195,8 @@ export class A2AServerBuilder<
   private taskResultProcessor: TaskResultProcessor | undefined;
   private agent: OpenAICompatibleAgent | undefined;
   private artifactService: ArtifactService | undefined;
+  private authenticator: Authenticator | undefined;
+  private authConfig: AuthConfig | undefined;
 
   constructor(
     config: A2AServerBuilderConfig = {},
@@ -348,6 +353,34 @@ export class A2AServerBuilder<
   }
 
   /**
+   * Install an OIDC authenticator. When the authenticator is `enabled`, its
+   * middleware is applied to the JSON-RPC endpoint by the constructed
+   * {@link A2AServer}. A disabled authenticator (e.g.,
+   * `NoopAuthenticator`) is accepted unchanged - the server treats it as a
+   * pass-through and the agent card is left untouched.
+   *
+   * When the `authConfig` is also supplied (via {@link withAuthConfig}), the
+   * builder additionally decorates the agent card with the OIDC security
+   * scheme at `build()` time so callers don't have to remember to do it
+   * manually.
+   */
+  withAuthenticator(authenticator: Authenticator): this {
+    this.authenticator = authenticator;
+    return this;
+  }
+
+  /**
+   * Provide the auth configuration the {@link withAuthenticator} above was
+   * built from. Used solely to decorate the agent card with OIDC security
+   * metadata at `build()` time; if omitted, the card is left untouched
+   * regardless of whether the authenticator is enabled.
+   */
+  withAuthConfig(config: AuthConfig): this {
+    this.authConfig = config;
+    return this;
+  }
+
+  /**
    * Create and return the configured A2A server.
    *
    * Validates that:
@@ -396,6 +429,12 @@ export class A2AServerBuilder<
   getLogger(): Logger {
     return this.builderLogger;
   }
+  getAuthenticator(): Authenticator | undefined {
+    return this.authenticator;
+  }
+  getAuthConfig(): AuthConfig | undefined {
+    return this.authConfig;
+  }
 
   private buildInternal(): A2AServer {
     const card = this.agentCard;
@@ -429,13 +468,21 @@ export class A2AServerBuilder<
     const cancellationRegistry = new TaskCancellationRegistry();
     const eventBusRegistry = new TaskEventBusRegistry();
 
+    const advertisedCard =
+      this.authConfig !== undefined
+        ? decorateAgentCardWithAuth(card, this.authConfig)
+        : card;
+
     const serverConfig: A2AServerConfig = {
-      card,
+      card: advertisedCard,
       ...(this.builderConfig.cacheControl !== undefined
         ? { cacheControl: this.builderConfig.cacheControl }
         : {}),
       ...(this.builderConfig.jsonRpcPath !== undefined
         ? { jsonRpcPath: this.builderConfig.jsonRpcPath }
+        : {}),
+      ...(this.authenticator !== undefined
+        ? { authenticator: this.authenticator }
         : {}),
     };
 

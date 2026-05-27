@@ -2,6 +2,7 @@ import { createAdaptorServer } from '@hono/node-server';
 import { Hono } from 'hono';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import type { Authenticator } from '../auth/index.js';
 import type { AgentCard } from '../types/generated/a2a.js';
 import {
   JSONRPC_ERROR_CODES,
@@ -59,6 +60,16 @@ export interface A2AServerConfig {
    * {@link DEFAULT_JSONRPC_PATH}.
    */
   readonly jsonRpcPath?: string;
+  /**
+   * Optional authenticator. When provided and `enabled`, its middleware is
+   * applied to the JSON-RPC endpoint (`POST <jsonRpcPath>`). The agent card
+   * discovery (`GET /.well-known/agent-card.json`) and health
+   * (`GET /health`) endpoints are intentionally left unauthenticated so
+   * clients can discover the agent before negotiating credentials.
+   *
+   * A disabled or omitted authenticator is a zero-overhead no-op.
+   */
+  readonly authenticator?: Authenticator;
 }
 
 type NodeServer = Server;
@@ -78,6 +89,7 @@ export class A2AServer {
   private readonly card: AgentCard;
   private readonly cacheControl: string;
   private readonly jsonRpcPath: string;
+  private readonly authenticator: Authenticator | undefined;
   private readonly registry = new MethodRegistry();
   private readonly streamingRegistry = new Map<
     string,
@@ -90,6 +102,7 @@ export class A2AServer {
     this.card = config.card;
     this.cacheControl = config.cacheControl ?? DEFAULT_AGENT_CARD_CACHE_CONTROL;
     this.jsonRpcPath = config.jsonRpcPath ?? DEFAULT_JSONRPC_PATH;
+    this.authenticator = config.authenticator;
 
     this.app = this.buildApp();
     this.httpServer = createAdaptorServer({
@@ -111,6 +124,10 @@ export class A2AServer {
     });
 
     app.get(HEALTH_PATH, (c) => c.json({ status: 'healthy' }));
+
+    if (this.authenticator !== undefined && this.authenticator.enabled) {
+      app.use(this.jsonRpcPath, this.authenticator.middleware());
+    }
 
     app.post(this.jsonRpcPath, async (c) => {
       const body = await c.req.text();
