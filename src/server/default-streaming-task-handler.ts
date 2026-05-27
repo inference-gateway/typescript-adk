@@ -21,6 +21,7 @@ import type {
   StreamingTaskExecutor,
 } from './message-stream.js';
 import { NOOP_LOGGER, type Logger } from './server-builder.js';
+import { createToolContext } from './toolbox.js';
 
 /** Constructor options for {@link DefaultStreamingTaskHandler}. */
 export interface DefaultStreamingTaskHandlerOptions {
@@ -51,6 +52,12 @@ export interface DefaultStreamingTaskHandlerOptions {
    * {@link maxConversationHistory}.
    */
   readonly systemPrompt?: string;
+  /**
+   * Optional name of the agent running these tasks. Forwarded to every
+   * {@link import('./toolbox.js').ToolContext} so tools can attribute their
+   * work. Defaults to the empty string.
+   */
+  readonly agentName?: string;
   /**
    * Read environment variables from this object instead of `process.env`.
    * Test seam.
@@ -103,6 +110,7 @@ export class DefaultStreamingTaskHandler {
   private readonly maxIterations: number;
   private readonly maxConversationHistory: number;
   private readonly systemPrompt: string | undefined;
+  private readonly agentName: string;
   private enableUsageMetadata = false;
 
   constructor(options: DefaultStreamingTaskHandlerOptions) {
@@ -127,6 +135,7 @@ export class DefaultStreamingTaskHandler {
       );
     }
     this.systemPrompt = options.systemPrompt;
+    this.agentName = options.agentName ?? '';
   }
 
   /**
@@ -180,6 +189,7 @@ export class DefaultStreamingTaskHandler {
     const conversation: ChatMessage[] = this.buildInitialConversation(
       context.task
     );
+    const toolState: Record<string, unknown> = {};
 
     for (let iteration = 0; iteration < this.maxIterations; iteration++) {
       if (context.signal.aborted) {
@@ -188,7 +198,7 @@ export class DefaultStreamingTaskHandler {
       tracker.incrementIteration();
 
       const truncated = this.truncateConversation(conversation);
-      const tools = this.toolBox?.list();
+      const tools = this.toolBox?.getTools();
       this.logger.debug('streaming iteration starting', {
         iteration: iteration + 1,
         messages: truncated.length,
@@ -315,6 +325,10 @@ export class DefaultStreamingTaskHandler {
         lastAssistantMessage = buildAgentMessage(context.task, text);
       }
 
+      // Emit toolStarted for every call up front, then dispatch them in
+      // parallel; results are awaited (and announced) in submission order so
+      // the SSE consumer always sees `started -> result` pairs in the same
+      // order the LLM produced them.
       for (const call of toolCalls) {
         if (context.signal.aborted) {
           return;
@@ -325,12 +339,20 @@ export class DefaultStreamingTaskHandler {
           toolName: call.name,
           arguments: call.arguments,
         };
+      }
+      const dispatches = toolCalls.map((call) =>
+        this.executeTool(call, context.task, context.signal, toolState)
+      );
 
-        const toolResult = await this.executeTool(
-          call,
-          context.task,
-          context.signal
-        );
+      for (let i = 0; i < toolCalls.length; i++) {
+        if (context.signal.aborted) {
+          return;
+        }
+        const call = toolCalls[i] as ToolCall;
+        const toolResult = (await dispatches[i]) as {
+          readonly ok: boolean;
+          readonly content: string;
+        };
         if (context.signal.aborted) {
           return;
         }
@@ -419,7 +441,8 @@ export class DefaultStreamingTaskHandler {
   private async executeTool(
     call: ToolCall,
     task: ManagedTask,
-    signal: AbortSignal
+    signal: AbortSignal,
+    state: Record<string, unknown>
   ): Promise<{ readonly ok: boolean; readonly content: string }> {
     if (this.toolBox === undefined) {
       return {
@@ -428,10 +451,18 @@ export class DefaultStreamingTaskHandler {
       };
     }
     try {
-      const content = await this.toolBox.execute(call.name, call.arguments, {
-        task,
-        signal,
-      });
+      const content = await this.toolBox.executeTool(
+        call.name,
+        call.arguments,
+        createToolContext({
+          task,
+          invocationId: call.id,
+          signal,
+          state,
+          agentName: this.agentName,
+          logger: this.logger,
+        })
+      );
       return { ok: true, content };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

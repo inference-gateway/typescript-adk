@@ -674,9 +674,17 @@ describe('Resume with a custom user toolbox containing only non-reserved tools',
   it('still pauses on input_required even when input_required is not in the user toolbox list (handler intercepts by name)', async () => {
     // Custom toolbox without input_required - should still intercept the call.
     const customToolbox: import('../../src/server/index.js').ToolBox = {
-      list: () => [{ name: 'lookup', description: 'Look up', parameters: {} }],
-      execute: async (name) => {
-        throw new Error(`unexpected execute for ${name}`);
+      getTools: () => [
+        { name: 'lookup', description: 'Look up', parameters: {} },
+      ],
+      executeTool: async (name) => {
+        throw new Error(`unexpected executeTool for ${name}`);
+      },
+      getToolNames: () => ['lookup'],
+      hasTool: (name) => name === 'lookup',
+      getTool: () => undefined,
+      addTool: () => {
+        throw new Error('customToolbox is read-only');
       },
     };
 
@@ -724,7 +732,7 @@ describe('Resume with a custom user toolbox containing only non-reserved tools',
       })
     );
     const names = toolbox
-      .list()
+      .getTools()
       .map((t) => t.name)
       .sort();
     expect(names).toEqual([INPUT_REQUIRED_TOOL, 'lookup'].sort());

@@ -108,6 +108,25 @@ function assistantToolCalls(
   };
 }
 
+function fakeToolBox(input: {
+  readonly tools?: readonly ToolDefinition[];
+  readonly executeTool?: ToolBox['executeTool'];
+}): ToolBox {
+  const tools = input.tools ?? [];
+  const executeTool: ToolBox['executeTool'] =
+    input.executeTool ?? (async () => '');
+  return {
+    getTools: () => tools,
+    executeTool,
+    getToolNames: () => tools.map((t) => t.name),
+    hasTool: (name) => tools.some((t) => t.name === name),
+    getTool: () => undefined,
+    addTool: () => {
+      throw new Error('fakeToolBox is read-only');
+    },
+  };
+}
+
 describe('DefaultBackgroundTaskHandler constructor', () => {
   it('resolves the iteration cap from MAX_CHAT_COMPLETION_ITERATIONS env var', () => {
     const handler = new DefaultBackgroundTaskHandler({
@@ -228,19 +247,19 @@ describe('DefaultBackgroundTaskHandler happy path', () => {
       assistantText('found 42 results'),
     ]);
     const executed: Array<{ name: string; args: string }> = [];
-    const toolBox: ToolBox = {
-      list: () => [
+    const toolBox = fakeToolBox({
+      tools: [
         {
           name: 'lookup',
           description: 'Look something up',
           parameters: {},
         },
       ],
-      execute: async (name, args) => {
+      executeTool: async (name, args) => {
         executed.push({ name, args });
         return '42';
       },
-    };
+    });
     const handler = new DefaultBackgroundTaskHandler({
       llmClient: client,
       toolBox,
@@ -286,10 +305,10 @@ describe('DefaultBackgroundTaskHandler iteration cap', () => {
       );
     }
     const { client, calls } = scriptedClient(responses);
-    const toolBox: ToolBox = {
-      list: () => [{ name: 'noop', description: 'noop', parameters: {} }],
-      execute: async () => 'ok',
-    };
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'noop', description: 'noop', parameters: {} }],
+      executeTool: async () => 'ok',
+    });
     const handler = new DefaultBackgroundTaskHandler({
       llmClient: client,
       toolBox,
@@ -313,10 +332,10 @@ describe('DefaultBackgroundTaskHandler iteration cap', () => {
       ]),
       assistantText('done'),
     ]);
-    const toolBox: ToolBox = {
-      list: () => [{ name: 't', description: 't', parameters: {} }],
-      execute: async () => 'ok',
-    };
+    const toolBox = fakeToolBox({
+      tools: [{ name: 't', description: 't', parameters: {} }],
+      executeTool: async () => 'ok',
+    });
     const handler = new DefaultBackgroundTaskHandler({
       llmClient: client,
       toolBox,
@@ -384,10 +403,10 @@ describe('DefaultBackgroundTaskHandler history truncation', () => {
       assistantToolCalls([{ id: 'call-2', name: 't', arguments: '{}' }]),
       assistantText('done'),
     ]);
-    const toolBox: ToolBox = {
-      list: () => [{ name: 't', description: 't', parameters: {} }],
-      execute: async () => 'result',
-    };
+    const toolBox = fakeToolBox({
+      tools: [{ name: 't', description: 't', parameters: {} }],
+      executeTool: async () => 'result',
+    });
     const handler = new DefaultBackgroundTaskHandler({
       llmClient: client,
       toolBox,
@@ -412,16 +431,16 @@ describe('DefaultBackgroundTaskHandler input_required interception', () => {
       ]),
     ]);
     const executed = vi.fn().mockResolvedValue('should-not-run');
-    const toolBox: ToolBox = {
-      list: () => [
+    const toolBox = fakeToolBox({
+      tools: [
         {
           name: INPUT_REQUIRED_TOOL,
           description: 'Pause and wait for user input.',
           parameters: {},
         },
       ],
-      execute: executed,
-    };
+      executeTool: executed,
+    });
     const handler = new DefaultBackgroundTaskHandler({
       llmClient: client,
       toolBox,
@@ -476,10 +495,10 @@ describe('DefaultBackgroundTaskHandler usage metadata', () => {
         totalTokens: 11,
       }),
     ]);
-    const toolBox: ToolBox = {
-      list: () => [{ name: 't', description: 't', parameters: {} }],
-      execute: async () => 'ok',
-    };
+    const toolBox = fakeToolBox({
+      tools: [{ name: 't', description: 't', parameters: {} }],
+      executeTool: async () => 'ok',
+    });
     const handler = new DefaultBackgroundTaskHandler({
       llmClient: client,
       toolBox,
@@ -508,14 +527,12 @@ describe('DefaultBackgroundTaskHandler usage metadata', () => {
       assistantToolCalls([{ id: 'a', name: 'broken', arguments: '{}' }]),
       assistantText('giving up'),
     ]);
-    const toolBox: ToolBox = {
-      list: () => [
-        { name: 'broken', description: 'always fails', parameters: {} },
-      ],
-      execute: async () => {
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'broken', description: 'always fails', parameters: {} }],
+      executeTool: async () => {
         throw new Error('boom');
       },
-    };
+    });
     const handler = new DefaultBackgroundTaskHandler({
       llmClient: client,
       toolBox,
@@ -563,14 +580,12 @@ describe('DefaultBackgroundTaskHandler error handling', () => {
       assistantToolCalls([{ id: 'a', name: 'broken', arguments: '{}' }]),
       assistantText('moving on'),
     ]);
-    const toolBox: ToolBox = {
-      list: () => [
-        { name: 'broken', description: 'always fails', parameters: {} },
-      ],
-      execute: async () => {
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'broken', description: 'always fails', parameters: {} }],
+      executeTool: async () => {
         throw new Error('boom');
       },
-    };
+    });
     const handler = new DefaultBackgroundTaskHandler({
       llmClient: client,
       toolBox,
@@ -597,6 +612,156 @@ describe('DefaultBackgroundTaskHandler error handling', () => {
       toolCallId: 'a',
       content: 'Tool "do_thing" is not available: no toolBox configured.',
     });
+  });
+});
+
+describe('DefaultBackgroundTaskHandler concurrent tool dispatch', () => {
+  it('runs parallel tool calls concurrently', async () => {
+    const { client } = scriptedClient([
+      assistantToolCalls([
+        { id: 'a', name: 'wait', arguments: '{"ms":40}' },
+        { id: 'b', name: 'wait', arguments: '{"ms":40}' },
+        { id: 'c', name: 'wait', arguments: '{"ms":40}' },
+      ]),
+      assistantText('done'),
+    ]);
+    let liveConcurrent = 0;
+    let peakConcurrent = 0;
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'wait', description: 'sleeps', parameters: {} }],
+      executeTool: async () => {
+        liveConcurrent++;
+        peakConcurrent = Math.max(peakConcurrent, liveConcurrent);
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        liveConcurrent--;
+        return 'slept';
+      },
+    });
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      toolBox,
+    });
+    const start = Date.now();
+    const result = await handler.handle(buildContext());
+    const elapsed = Date.now() - start;
+    expect(result.state).toBe(TASK_STATE.COMPLETED);
+    expect(peakConcurrent).toBe(3);
+    // Three 30ms sleeps in parallel should still fit well under the 90ms a
+    // sequential dispatch would need; give a generous CI-friendly margin.
+    expect(elapsed).toBeLessThan(85);
+  });
+
+  it('preserves submission order in the conversation tail even when slow tools resolve last', async () => {
+    const { client, calls } = scriptedClient([
+      assistantToolCalls([
+        { id: 'slow', name: 'wait', arguments: '{"ms":40}' },
+        { id: 'fast', name: 'fast', arguments: '{}' },
+      ]),
+      assistantText('done'),
+    ]);
+    const toolBox = fakeToolBox({
+      tools: [
+        { name: 'wait', description: 'sleeps', parameters: {} },
+        { name: 'fast', description: 'returns quickly', parameters: {} },
+      ],
+      executeTool: async (name) => {
+        if (name === 'wait') {
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          return 'slept';
+        }
+        return 'fast-result';
+      },
+    });
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      toolBox,
+    });
+    await handler.handle(buildContext());
+    const toolMessages = calls[1]?.messages.filter((m) => m.role === 'tool');
+    expect(toolMessages?.map((m) => m.toolCallId)).toEqual(['slow', 'fast']);
+  });
+
+  it('shares the same mutable state record across every tool call in a handle()', async () => {
+    const { client } = scriptedClient([
+      assistantToolCalls([
+        { id: '1', name: 'tick', arguments: '{}' },
+        { id: '2', name: 'tick', arguments: '{}' },
+      ]),
+      assistantToolCalls([{ id: '3', name: 'tick', arguments: '{}' }]),
+      assistantText('done'),
+    ]);
+    const stateRefs = new Set<object>();
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'tick', description: 'increments', parameters: {} }],
+      executeTool: async (_name, _args, context) => {
+        stateRefs.add(context.state);
+        const previous = (context.state['count'] as number | undefined) ?? 0;
+        context.state['count'] = previous + 1;
+        return String(context.state['count']);
+      },
+    });
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      toolBox,
+    });
+    await handler.handle(buildContext());
+    expect(stateRefs.size).toBe(1);
+  });
+
+  it('forwards the configured agentName to every ToolContext', async () => {
+    const { client } = scriptedClient([
+      assistantToolCalls([{ id: 'x', name: 'inspect', arguments: '{}' }]),
+      assistantText('done'),
+    ]);
+    let seenAgentName: string | undefined;
+    let seenInvocationId: string | undefined;
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'inspect', description: 'inspect', parameters: {} }],
+      executeTool: async (_name, _args, context) => {
+        seenAgentName = context.agentName;
+        seenInvocationId = context.invocationId;
+        return 'ok';
+      },
+    });
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      toolBox,
+      agentName: 'forecaster',
+    });
+    await handler.handle(buildContext());
+    expect(seenAgentName).toBe('forecaster');
+    expect(seenInvocationId).toBe('x');
+  });
+
+  it('honors per-tool AbortSignal cancellation by aborting the handler signal', async () => {
+    const controller = new AbortController();
+    const { client } = scriptedClient([
+      assistantToolCalls([
+        { id: 'a', name: 'check', arguments: '{}' },
+        { id: 'b', name: 'check', arguments: '{}' },
+      ]),
+    ]);
+    const aborted: boolean[] = [];
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'check', description: 'check', parameters: {} }],
+      executeTool: async (_name, _args, context) => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        aborted.push(context.signal.aborted);
+        return 'ok';
+      },
+    });
+    const handler = new DefaultBackgroundTaskHandler({
+      llmClient: client,
+      toolBox,
+    });
+    const ctx = { ...buildContext(), signal: controller.signal };
+    const pending = handler.handle(ctx);
+    controller.abort();
+    const result = await pending;
+    expect(result.state).toBe(TASK_STATE.CANCELLED);
+    // Both executors observed an aborted signal (the abort raced ahead of
+    // their sleep).
+    expect(aborted.every((flag) => flag)).toBe(true);
   });
 });
 

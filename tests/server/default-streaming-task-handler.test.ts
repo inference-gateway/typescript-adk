@@ -102,6 +102,25 @@ function assistantToolCalls(
   };
 }
 
+function fakeToolBox(input: {
+  readonly tools?: readonly ToolDefinition[];
+  readonly executeTool?: ToolBox['executeTool'];
+}): ToolBox {
+  const tools = input.tools ?? [];
+  const executeTool: ToolBox['executeTool'] =
+    input.executeTool ?? (async () => '');
+  return {
+    getTools: () => tools,
+    executeTool,
+    getToolNames: () => tools.map((t) => t.name),
+    hasTool: (name) => tools.some((t) => t.name === name),
+    getTool: () => undefined,
+    addTool: () => {
+      throw new Error('fakeToolBox is read-only');
+    },
+  };
+}
+
 async function drain(
   iterable: AsyncIterable<StreamingTaskEvent>
 ): Promise<StreamingTaskEvent[]> {
@@ -237,15 +256,15 @@ describe('DefaultStreamingTaskHandler happy path', () => {
       assistantText('found 42 results'),
     ]);
     const executed: Array<{ name: string; args: string }> = [];
-    const toolBox: ToolBox = {
-      list: () => [
+    const toolBox = fakeToolBox({
+      tools: [
         { name: 'lookup', description: 'Look something up', parameters: {} },
       ],
-      execute: async (name, args) => {
+      executeTool: async (name, args) => {
         executed.push({ name, args });
         return '42';
       },
-    };
+    });
     const handler = new DefaultStreamingTaskHandler({
       llmClient: client,
       toolBox,
@@ -312,16 +331,16 @@ describe('DefaultStreamingTaskHandler input_required interception', () => {
       ]),
     ]);
     const executed = vi.fn().mockResolvedValue('should-not-run');
-    const toolBox: ToolBox = {
-      list: () => [
+    const toolBox = fakeToolBox({
+      tools: [
         {
           name: INPUT_REQUIRED_TOOL,
           description: 'Pause and wait for user input.',
           parameters: {},
         },
       ],
-      execute: executed,
-    };
+      executeTool: executed,
+    });
     const handler = new DefaultStreamingTaskHandler({
       llmClient: client,
       toolBox,
@@ -377,10 +396,10 @@ describe('DefaultStreamingTaskHandler iteration cap', () => {
       );
     }
     const { client } = scriptedClient(responses);
-    const toolBox: ToolBox = {
-      list: () => [{ name: 'noop', description: 'noop', parameters: {} }],
-      execute: async () => 'ok',
-    };
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'noop', description: 'noop', parameters: {} }],
+      executeTool: async () => 'ok',
+    });
     const handler = new DefaultStreamingTaskHandler({
       llmClient: client,
       toolBox,
@@ -418,13 +437,13 @@ describe('DefaultStreamingTaskHandler cancellation', () => {
         { id: 'b', name: 't', arguments: '{}' },
       ]),
     ]);
-    const toolBox: ToolBox = {
-      list: () => [{ name: 't', description: 't', parameters: {} }],
-      execute: async () => {
+    const toolBox = fakeToolBox({
+      tools: [{ name: 't', description: 't', parameters: {} }],
+      executeTool: async () => {
         controller.abort();
         return 'aborted-during';
       },
-    };
+    });
     const handler = new DefaultStreamingTaskHandler({
       llmClient: client,
       toolBox,
@@ -432,8 +451,9 @@ describe('DefaultStreamingTaskHandler cancellation', () => {
     const events = await drain(
       handler.handle(buildContext({ signal: controller.signal }))
     );
-    // Should have yielded toolStarted for the first call before the executor
-    // body aborts; afterwards generator returns and the second call is skipped.
+    // Both toolStarted events are emitted up-front (concurrent dispatch); the
+    // abort fires during the executor body, so both tools start but no
+    // results are awaited.
     expect(events[0]?.type).toBe('toolStarted');
     // No iterationCompleted because we bailed out of the loop.
     expect(events.find((e) => e.type === 'iterationCompleted')).toBeUndefined();
@@ -446,14 +466,12 @@ describe('DefaultStreamingTaskHandler tool failure handling', () => {
       assistantToolCalls([{ id: 'a', name: 'broken', arguments: '{}' }]),
       assistantText('moving on'),
     ]);
-    const toolBox: ToolBox = {
-      list: () => [
-        { name: 'broken', description: 'always fails', parameters: {} },
-      ],
-      execute: async () => {
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'broken', description: 'always fails', parameters: {} }],
+      executeTool: async () => {
         throw new Error('boom');
       },
-    };
+    });
     const handler = new DefaultStreamingTaskHandler({
       llmClient: client,
       toolBox,
