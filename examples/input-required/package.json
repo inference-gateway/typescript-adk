@@ -1,0 +1,21 @@
+{
+  "name": "@inference-gateway/adk-example-input-required",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Input-required A2A server + client example for @inference-gateway/adk — pause + client-driven resume, no LLM.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx server.ts",
+    "start:server": "tsx server.ts",
+    "start:client": "tsx client.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@inference-gateway/adk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.19.2",
+    "typescript": "^6.0.3"
+  }
+}
