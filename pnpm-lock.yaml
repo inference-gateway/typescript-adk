@@ -11,6 +11,9 @@ importers:
       '@hono/node-server':
         specifier: ^2.0.4
         version: 2.0.4(hono@4.12.23)
+      '@inference-gateway/sdk':
+        specifier: ^0.8.6
+        version: 0.8.6
       hono:
         specifier: ^4.12.23
         version: 4.12.23
@@ -518,6 +521,15 @@ packages:
   '@humanwhocodes/retry@0.4.3':
     resolution: {integrity: sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==}
     engines: {node: '>=18.18'}
+
+  '@inference-gateway/sdk@0.8.6':
+    resolution: {integrity: sha512-LZfvaIUVHzN9Jh50Tc/dejoesaupDP8rZs8a0JM8KK/ljL5BVRQ75DozvazbBu1SOOD3CpfoPPU4wblBINvRYg==}
+    engines: {node: '>=24.15.0'}
+    peerDependencies:
+      node-fetch: ^2.7.0
+    peerDependenciesMeta:
+      node-fetch:
+        optional: true
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -1900,6 +1912,8 @@ snapshots:
   '@humanwhocodes/module-importer@1.0.1': {}
 
   '@humanwhocodes/retry@0.4.3': {}
+
+  '@inference-gateway/sdk@0.8.6': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
