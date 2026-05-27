@@ -25,6 +25,7 @@ import {
   type CloudEvent,
 } from './cloudevents.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
+import { appendAndResume, findResumableTask } from './message-send.js';
 import type { MethodContext } from './method-registry.js';
 import { SSEStreamWriter } from './sse.js';
 import type { TaskCancellationRegistry } from './task-cancellation.js';
@@ -301,16 +302,47 @@ export function createMessageStreamHandler(
 
   return (params: unknown, context: MethodContext): StreamingMethodResult => {
     const validated = validateMessageStreamParams(params);
-    const taskId = newId();
-    const enrichedMessage = enrichMessage(validated.message, newId);
+    const inboundContextId =
+      typeof validated.message.contextId === 'string' &&
+      validated.message.contextId.length > 0
+        ? validated.message.contextId
+        : undefined;
 
-    let task = createTask({
-      id: taskId,
-      contextId: enrichedMessage.contextId as string,
-      messages: [enrichedMessage],
-      now: clock,
-    });
-    storage.enqueue(task);
+    let task: ManagedTask;
+    let enrichedMessage: Message;
+    let resumingExistingTask = false;
+    if (inboundContextId !== undefined) {
+      const paused = findResumableTask(storage, inboundContextId);
+      if (paused !== undefined) {
+        enrichedMessage = enrichMessage(
+          validated.message,
+          newId,
+          paused.contextId
+        );
+        task = appendAndResume(paused, enrichedMessage, clock);
+        storage.updateActive(task);
+        resumingExistingTask = true;
+      } else {
+        enrichedMessage = enrichMessage(validated.message, newId);
+        task = createTask({
+          id: newId(),
+          contextId: enrichedMessage.contextId as string,
+          messages: [enrichedMessage],
+          now: clock,
+        });
+        storage.enqueue(task);
+      }
+    } else {
+      enrichedMessage = enrichMessage(validated.message, newId);
+      task = createTask({
+        id: newId(),
+        contextId: enrichedMessage.contextId as string,
+        messages: [enrichedMessage],
+        now: clock,
+      });
+      storage.enqueue(task);
+    }
+    const taskId = task.id;
 
     const executorAbort = new AbortController();
     const onParentAbort = (): void => {
@@ -337,9 +369,11 @@ export function createMessageStreamHandler(
     const done = (async (): Promise<void> => {
       let periodicTimer: ReturnType<typeof setInterval> | null = null;
       try {
-        task = transitionAndPersist(task, TASK_STATE.IN_PROGRESS, storage, {
-          now: clock,
-        });
+        if (!resumingExistingTask) {
+          task = transitionAndPersist(task, TASK_STATE.IN_PROGRESS, storage, {
+            now: clock,
+          });
+        }
         emitStatusEvent(writer, task, false, emitOptions);
 
         if (statusUpdateIntervalMs > 0) {
@@ -422,9 +456,12 @@ export function createMessageStreamHandler(
         const persisted = storage.getTask(taskId);
         if (persisted !== undefined && isTerminal(persisted.state)) {
           task = persisted;
-        } else {
+        } else if (isTerminal(task.state)) {
           storage.storeDeadLetter(task);
         }
+        // INPUT_REQUIRED tasks intentionally stay in the active store so a
+        // subsequent message/send or message/stream on the same contextId can
+        // discover and resume them via findResumableTask().
         writer.close();
         if (eventBus !== undefined) {
           eventBus.close();
@@ -471,8 +508,15 @@ function handleExecutorEvent(
       return next;
     }
     case 'inputRequired': {
+      // Append the prompt to task history so a subsequent resume sees the
+      // full conversation (matches DefaultBackgroundTaskHandler.finalizeInputRequired
+      // and the Go ADK's task_handler.go EventInputRequired branch).
+      const withPrompt: ManagedTask = {
+        ...task,
+        messages: [...task.messages, event.message],
+      };
       const next = transitionAndPersist(
-        task,
+        withPrompt,
         TASK_STATE.INPUT_REQUIRED,
         storage,
         { now: clock, message: event.message }
@@ -772,15 +816,20 @@ function validateMessageStreamParams(params: unknown): MessageStreamParams {
   return params as MessageStreamParams;
 }
 
-function enrichMessage(input: Message, newId: () => string): Message {
+function enrichMessage(
+  input: Message,
+  newId: () => string,
+  resumeContextId?: string
+): Message {
   const messageId =
     typeof input.messageId === 'string' && input.messageId.length > 0
       ? input.messageId
       : newId();
   const contextId =
-    typeof input.contextId === 'string' && input.contextId.length > 0
+    resumeContextId ??
+    (typeof input.contextId === 'string' && input.contextId.length > 0
       ? input.contextId
-      : newId();
+      : newId());
   return {
     ...input,
     messageId,
