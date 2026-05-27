@@ -87,3 +87,24 @@ export type {
   StreamingTaskHandler,
   TaskResultProcessor,
 } from './server-builder.js';
+export {
+  DEFAULT_MAX_CHAT_COMPLETION_ITERATIONS,
+  DEFAULT_MAX_CONVERSATION_HISTORY,
+  DefaultBackgroundTaskHandler,
+  INPUT_REQUIRED_TOOL,
+  MAX_CHAT_COMPLETION_ITERATIONS_ENV,
+  UsageTracker,
+} from './default-background-task-handler.js';
+export type {
+  AssistantMessage,
+  ChatMessage,
+  CompletionResult,
+  CompletionUsage,
+  CreateCompletionOptions,
+  DefaultBackgroundTaskHandlerOptions,
+  LLMClient,
+  ToolBox,
+  ToolCall,
+  ToolDefinition,
+  ToolExecutionContext,
+} from './default-background-task-handler.js';
