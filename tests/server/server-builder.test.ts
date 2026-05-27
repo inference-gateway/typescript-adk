@@ -194,6 +194,7 @@ describe('A2AServerBuilder.build success paths', () => {
     expect(server).toBeInstanceOf(A2AServer);
     expect(server.hasMethod(MESSAGE_STREAM_METHOD)).toBe(true);
     expect(server.hasMethod(MESSAGE_SEND_METHOD)).toBe(false);
+    expect(server.hasMethod('tasks/cancel')).toBe(true);
   });
 
   it('builds a server when a non-streaming card has a background handler', () => {

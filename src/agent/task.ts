@@ -97,7 +97,10 @@ const PAUSED_STATES: ReadonlySet<ManagedTaskState> = new Set([
 const VALID_TRANSITIONS: Readonly<
   Record<ManagedTaskState, ReadonlySet<ManagedTaskState>>
 > = {
-  [TASK_STATE.PENDING]: new Set<ManagedTaskState>([TASK_STATE.IN_PROGRESS]),
+  [TASK_STATE.PENDING]: new Set<ManagedTaskState>([
+    TASK_STATE.IN_PROGRESS,
+    TASK_STATE.CANCELLED,
+  ]),
   [TASK_STATE.IN_PROGRESS]: new Set<ManagedTaskState>([
     TASK_STATE.INPUT_REQUIRED,
     TASK_STATE.COMPLETED,
@@ -106,6 +109,7 @@ const VALID_TRANSITIONS: Readonly<
   ]),
   [TASK_STATE.INPUT_REQUIRED]: new Set<ManagedTaskState>([
     TASK_STATE.IN_PROGRESS,
+    TASK_STATE.CANCELLED,
   ]),
   [TASK_STATE.COMPLETED]: new Set<ManagedTaskState>(),
   [TASK_STATE.FAILED]: new Set<ManagedTaskState>(),

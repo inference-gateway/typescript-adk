@@ -20,6 +20,8 @@ import {
   type StreamingTaskExecutor,
 } from './message-stream.js';
 import { A2AServer, type A2AServerConfig } from './server.js';
+import { TASK_CANCEL_METHOD, createTaskCancelHandler } from './task-cancel.js';
+import { TaskCancellationRegistry } from './task-cancellation.js';
 import type {
   StreamableTaskHandler,
   TaskHandler,
@@ -427,6 +429,7 @@ export class A2AServerBuilder<
     }
 
     const storage = this.builderConfig.storage ?? new InMemoryTaskStorage();
+    const cancellationRegistry = new TaskCancellationRegistry();
 
     const serverConfig: A2AServerConfig = {
       card,
@@ -453,9 +456,18 @@ export class A2AServerBuilder<
         createMessageStreamHandler({
           storage,
           executor: this.streamingTaskHandler,
+          cancellationRegistry,
         })
       );
     }
+
+    server.registerMethod(
+      TASK_CANCEL_METHOD,
+      createTaskCancelHandler({
+        storage,
+        registry: cancellationRegistry,
+      })
+    );
 
     return server;
   }

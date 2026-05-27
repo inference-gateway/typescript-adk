@@ -51,6 +51,12 @@ export type {
 } from './message-stream.js';
 export { TASK_GET_METHOD, createTaskGetHandler } from './task-get.js';
 export type { TaskGetHandlerOptions, TaskGetParams } from './task-get.js';
+export { TASK_CANCEL_METHOD, createTaskCancelHandler } from './task-cancel.js';
+export type {
+  TaskCancelHandlerOptions,
+  TaskCancelParams,
+} from './task-cancel.js';
+export { TaskCancellationRegistry } from './task-cancellation.js';
 export {
   DEFAULT_TASK_LIST_LIMIT,
   MAX_TASK_LIST_LIMIT,

@@ -398,6 +398,54 @@ describe('InMemoryTaskStorage - cleanupCompleted', () => {
   });
 });
 
+describe('InMemoryTaskStorage - removeFromQueue', () => {
+  it('removes a queued task and returns true', () => {
+    const storage = new InMemoryTaskStorage();
+    storage.enqueue(makeTask({ id: 'a' }));
+    storage.enqueue(makeTask({ id: 'b' }));
+    storage.enqueue(makeTask({ id: 'c' }));
+
+    expect(storage.removeFromQueue('b')).toBe(true);
+    expect(storage.queueLength()).toBe(2);
+  });
+
+  it('preserves FIFO order of the remaining queued tasks', async () => {
+    const storage = new InMemoryTaskStorage();
+    storage.enqueue(makeTask({ id: 'a' }));
+    storage.enqueue(makeTask({ id: 'b' }));
+    storage.enqueue(makeTask({ id: 'c' }));
+
+    storage.removeFromQueue('b');
+
+    expect((await storage.dequeue()).id).toBe('a');
+    expect((await storage.dequeue()).id).toBe('c');
+  });
+
+  it('returns false for an unknown task id', () => {
+    const storage = new InMemoryTaskStorage();
+    storage.enqueue(makeTask({ id: 'a' }));
+    expect(storage.removeFromQueue('missing')).toBe(false);
+    expect(storage.queueLength()).toBe(1);
+  });
+
+  it('does not touch active or dead-letter storage when removing a queued task', () => {
+    const storage = new InMemoryTaskStorage();
+    const task = makeTask({ id: 'queued' });
+    storage.enqueue(task);
+
+    storage.removeFromQueue('queued');
+
+    expect(storage.getActive('queued')).toBe(task);
+  });
+
+  it('returns false after a task is dequeued (queue no longer holds it)', async () => {
+    const storage = new InMemoryTaskStorage();
+    storage.enqueue(makeTask({ id: 'a' }));
+    await storage.dequeue();
+    expect(storage.removeFromQueue('a')).toBe(false);
+  });
+});
+
 describe('InMemoryTaskStorage - getStats', () => {
   it('reports counts grouped by state', () => {
     const storage = new InMemoryTaskStorage();
