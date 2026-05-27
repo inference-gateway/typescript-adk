@@ -27,6 +27,7 @@ import {
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
 import type { MethodContext } from './method-registry.js';
 import { SSEStreamWriter } from './sse.js';
+import type { TaskCancellationRegistry } from './task-cancellation.js';
 
 /**
  * Canonical JSON-RPC method name for the A2A `message/stream` operation.
@@ -202,6 +203,14 @@ export interface MessageStreamHandlerOptions {
    */
   readonly eventSource?: string;
   /**
+   * Shared cancellation registry. When provided, the handler registers the
+   * executor's `AbortController` under the task id at startup and removes it
+   * once the executor finishes. The `tasks/cancel` JSON-RPC handler (see
+   * {@link import('./task-cancel.js').createTaskCancelHandler}) uses the same
+   * registry to abort in-flight executors.
+   */
+  readonly cancellationRegistry?: TaskCancellationRegistry;
+  /**
    * Read environment variables from this object instead of `process.env`.
    * Mainly a test seam.
    */
@@ -271,7 +280,7 @@ export type StreamingMethodHandler = (
 export function createMessageStreamHandler(
   options: MessageStreamHandlerOptions
 ): StreamingMethodHandler {
-  const { storage, executor } = options;
+  const { storage, executor, cancellationRegistry } = options;
   const newId = options.idGenerator ?? (() => crypto.randomUUID());
   const clock = options.now ?? defaultNow;
   const env = options.env ?? process.env;
@@ -302,6 +311,7 @@ export function createMessageStreamHandler(
     } else {
       context.signal.addEventListener('abort', onParentAbort, { once: true });
     }
+    cancellationRegistry?.register(taskId, executorAbort);
 
     const writer = new SSEStreamWriter({
       signal: context.signal,
@@ -393,7 +403,16 @@ export function createMessageStreamHandler(
           clearInterval(periodicTimer);
         }
         context.signal.removeEventListener('abort', onParentAbort);
-        storage.storeDeadLetter(task);
+        cancellationRegistry?.unregister(taskId);
+        // An external `tasks/cancel` may have already moved the task to the
+        // dead-letter store with the correct terminal state; respect that
+        // rather than overwriting it with our stale local `task` reference.
+        const persisted = storage.getTask(taskId);
+        if (persisted !== undefined && isTerminal(persisted.state)) {
+          task = persisted;
+        } else {
+          storage.storeDeadLetter(task);
+        }
         writer.close();
       }
     })();

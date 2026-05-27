@@ -68,6 +68,18 @@ export interface TaskStorage {
   queueLength(): number;
 
   /**
+   * Remove a task from the FIFO queue by id without affecting active or
+   * dead-letter storage. Returns `true` if the task was present in the queue
+   * and removed, `false` if it was not queued (already dequeued, or never
+   * enqueued under that id).
+   *
+   * Used by cancellation flows to drop a `PENDING` task before any worker
+   * picks it up; the caller is still responsible for transitioning state and
+   * moving the task to the dead-letter store.
+   */
+  removeFromQueue(taskId: string): boolean;
+
+  /**
    * Register `task` as active without enqueueing it. Useful when a task is
    * recreated from a checkpoint or resumed out-of-band. Throws if a task
    * with the same id is already active.

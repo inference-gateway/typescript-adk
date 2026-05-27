@@ -83,6 +83,17 @@ export class InMemoryTaskStorage implements TaskStorage {
     return this.queue.length;
   }
 
+  removeFromQueue(taskId: string): boolean {
+    for (let i = 0; i < this.queue.length; i++) {
+      const queued = this.queue[i];
+      if (queued !== undefined && queued.id === taskId) {
+        this.queue.splice(i, 1);
+        return true;
+      }
+    }
+    return false;
+  }
+
   createActive(task: ManagedTask): void {
     if (this.activeTasks.has(task.id)) {
       throw new TaskStorageError(`active task already exists: ${task.id}`);

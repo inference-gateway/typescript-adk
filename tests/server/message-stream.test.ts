@@ -7,7 +7,9 @@ import {
   JSONRPCError,
   MESSAGE_STREAM_METHOD,
   STREAMING_STATUS_UPDATE_INTERVAL_ENV,
+  TaskCancellationRegistry,
   createMessageStreamHandler,
+  createTaskCancelHandler,
   type StreamingExecutorContext,
   type StreamingTaskExecutor,
 } from '../../src/server/index.js';
@@ -679,5 +681,86 @@ describe('createMessageStreamHandler', () => {
       ).not.toThrow();
       expect(DEFAULT_STREAMING_STATUS_UPDATE_INTERVAL_MS).toBe(1000);
     });
+  });
+});
+
+describe('createMessageStreamHandler + tasks/cancel integration', () => {
+  it('tasks/cancel aborts an in-flight streaming executor via the shared registry', async () => {
+    const storage = new InMemoryTaskStorage();
+    const registry = new TaskCancellationRegistry();
+
+    let observedSignal: AbortSignal | undefined;
+    let executorObservedAbort = false;
+    let resolveParked!: () => void;
+    const executorParked = new Promise<void>((resolve) => {
+      resolveParked = resolve;
+    });
+
+    const executor: StreamingTaskExecutor = async function* (
+      ctx: StreamingExecutorContext
+    ) {
+      observedSignal = ctx.signal;
+      yield {
+        type: 'delta',
+        message: {
+          messageId: 'd-1',
+          role: 'ROLE_AGENT',
+          parts: [{ text: 'partial' }],
+        },
+      };
+      resolveParked();
+      await new Promise<void>((_, reject) => {
+        ctx.signal.addEventListener(
+          'abort',
+          () => {
+            executorObservedAbort = true;
+            reject(new Error('aborted by tasks/cancel'));
+          },
+          { once: true }
+        );
+      });
+    };
+
+    const streamHandler = createMessageStreamHandler({
+      storage,
+      executor,
+      cancellationRegistry: registry,
+      idGenerator: sequentialIdGenerator(),
+      env: { [STREAMING_STATUS_UPDATE_INTERVAL_ENV]: '0' },
+      heartbeatMs: 0,
+    });
+
+    const requestController = new AbortController();
+    const streamResult = streamHandler(
+      { message: makeMessage({ contextId: 'ctx-cancel-integration' }) },
+      { signal: requestController.signal }
+    );
+
+    // Drain the stream in the background so the executor can progress past
+    // its first yield and park on the abort signal.
+    const drain = drainFrames(streamResult.readable);
+
+    await executorParked;
+    expect(registry.has('id-1')).toBe(true);
+
+    const cancelHandler = createTaskCancelHandler({ storage, registry });
+    const cancelled = cancelHandler(
+      { taskId: 'id-1' },
+      { signal: new AbortController().signal }
+    );
+    expect(cancelled).toMatchObject({
+      id: 'id-1',
+      status: { state: TASK_STATE.CANCELLED },
+    });
+
+    await drain;
+    await streamResult.done;
+
+    expect(observedSignal?.aborted).toBe(true);
+    expect(executorObservedAbort).toBe(true);
+    expect(registry.has('id-1')).toBe(false);
+    // The stream's finally must respect the dead-letter entry written by
+    // `tasks/cancel` rather than overwriting it with a stale local task.
+    expect(storage.getTask('id-1')?.state).toBe(TASK_STATE.CANCELLED);
   });
 });
