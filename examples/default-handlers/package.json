@@ -1,0 +1,21 @@
+{
+  "name": "@inference-gateway/adk-example-default-handlers",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Default-handlers example for @inference-gateway/adk — boots an A2A server using A2AServerBuilder.withDefaultTaskHandlers() and exercises both message/send and message/stream from a single client.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx server.ts",
+    "start:server": "tsx server.ts",
+    "start:client": "tsx client.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@inference-gateway/adk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.19.2",
+    "typescript": "^6.0.3"
+  }
+}
