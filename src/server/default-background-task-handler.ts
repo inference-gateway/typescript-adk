@@ -10,15 +10,19 @@ import type {
   BackgroundTaskContext,
   BackgroundTaskHandler,
 } from './server-builder.js';
+import {
+  INPUT_REQUIRED_TOOL,
+  createToolContext,
+  type ToolBox,
+  type ToolDefinition,
+} from './toolbox.js';
 
 /**
- * Reserved tool name the handler intercepts to pause a task awaiting user
- * input. When the LLM calls a tool with this name, the handler transitions the
- * task to `INPUT_REQUIRED` rather than executing it via the toolbox.
- *
- * Mirrors the Go ADK's `input_required` reserved tool (see `adk/server/`).
+ * Re-exported from {@link './toolbox.js'} so callers wiring a handler do not
+ * need to import the reserved-tool constant from two modules. The canonical
+ * definition lives in `toolbox.ts`.
  */
-export const INPUT_REQUIRED_TOOL = 'input_required' as const;
+export { INPUT_REQUIRED_TOOL };
 
 /**
  * Name of the environment variable that overrides the iteration cap. Must
@@ -42,14 +46,11 @@ export const DEFAULT_MAX_CHAT_COMPLETION_ITERATIONS = 50;
 export const DEFAULT_MAX_CONVERSATION_HISTORY = 20;
 
 /**
- * OpenAI-compatible tool definition. `parameters` is the JSON Schema object
- * describing the tool's arguments.
+ * Re-export so callers wiring a handler can pull the LLM-facing tool
+ * definition from one place. The canonical declaration lives in
+ * `toolbox.ts`.
  */
-export interface ToolDefinition {
-  readonly name: string;
-  readonly description: string;
-  readonly parameters: Struct;
-}
+export type { ToolDefinition };
 
 /**
  * A single tool call requested by the assistant in an LLM response. The
@@ -116,28 +117,11 @@ export interface LLMClient {
   createCompletion(options: CreateCompletionOptions): Promise<CompletionResult>;
 }
 
-/** Context passed to a tool's `execute` call. */
-export interface ToolExecutionContext {
-  readonly task: ManagedTask;
-  readonly signal: AbortSignal;
-}
-
 /**
- * Tool registry. `list()` is consulted once per LLM call to advertise the
- * available tools; `execute(name, args, ctx)` runs a specific tool with the
- * raw JSON argument string returned by the model and yields a string that is
- * fed back into the conversation as a `tool` message.
- *
- * Concrete implementations land in issue #31.
+ * Re-exported from {@link './toolbox.js'} so callers that only depend on the
+ * handler surface still pick up the canonical {@link ToolBox} interface.
  */
-export interface ToolBox {
-  list(): readonly ToolDefinition[];
-  execute(
-    name: string,
-    args: string,
-    context: ToolExecutionContext
-  ): Promise<string>;
-}
+export type { ToolBox };
 
 /**
  * Token-usage and execution-statistics accumulator. Mirrors the Go ADK's
@@ -227,6 +211,12 @@ export interface DefaultBackgroundTaskHandlerOptions {
    */
   readonly systemPrompt?: string;
   /**
+   * Optional name of the agent running these tasks. Forwarded to every
+   * {@link import('./toolbox.js').ToolContext} so tools can attribute their
+   * work. Defaults to the empty string.
+   */
+  readonly agentName?: string;
+  /**
    * Read environment variables from this object instead of `process.env`.
    * Test seam.
    */
@@ -272,6 +262,7 @@ export class DefaultBackgroundTaskHandler {
   private readonly maxIterations: number;
   private readonly maxConversationHistory: number;
   private readonly systemPrompt: string | undefined;
+  private readonly agentName: string;
   private enableUsageMetadata = false;
 
   constructor(options: DefaultBackgroundTaskHandlerOptions) {
@@ -296,6 +287,7 @@ export class DefaultBackgroundTaskHandler {
       );
     }
     this.systemPrompt = options.systemPrompt;
+    this.agentName = options.agentName ?? '';
   }
 
   /**
@@ -346,6 +338,7 @@ export class DefaultBackgroundTaskHandler {
 
     const tracker = new UsageTracker();
     const conversation: ChatMessage[] = this.buildInitialConversation(task);
+    const toolState: Record<string, unknown> = {};
 
     try {
       for (let iteration = 0; iteration < this.maxIterations; iteration++) {
@@ -355,7 +348,7 @@ export class DefaultBackgroundTaskHandler {
         tracker.incrementIteration();
 
         const truncated = this.truncateConversation(conversation);
-        const tools = this.toolBox?.list();
+        const tools = this.toolBox?.getTools();
         this.logger.debug('llm iteration starting', {
           iteration: iteration + 1,
           messages: truncated.length,
@@ -403,11 +396,22 @@ export class DefaultBackgroundTaskHandler {
           continue;
         }
 
-        for (const call of toolCalls) {
-          if (context.signal.aborted) {
-            return this.finalizeCancelled(task, tracker);
-          }
-          const toolResult = await this.executeTool(call, task, context.signal);
+        // Dispatch every tool call from this iteration concurrently. Results
+        // are awaited in submission order so the assistant sees them in the
+        // same order it produced the calls.
+        const dispatches = toolCalls.map((call) =>
+          this.executeTool(call, task, context.signal, toolState)
+        );
+        const results = await Promise.all(dispatches);
+        if (context.signal.aborted) {
+          return this.finalizeCancelled(task, tracker);
+        }
+        for (let i = 0; i < toolCalls.length; i++) {
+          const call = toolCalls[i] as ToolCall;
+          const toolResult = results[i] as {
+            readonly ok: boolean;
+            readonly content: string;
+          };
           if (!toolResult.ok) {
             tracker.incrementFailedTools();
           }
@@ -467,7 +471,8 @@ export class DefaultBackgroundTaskHandler {
   private async executeTool(
     call: ToolCall,
     task: ManagedTask,
-    signal: AbortSignal
+    signal: AbortSignal,
+    state: Record<string, unknown>
   ): Promise<{ readonly ok: boolean; readonly content: string }> {
     if (this.toolBox === undefined) {
       return {
@@ -476,10 +481,18 @@ export class DefaultBackgroundTaskHandler {
       };
     }
     try {
-      const content = await this.toolBox.execute(call.name, call.arguments, {
-        task,
-        signal,
-      });
+      const content = await this.toolBox.executeTool(
+        call.name,
+        call.arguments,
+        createToolContext({
+          task,
+          invocationId: call.id,
+          signal,
+          state,
+          agentName: this.agentName,
+          logger: this.logger,
+        })
+      );
       return { ok: true, content };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

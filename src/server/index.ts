@@ -126,7 +126,6 @@ export {
   DEFAULT_MAX_CHAT_COMPLETION_ITERATIONS,
   DEFAULT_MAX_CONVERSATION_HISTORY,
   DefaultBackgroundTaskHandler,
-  INPUT_REQUIRED_TOOL,
   MAX_CHAT_COMPLETION_ITERATIONS_ENV,
   UsageTracker,
 } from './default-background-task-handler.js';
@@ -138,23 +137,32 @@ export type {
   CreateCompletionOptions,
   DefaultBackgroundTaskHandlerOptions,
   LLMClient,
-  ToolBox,
   ToolCall,
-  ToolDefinition,
-  ToolExecutionContext,
 } from './default-background-task-handler.js';
 export { DefaultStreamingTaskHandler } from './default-streaming-task-handler.js';
 export type { DefaultStreamingTaskHandlerOptions } from './default-streaming-task-handler.js';
 export {
+  CREATE_ARTIFACT_TOOL,
+  CREATE_ARTIFACT_TOOL_DESCRIPTION,
+  CREATE_ARTIFACT_TOOL_PARAMETERS,
   DefaultToolBox,
+  INPUT_REQUIRED_TOOL,
   INPUT_REQUIRED_TOOL_DESCRIPTION,
   INPUT_REQUIRED_TOOL_PARAMETERS,
   RESERVED_TOOL_NAMES,
   ReservedToolNameError,
   ToolNotFoundError,
+  ToolSchemaValidationError,
   createTool,
+  createToolContext,
 } from './toolbox.js';
-export type { Tool } from './toolbox.js';
+export type {
+  DefaultToolBoxOptions,
+  Tool,
+  ToolBox,
+  ToolContext,
+  ToolDefinition,
+} from './toolbox.js';
 export { BaseStreamableTaskHandler, BaseTaskHandler } from './task-handler.js';
 export type {
   StreamableTaskHandler,

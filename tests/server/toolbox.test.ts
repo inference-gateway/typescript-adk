@@ -1,16 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createTask } from '../../src/agent/task.js';
-import { INPUT_REQUIRED_TOOL } from '../../src/server/default-background-task-handler.js';
 import {
+  CREATE_ARTIFACT_TOOL,
   DefaultToolBox,
+  INPUT_REQUIRED_TOOL,
   INPUT_REQUIRED_TOOL_DESCRIPTION,
   INPUT_REQUIRED_TOOL_PARAMETERS,
   RESERVED_TOOL_NAMES,
   ReservedToolNameError,
   ToolNotFoundError,
+  ToolSchemaValidationError,
   createTool,
+  createToolContext,
 } from '../../src/server/toolbox.js';
 import type { Tool } from '../../src/server/toolbox.js';
+
+function ctx(taskId = 't', contextId = 'c') {
+  return createToolContext({
+    task: createTask({ id: taskId, contextId }),
+    invocationId: 'inv-1',
+    signal: new AbortController().signal,
+  });
+}
 
 describe('DefaultToolBox reserved input_required tool', () => {
   it('auto-registers input_required at construction', () => {
@@ -19,16 +30,49 @@ describe('DefaultToolBox reserved input_required tool', () => {
     expect(toolbox.getToolNames()).toContain(INPUT_REQUIRED_TOOL);
   });
 
-  it('surfaces the reserved tool in list() with the canonical description and schema', () => {
+  it('surfaces the reserved tool in getTools() with the canonical description and schema', () => {
     const toolbox = new DefaultToolBox();
-    const def = toolbox.list().find((t) => t.name === INPUT_REQUIRED_TOOL);
+    const def = toolbox.getTools().find((t) => t.name === INPUT_REQUIRED_TOOL);
     expect(def).toBeDefined();
     expect(def?.description).toBe(INPUT_REQUIRED_TOOL_DESCRIPTION);
     expect(def?.parameters).toEqual(INPUT_REQUIRED_TOOL_PARAMETERS);
   });
 
-  it('RESERVED_TOOL_NAMES contains input_required', () => {
+  it('RESERVED_TOOL_NAMES contains both reserved tool names', () => {
     expect(RESERVED_TOOL_NAMES.has(INPUT_REQUIRED_TOOL)).toBe(true);
+    expect(RESERVED_TOOL_NAMES.has(CREATE_ARTIFACT_TOOL)).toBe(true);
+  });
+});
+
+describe('DefaultToolBox create_artifact opt-in', () => {
+  it('is OFF by default', () => {
+    const toolbox = new DefaultToolBox();
+    expect(toolbox.hasTool(CREATE_ARTIFACT_TOOL)).toBe(false);
+    expect(toolbox.getToolNames()).not.toContain(CREATE_ARTIFACT_TOOL);
+  });
+
+  it('is registered when enableCreateArtifact is true', () => {
+    const toolbox = new DefaultToolBox({ enableCreateArtifact: true });
+    expect(toolbox.hasTool(CREATE_ARTIFACT_TOOL)).toBe(true);
+    const def = toolbox.getTools().find((t) => t.name === CREATE_ARTIFACT_TOOL);
+    expect(def?.parameters).toMatchObject({
+      type: 'object',
+      required: ['name', 'parts'],
+    });
+  });
+
+  it('still refuses user tools that shadow create_artifact even when disabled', () => {
+    const toolbox = new DefaultToolBox();
+    expect(() =>
+      toolbox.addTool(
+        createTool({
+          name: CREATE_ARTIFACT_TOOL,
+          description: 'sneaky',
+          parameters: { type: 'object' },
+          execute: async () => '',
+        })
+      )
+    ).toThrow(ReservedToolNameError);
   });
 });
 
@@ -99,7 +143,7 @@ describe('DefaultToolBox shadowing guard', () => {
   });
 });
 
-describe('DefaultToolBox.execute', () => {
+describe('DefaultToolBox.executeTool', () => {
   it('dispatches a user tool by name and returns its result', async () => {
     const toolbox = new DefaultToolBox();
     const exec = vi.fn().mockResolvedValue('43');
@@ -107,38 +151,143 @@ describe('DefaultToolBox.execute', () => {
       createTool({
         name: 'lookup',
         description: 'Look something up',
-        parameters: { type: 'object' },
+        parameters: {
+          type: 'object',
+          properties: { q: { type: 'string' } },
+        },
         execute: exec,
       })
     );
-    const task = createTask({ id: 't', contextId: 'c' });
-    const result = await toolbox.execute('lookup', '{"q":"x"}', {
-      task,
-      signal: new AbortController().signal,
-    });
+    const result = await toolbox.executeTool('lookup', '{"q":"x"}', ctx());
     expect(result).toBe('43');
     expect(exec).toHaveBeenCalledWith('{"q":"x"}', expect.anything());
   });
 
   it('throws ToolNotFoundError when the tool name is unknown', async () => {
     const toolbox = new DefaultToolBox();
-    const task = createTask({ id: 't', contextId: 'c' });
     await expect(
-      toolbox.execute('missing', '{}', {
-        task,
-        signal: new AbortController().signal,
-      })
+      toolbox.executeTool('missing', '{}', ctx())
     ).rejects.toBeInstanceOf(ToolNotFoundError);
   });
 
-  it('reserved input_required executor is a no-op returning empty string (handler intercepts before execute is reached)', async () => {
+  it('reserved input_required executor is a no-op returning empty string', async () => {
     const toolbox = new DefaultToolBox();
-    const task = createTask({ id: 't', contextId: 'c' });
-    const result = await toolbox.execute(INPUT_REQUIRED_TOOL, '{}', {
-      task,
-      signal: new AbortController().signal,
-    });
+    const result = await toolbox.executeTool(
+      INPUT_REQUIRED_TOOL,
+      '{"message":"hi"}',
+      ctx()
+    );
     expect(result).toBe('');
+  });
+
+  it('passes the full ToolContext (taskId, contextId, invocationId, state, logger, signal) through', async () => {
+    const toolbox = new DefaultToolBox();
+    const received: unknown[] = [];
+    toolbox.addTool(
+      createTool({
+        name: 'inspect',
+        description: 'inspect',
+        parameters: { type: 'object' },
+        execute: async (_args, context) => {
+          received.push(context);
+          return 'ok';
+        },
+      })
+    );
+    const sharedState: Record<string, unknown> = { calls: 0 };
+    const customContext = createToolContext({
+      task: createTask({ id: 'task-7', contextId: 'ctx-9' }),
+      invocationId: 'inv-42',
+      signal: new AbortController().signal,
+      state: sharedState,
+      agentName: 'unit-test-agent',
+    });
+    await toolbox.executeTool('inspect', '{}', customContext);
+    expect(received[0]).toMatchObject({
+      taskId: 'task-7',
+      contextId: 'ctx-9',
+      invocationId: 'inv-42',
+      agentName: 'unit-test-agent',
+      state: sharedState,
+    });
+  });
+});
+
+describe('DefaultToolBox.executeTool JSON-schema validation', () => {
+  it('rejects arguments that miss a required field', async () => {
+    const toolbox = new DefaultToolBox();
+    toolbox.addTool(
+      createTool({
+        name: 'lookup',
+        description: 'requires q',
+        parameters: {
+          type: 'object',
+          properties: { q: { type: 'string' } },
+          required: ['q'],
+        },
+        execute: async () => 'should not run',
+      })
+    );
+    await expect(
+      toolbox.executeTool('lookup', '{}', ctx())
+    ).rejects.toBeInstanceOf(ToolSchemaValidationError);
+  });
+
+  it('rejects arguments whose type does not match the schema', async () => {
+    const toolbox = new DefaultToolBox();
+    toolbox.addTool(
+      createTool({
+        name: 'inc',
+        description: 'requires n number',
+        parameters: {
+          type: 'object',
+          properties: { n: { type: 'number' } },
+          required: ['n'],
+        },
+        execute: async () => 'never',
+      })
+    );
+    try {
+      await toolbox.executeTool('inc', '{"n":"oops"}', ctx());
+    } catch (err) {
+      expect(err).toBeInstanceOf(ToolSchemaValidationError);
+      expect((err as ToolSchemaValidationError).toolName).toBe('inc');
+      expect((err as ToolSchemaValidationError).errors.length).toBeGreaterThan(
+        0
+      );
+      return;
+    }
+    throw new Error('expected ToolSchemaValidationError');
+  });
+
+  it('rejects arguments that are not valid JSON', async () => {
+    const toolbox = new DefaultToolBox();
+    toolbox.addTool(
+      createTool({
+        name: 'noop',
+        description: 'noop',
+        parameters: { type: 'object' },
+        execute: async () => 'never',
+      })
+    );
+    await expect(
+      toolbox.executeTool('noop', '{not json', ctx())
+    ).rejects.toBeInstanceOf(ToolSchemaValidationError);
+  });
+
+  it('treats an empty argument string as {}', async () => {
+    const toolbox = new DefaultToolBox();
+    const exec = vi.fn().mockResolvedValue('ok');
+    toolbox.addTool(
+      createTool({
+        name: 'noop',
+        description: 'noop',
+        parameters: { type: 'object' },
+        execute: exec,
+      })
+    );
+    await expect(toolbox.executeTool('noop', '', ctx())).resolves.toBe('ok');
+    expect(exec).toHaveBeenCalled();
   });
 });
 
@@ -167,5 +316,21 @@ describe('createTool', () => {
     expect(tool.name).toBe('demo');
     expect(tool.description).toBe('demo description');
     expect(tool.parameters).toEqual({ type: 'object' });
+  });
+});
+
+describe('createToolContext', () => {
+  it('fills defaults for agentName/state/logger', () => {
+    const context = createToolContext({
+      task: createTask({ id: 't', contextId: 'c' }),
+      invocationId: 'inv',
+      signal: new AbortController().signal,
+    });
+    expect(context.agentName).toBe('');
+    expect(context.state).toEqual({});
+    expect(typeof context.logger.info).toBe('function');
+    expect(context.taskId).toBe('t');
+    expect(context.contextId).toBe('c');
+    expect(context.invocationId).toBe('inv');
   });
 });

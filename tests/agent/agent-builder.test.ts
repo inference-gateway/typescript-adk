@@ -15,9 +15,10 @@ import {
 import {
   DEFAULT_MAX_CHAT_COMPLETION_ITERATIONS,
   DEFAULT_MAX_CONVERSATION_HISTORY,
+  type Tool,
   type ToolBox,
+  type ToolContext,
   type ToolDefinition,
-  type ToolExecutionContext,
 } from '../../src/server/index.js';
 
 function fakeTransport(): LLMTransport {
@@ -41,15 +42,27 @@ function fakeLLMClient(model = 'gpt-4o-mini'): OpenAICompatibleLLMClient {
 
 function noopToolBox(): ToolBox {
   return {
-    list(): readonly ToolDefinition[] {
+    getTools(): readonly ToolDefinition[] {
       return [];
     },
-    async execute(
+    async executeTool(
       _name: string,
       _args: string,
-      _context: ToolExecutionContext
+      _context: ToolContext
     ): Promise<string> {
       return '';
+    },
+    getToolNames(): readonly string[] {
+      return [];
+    },
+    hasTool(_name: string): boolean {
+      return false;
+    },
+    getTool(_name: string): Tool | undefined {
+      return undefined;
+    },
+    addTool(_tool: Tool): void {
+      throw new Error('not used in builder tests');
     },
   };
 }
