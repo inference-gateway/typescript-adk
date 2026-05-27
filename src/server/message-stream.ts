@@ -88,6 +88,10 @@ export interface MessageStreamParams {
  *  - `toolStarted` / `toolCompleted` / `toolFailed` / `toolResult`: emit the
  *    corresponding `adk.agent.tool.*` SSE frames around a tool dispatch. None
  *    of these change task state.
+ *  - `rawCloudEvent`: forward a pre-built CloudEvents envelope to the SSE
+ *    stream verbatim. Does not change task state. Used by the
+ *    {@link import('./task-handler.js').StreamableTaskHandler} adapter so
+ *    handlers that yield raw CloudEvents can plug into this pipeline.
  */
 export type StreamingTaskEvent =
   | { readonly type: 'delta'; readonly message: Message }
@@ -126,7 +130,8 @@ export type StreamingTaskEvent =
       readonly toolName: string;
       readonly result: string;
       readonly isError: boolean;
-    };
+    }
+  | { readonly type: 'rawCloudEvent'; readonly event: CloudEvent };
 
 /**
  * Context handed to a {@link StreamingTaskExecutor} on each invocation.
@@ -458,6 +463,10 @@ function handleExecutorEvent(
     }
     case 'toolResult': {
       emitToolResultEvent(writer, task, event, emitOptions);
+      return task;
+    }
+    case 'rawCloudEvent': {
+      writer.emitCloudEvent(event.event);
       return task;
     }
   }
