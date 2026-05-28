@@ -38,3 +38,4 @@ export * from './client/index.js';
 export * from './llm/index.js';
 export * from './telemetry/index.js';
 export * from './metrics/index.js';
+export * from './tls/index.js';

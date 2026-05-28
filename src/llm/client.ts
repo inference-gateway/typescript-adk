@@ -3,6 +3,7 @@ import {
   type ChatCompletionStreamCallbacks,
   type SchemaCreateChatCompletionRequest,
 } from '@inference-gateway/sdk';
+import { createTLSFetch, type ClientTLSConfig } from '../tls/index.js';
 import { LLMConfigurationError, LLMRequestError } from './errors.js';
 import {
   Provider,
@@ -94,9 +95,21 @@ export interface OpenAICompatibleLLMClientConfig {
   /** Custom `fetch` implementation. Defaults to `globalThis.fetch`. */
   readonly fetch?: typeof globalThis.fetch;
   /**
+   * Optional client TLS configuration for HTTPS calls to the gateway / LLM
+   * provider. When set, the client builds a `fetch` backed by an
+   * `https.Agent` configured with the supplied cert/key/CA - this is
+   * mutually exclusive with the {@link fetch} slot. Supplying both throws
+   * {@link LLMConfigurationError}.
+   *
+   * For local development against self-signed certs, set
+   * `tls: { insecureSkipVerify: true }`. In production, point
+   * {@link ClientTLSConfig.caPath} at the CA bundle that signed the peer.
+   */
+  readonly tls?: ClientTLSConfig;
+  /**
    * Pre-built {@link LLMTransport} (typically a fake) used in tests. When
-   * supplied, `baseURL`/`apiKey`/`headers`/`fetch` on this config are ignored
-   * - the caller is responsible for the transport's configuration.
+   * supplied, `baseURL`/`apiKey`/`headers`/`fetch`/`tls` on this config are
+   * ignored - the caller is responsible for the transport's configuration.
    */
   readonly client?: LLMTransport;
 }
@@ -179,6 +192,11 @@ export class OpenAICompatibleLLMClient {
     if (config.client !== undefined) {
       this.transport = config.client;
     } else {
+      if (config.fetch !== undefined && config.tls !== undefined) {
+        throw new LLMConfigurationError(
+          'fetch and tls are mutually exclusive - build your own fetch from createTLSFetch if you need both'
+        );
+      }
       const options: ConstructorParameters<typeof InferenceGatewayClient>[0] = {
         timeout: config.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS,
       };
@@ -186,7 +204,13 @@ export class OpenAICompatibleLLMClient {
       if (config.apiKey !== undefined) options.apiKey = config.apiKey;
       if (config.headers !== undefined)
         options.defaultHeaders = { ...config.headers };
-      if (config.fetch !== undefined) options.fetch = config.fetch;
+      if (config.fetch !== undefined) {
+        options.fetch = config.fetch;
+      } else if (config.tls !== undefined) {
+        options.fetch = createTLSFetch(
+          config.tls
+        ) as unknown as typeof globalThis.fetch;
+      }
       this.transport = new InferenceGatewayClient(options);
     }
 

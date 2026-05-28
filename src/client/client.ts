@@ -1,4 +1,5 @@
 import pkg from '../../package.json' with { type: 'json' };
+import { createTLSFetch, type ClientTLSConfig } from '../tls/index.js';
 import type {
   AgentCard,
   Message,
@@ -122,6 +123,18 @@ export interface A2AClientConfig {
    * to disable retries entirely. Defaults to {@link DEFAULT_RETRY_CONFIG}.
    */
   readonly retry?: Partial<RetryConfig> | false;
+  /**
+   * Optional client TLS configuration. When set, the client builds a `fetch`
+   * backed by an `https.Agent` configured with the supplied cert/key/CA -
+   * use this to talk to an A2A peer with a self-signed or private-CA cert
+   * without resorting to disabling system trust globally.
+   *
+   * Mutually exclusive with {@link fetch}: supplying both throws
+   * {@link A2AClientError}. To combine TLS with a custom fetch wrapper,
+   * build the fetch yourself via `createTLSFetch` and pass it via
+   * {@link fetch}.
+   */
+  readonly tls?: ClientTLSConfig;
 }
 
 /**
@@ -204,7 +217,16 @@ export class A2AClient {
     this.baseURL = stripTrailingSlash(config.baseURL);
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.headers = config.headers ?? {};
-    const resolvedFetch = config.fetch ?? globalThis.fetch;
+    if (config.fetch !== undefined && config.tls !== undefined) {
+      throw new A2AClientError(
+        'fetch and tls are mutually exclusive - build your own fetch from createTLSFetch if you need both'
+      );
+    }
+    const resolvedFetch =
+      config.fetch ??
+      (config.tls !== undefined
+        ? (createTLSFetch(config.tls) as unknown as FetchLike)
+        : globalThis.fetch);
     if (typeof resolvedFetch !== 'function') {
       throw new A2AClientError(
         'no fetch implementation available; pass `fetch` in config'
