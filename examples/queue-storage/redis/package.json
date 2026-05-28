@@ -1,0 +1,24 @@
+{
+  "name": "@inference-gateway/adk-example-queue-storage-redis",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Queue storage example: A2A echo agent backed by RedisTaskStorage. Ships a docker-compose.yml for local Redis.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx server.ts",
+    "start:server": "tsx server.ts",
+    "start:client": "tsx client.ts",
+    "redis:up": "docker compose up -d",
+    "redis:down": "docker compose down -v",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@inference-gateway/adk": "workspace:*",
+    "ioredis": "^5.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.19.2",
+    "typescript": "^6.0.3"
+  }
+}
