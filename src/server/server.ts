@@ -2,12 +2,17 @@ import { createAdaptorServer } from '@hono/node-server';
 import { Hono } from 'hono';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import type { ArtifactStorageProvider } from '../artifacts/artifact-storage.js';
 import type { Authenticator } from '../auth/index.js';
 import type { AgentCard } from '../types/generated/a2a.js';
 import {
   GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
   createGetAuthenticatedExtendedCardHandler,
 } from './agent-extended-card.js';
+import {
+  DEFAULT_ARTIFACTS_PATH,
+  registerArtifactsRoute,
+} from './artifacts-route.js';
 import {
   JSONRPC_ERROR_CODES,
   JSONRPC_VERSION,
@@ -87,6 +92,22 @@ export interface A2AServerConfig {
    * A disabled or omitted authenticator is a zero-overhead no-op.
    */
   readonly authenticator?: Authenticator;
+  /**
+   * Optional artifact storage backend. When provided, the server mounts a
+   * `GET <artifactsPath>/:artifactId/:filename` endpoint that streams the
+   * stored bytes with their recorded `Content-Type`. When omitted, the
+   * endpoint is not registered and matching requests yield 404.
+   *
+   * Pair with a backend that produces matching download URLs (the in-memory
+   * and filesystem providers' `getUrl` already match this shape).
+   */
+  readonly artifactStorage?: ArtifactStorageProvider;
+  /**
+   * Path the artifact download endpoint is mounted at. Defaults to
+   * {@link DEFAULT_ARTIFACTS_PATH}. Ignored when {@link artifactStorage} is
+   * omitted.
+   */
+  readonly artifactsPath?: string;
 }
 
 type NodeServer = Server;
@@ -107,6 +128,8 @@ export class A2AServer {
   private readonly cacheControl: string;
   private readonly jsonRpcPath: string;
   private readonly authenticator: Authenticator | undefined;
+  private readonly artifactStorage: ArtifactStorageProvider | undefined;
+  private readonly artifactsPath: string;
   private readonly registry = new MethodRegistry();
   private readonly streamingRegistry = new Map<
     string,
@@ -120,6 +143,8 @@ export class A2AServer {
     this.cacheControl = config.cacheControl ?? DEFAULT_AGENT_CARD_CACHE_CONTROL;
     this.jsonRpcPath = config.jsonRpcPath ?? DEFAULT_JSONRPC_PATH;
     this.authenticator = config.authenticator;
+    this.artifactStorage = config.artifactStorage;
+    this.artifactsPath = config.artifactsPath ?? DEFAULT_ARTIFACTS_PATH;
 
     if (config.extendedCard !== undefined) {
       this.registry.register(
@@ -150,6 +175,13 @@ export class A2AServer {
     });
 
     app.get(HEALTH_PATH, (c) => c.json({ status: 'healthy' }));
+
+    if (this.artifactStorage !== undefined) {
+      registerArtifactsRoute(app, {
+        storage: this.artifactStorage,
+        path: this.artifactsPath,
+      });
+    }
 
     if (this.authenticator !== undefined && this.authenticator.enabled) {
       app.use(this.jsonRpcPath, this.authenticator.middleware());

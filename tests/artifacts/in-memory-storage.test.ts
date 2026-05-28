@@ -69,6 +69,22 @@ describe('InMemoryArtifactStorage', () => {
     expect(await storage.exists('missing', 'f')).toBe(false);
   });
 
+  it('getMetadata returns the stored metadata or undefined', async () => {
+    const stamp = new Date('2026-03-01T12:00:00Z');
+    const storage = new InMemoryArtifactStorage({ now: () => stamp });
+    await storage.store(
+      'a',
+      'f.txt',
+      new TextEncoder().encode('hi'),
+      'text/plain'
+    );
+    const meta = await storage.getMetadata('a', 'f.txt');
+    expect(meta?.contentType).toBe('text/plain');
+    expect(meta?.size).toBe(2);
+    expect(meta?.uploadedAt.getTime()).toBe(stamp.getTime());
+    expect(await storage.getMetadata('a', 'missing')).toBeUndefined();
+  });
+
   it('delete removes the file', async () => {
     const storage = new InMemoryArtifactStorage();
     await storage.store('a', 'f', new Uint8Array(), 'application/octet-stream');
