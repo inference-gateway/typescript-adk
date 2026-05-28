@@ -204,7 +204,7 @@ Each example ships its own README with setup instructions.
 
 ### Status & Roadmap
 
-The TypeScript ADK currently focuses on the core A2A protocol surface: `message/send`, `tasks/get`, `tasks/list`, AgentCard discovery, the task lifecycle state machine, in-memory storage, the retrying client, CloudEvents, and SSE. Capabilities that exist in the [Go ADK](https://github.com/inference-gateway/adk) but are **not yet implemented** here include: LLM client / multi-provider chat completion, streaming task handlers, additional JSON-RPC methods (`tasks/cancel`, `tasks/resubscribe`, `tasks/pushNotificationConfig/*`, `agent/getAuthenticatedExtendedCard`), Redis-backed storage, file artifacts (filesystem & MinIO), OIDC/OAuth authentication, TLS configuration, push notifications, and OpenTelemetry-based observability. The TS ADK tracks the Go ADK as the long-term feature target - contributions toward parity are welcome.
+The TypeScript ADK currently focuses on the core A2A protocol surface: `message/send`, `tasks/get`, `tasks/list`, AgentCard discovery, the task lifecycle state machine, in-memory and Redis-backed storage, the retrying client, CloudEvents, and SSE. Capabilities that exist in the [Go ADK](https://github.com/inference-gateway/adk) but are **not yet implemented** here include: LLM client / multi-provider chat completion, streaming task handlers, additional JSON-RPC methods (`tasks/cancel`, `tasks/resubscribe`, `tasks/pushNotificationConfig/*`, `agent/getAuthenticatedExtendedCard`), file artifacts (filesystem & MinIO), OIDC/OAuth authentication, TLS configuration, push notifications, and OpenTelemetry-based observability. The TS ADK tracks the Go ADK as the long-term feature target - contributions toward parity are welcome.
 
 ## 📖 API Reference
 
@@ -263,7 +263,26 @@ The included `InMemoryTaskStorage` is suitable for tests, local development, and
 - `getStats()` - snapshot of storage health (counts by state, queue length, etc.)
 - `cleanupCompleted()`, `deleteContext(id)` - cleanup helpers
 
-To plug in a different backend (Redis, Postgres, S3-backed), implement `TaskStorage` and pass your implementation to the message-send and task-get handlers.
+To plug in a different backend (Postgres, S3-backed, ...), implement `TaskStorage` and pass your implementation to the message-send and task-get handlers. A Redis-backed implementation ships out of the box - see below.
+
+#### `RedisTaskStorage`
+
+For multi-instance deployments that need a shared queue, the package also exports `RedisTaskStorage`, a `TaskStorage` implementation backed by Redis 6+ via [`ioredis`](https://github.com/redis/ioredis) (declared as an optional peer dependency - install it alongside the ADK to use this backend).
+
+Because the `TaskStorage` interface is synchronous (`dequeue` aside), the Redis backend keeps an in-memory write-through mirror: sync reads serve from memory while writes update both memory and Redis, and the blocking `BRPOP` loop is the cross-instance shared-queue source of truth. Single-instance deployments get persistence across restarts (state is hydrated from Redis on `connect`); multi-instance deployments get a shared queue plus eventually-consistent state visibility across replicas.
+
+```ts
+import {
+  RedisTaskStorage,
+  redisConnectOptionsFromEnv,
+} from '@inference-gateway/adk';
+
+const storage = await RedisTaskStorage.connect(redisConnectOptionsFromEnv());
+// ...wire `storage` into the same handlers as InMemoryTaskStorage
+await storage.disconnect(); // on shutdown
+```
+
+Configuration is read from `REDIS_URL` (preferred) or `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` / `REDIS_DB`. Pass a `keyPrefix` to isolate multiple ADK deployments on a shared Redis (defaults to `"a2a:"` to match the Go ADK).
 
 #### Writing a custom storage backend
 
