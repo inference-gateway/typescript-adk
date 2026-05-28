@@ -28,3 +28,13 @@ export {
   METADATA_SUFFIX,
 } from './filesystem-storage.js';
 export type { FilesystemArtifactStorageOptions } from './filesystem-storage.js';
+
+export {
+  DEFAULT_PRESIGN_EXPIRY_SECONDS,
+  DEFAULT_S3_REGION,
+  MinioArtifactStorage,
+} from './minio-storage.js';
+export type {
+  MinioArtifactStorageMode,
+  MinioArtifactStorageOptions,
+} from './minio-storage.js';
