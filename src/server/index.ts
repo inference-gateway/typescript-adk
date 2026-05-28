@@ -77,6 +77,23 @@ export type {
   TaskPushNotificationConfigListResult,
   TaskPushNotificationConfigSetParams,
 } from './push-notification-config.js';
+export {
+  DEFAULT_PUSH_NOTIFICATION_CONCURRENCY,
+  DEFAULT_PUSH_NOTIFICATION_RETRY_CONFIG,
+  DEFAULT_PUSH_NOTIFICATION_TIMEOUT_MS,
+  HTTPPushNotificationSender,
+  PushNotificationSendError,
+} from './push-notification-sender.js';
+export type {
+  DeliverTaskUpdateOptions,
+  DeliveryResult,
+  FetchLike as PushNotificationFetchLike,
+  HTTPPushNotificationSenderConfig,
+  PushNotificationRetryConfig,
+  PushNotificationSender,
+  SendTaskUpdateOptions,
+  TaskUpdateNotification,
+} from './push-notification-sender.js';
 export { TASK_CANCEL_METHOD, createTaskCancelHandler } from './task-cancel.js';
 export type {
   TaskCancelHandlerOptions,
