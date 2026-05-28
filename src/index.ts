@@ -36,3 +36,4 @@ export * from './server/index.js';
 export * from './storage/index.js';
 export * from './client/index.js';
 export * from './llm/index.js';
+export * from './telemetry/index.js';

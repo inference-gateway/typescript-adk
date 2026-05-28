@@ -9,6 +9,15 @@ import {
   createRequestLoggerMiddleware,
   type Logger,
 } from '../logging/index.js';
+import {
+  ATTR_JSONRPC_METHOD,
+  ATTR_JSONRPC_REQUEST_ID,
+  DEFAULT_JSONRPC_SPAN_KIND,
+  SPAN_NAME_JSONRPC_REQUEST,
+  recordSpanError,
+  setSpanAttributes,
+  type TelemetryProvider,
+} from '../telemetry/index.js';
 import type { AgentCard } from '../types/generated/a2a.js';
 import {
   GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
@@ -131,6 +140,19 @@ export interface A2AServerConfig {
    * pino-backed production default.
    */
   readonly logger?: Logger;
+  /**
+   * Optional OpenTelemetry provider. When supplied, each JSON-RPC request gets
+   * a server span (`adk.jsonrpc.request`) annotated with the JSON-RPC method
+   * and request id, so traces tie the inbound HTTP boundary to the dispatched
+   * method handler. The server does not call `start()` on the provider -
+   * callers own its lifecycle and should call it before `listen()` and
+   * `shutdown()` after `close()`.
+   *
+   * A disabled provider ({@link TelemetryProvider.isEnabled} returns `false`)
+   * still wraps requests, but the underlying tracer is a no-op so the
+   * overhead is the tracer lookup only.
+   */
+  readonly telemetry?: TelemetryProvider;
 }
 
 type NodeServer = Server;
@@ -154,6 +176,7 @@ export class A2AServer {
   private readonly artifactStorage: ArtifactStorageProvider | undefined;
   private readonly artifactsPath: string;
   private readonly logger: Logger;
+  private readonly telemetry: TelemetryProvider | undefined;
   private readonly registry = new MethodRegistry();
   private readonly streamingRegistry = new Map<
     string,
@@ -170,6 +193,7 @@ export class A2AServer {
     this.artifactStorage = config.artifactStorage;
     this.artifactsPath = config.artifactsPath ?? DEFAULT_ARTIFACTS_PATH;
     this.logger = config.logger ?? NOOP_LOGGER;
+    this.telemetry = config.telemetry;
 
     if (config.extendedCard !== undefined) {
       this.registry.register(
@@ -236,11 +260,13 @@ export class A2AServer {
         return streamingResponse;
       }
 
-      const result = await dispatch(body, this.registry, signal);
-      if (result === null) {
-        return new Response(null, { status: 204 });
-      }
-      return c.json(result as JSONRPCResponse | JSONRPCResponse[]);
+      return this.runWithJsonRpcSpan(body, async () => {
+        const result = await dispatch(body, this.registry, signal);
+        if (result === null) {
+          return new Response(null, { status: 204 });
+        }
+        return c.json(result as JSONRPCResponse | JSONRPCResponse[]);
+      });
     });
 
     app.notFound((c) => c.json({ error: 'Not Found' }, 404));
@@ -307,6 +333,32 @@ export class A2AServer {
       names.add(name);
     }
     return [...names];
+  }
+
+  private async runWithJsonRpcSpan(
+    rawBody: string,
+    fn: () => Promise<Response>
+  ): Promise<Response> {
+    if (this.telemetry === undefined) {
+      return fn();
+    }
+    const { method, id } = peekJsonRpcMethodAndId(rawBody);
+    return this.telemetry.withSpan(
+      SPAN_NAME_JSONRPC_REQUEST,
+      async (span) => {
+        setSpanAttributes(span, {
+          [ATTR_JSONRPC_METHOD]: method,
+          [ATTR_JSONRPC_REQUEST_ID]: id,
+        });
+        try {
+          return await fn();
+        } catch (err) {
+          recordSpanError(span, err);
+          throw err;
+        }
+      },
+      { kind: DEFAULT_JSONRPC_SPAN_KIND }
+    );
   }
 
   private tryDispatchStreaming(
@@ -442,4 +494,36 @@ function jsonResponse(body: JSONRPCResponse): Response {
     status: 200,
     headers: { 'Content-Type': 'application/json; charset=utf-8' },
   });
+}
+
+/**
+ * Best-effort extraction of the JSON-RPC `method` and `id` from a raw request
+ * body, used for telemetry attributes. Returns `undefined` for both fields
+ * when the body is not parseable or not a single-request object - batch
+ * requests yield `undefined` because a single span cannot meaningfully
+ * represent a heterogeneous batch.
+ */
+function peekJsonRpcMethodAndId(rawBody: string): {
+  method: string | undefined;
+  id: string | undefined;
+} {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawBody);
+  } catch {
+    return { method: undefined, id: undefined };
+  }
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { method: undefined, id: undefined };
+  }
+  const obj = parsed as Record<string, unknown>;
+  const method = typeof obj['method'] === 'string' ? obj['method'] : undefined;
+  const idValue = obj['id'];
+  let id: string | undefined;
+  if (typeof idValue === 'string') {
+    id = idValue;
+  } else if (typeof idValue === 'number') {
+    id = String(idValue);
+  }
+  return { method, id };
 }
