@@ -1,0 +1,21 @@
+{
+  "name": "@inference-gateway/adk-example-artifacts-autonomous-tool",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Autonomous artifact creation example for @inference-gateway/adk - LLM-driven agent that uses the reserved create_artifact tool to persist generated content.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx server.ts",
+    "start:server": "tsx server.ts",
+    "start:client": "tsx client.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@inference-gateway/adk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.19.2",
+    "typescript": "^6.0.3"
+  }
+}
