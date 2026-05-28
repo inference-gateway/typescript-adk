@@ -13,13 +13,17 @@ import {
   TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD,
   TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD,
   TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD,
-  type ArtifactService,
   type BackgroundTaskHandler,
   type Logger,
   type OpenAICompatibleAgent,
   type StreamingTaskHandler,
   type TaskResultProcessor,
 } from '../../src/server/index.js';
+import {
+  DefaultArtifactService,
+  InMemoryArtifactStorage,
+  type ArtifactService,
+} from '../../src/artifacts/index.js';
 import { InMemoryTaskStorage } from '../../src/storage/in-memory.js';
 import type { AgentCard } from '../../src/types/generated/a2a.js';
 
@@ -96,14 +100,18 @@ describe('A2AServerBuilder fluent chaining', () => {
       .withBackgroundTaskHandler(noopBackgroundHandler)
       .withTaskResultProcessor({ process: (t) => t })
       .withAgent({ id: 'gpt-4' })
-      .withArtifactService({ name: 'fs' })
+      .withArtifactService(
+        new DefaultArtifactService({ storage: new InMemoryArtifactStorage() })
+      )
       .withLogger(NOOP_LOGGER);
     expect(after).toBe(builder);
   });
 
   it('stores agent / artifact service / processor on the builder', () => {
     const agent: OpenAICompatibleAgent = { id: 'gpt-4o-mini' };
-    const service: ArtifactService = { name: 'filesystem' };
+    const service: ArtifactService = new DefaultArtifactService({
+      storage: new InMemoryArtifactStorage(),
+    });
     const processor: TaskResultProcessor = { process: (t) => t };
     const builder = new A2AServerBuilder({})
       .withAgent(agent)
