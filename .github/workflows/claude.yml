@@ -79,4 +79,5 @@ jobs:
             --effort max
             --model claude-opus-4-7
             --allowedTools "Bash(task:*),Bash(node:*),Bash(npm:*),Bash(pnpm:*),Bash(gh:*),Bash(git:*)"
+            --append-system-prompt "When your work on a branch is complete, open the pull request yourself with `gh pr create --base main --head <branch> --title <conventional-commit title> --body <body>` and reply with the resulting PR URL. Do not return a 'click here to create a pull request' compare link - the human should not have to click Create."
             --mcp-config '{"mcpServers":{"context7":{"command":"npx","args":["-y","@upstash/context7-mcp@latest"]}}}'
