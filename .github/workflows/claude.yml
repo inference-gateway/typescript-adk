@@ -64,8 +64,31 @@ jobs:
           curl -fsSL https://codeload.github.com/inference-gateway/skills/tar.gz/main |
             tar -xz --strip-components=2 -C ~/.claude/skills skills-main/skills/maintainer
 
+      - name: Write Claude system prompt
+        env:
+          CLAUDE_SYSTEM_PROMPT: |
+            **WHEN WORKING ON ISSUES:**
+            After implementing and committing the changes, open a PR with:
+            `gh pr create --title "<title>" --body "## Summary\n<summary>\n\nCloses #${{ github.event.issue.number }}"`
+            Always include a summary and `Closes #${{ github.event.issue.number }}` in the body.
+
+            **WHEN WORKING ON PR FEEDBACK:**
+            Make the requested changes and commit. The PR will automatically update - do NOT create a new PR.
+
+            **WHEN FIXING CI FAILURES:**
+            Fix the issues and commit. CI will automatically re-run.
+
+            **COMMIT RULES:**
+            - Do NOT add "Co-authored-by" lines to commits
+            - Do NOT add "Generated with Claude Code" or similar attributions
+            - Use conventional commit format with lowercase type (e.g., "fix:", "feat:", "refactor:")
+            - Subject line max 72 chars
+        run: printf '%s' "$CLAUDE_SYSTEM_PROMPT" > "$RUNNER_TEMP/claude-system-prompt.txt"
+
       - name: Run Claude Code
         id: claude
+        env:
+          USE_SIMPLE_PROMPT: 'true'
         uses: anthropics/claude-code-action@v1.0.133
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -80,30 +103,5 @@ jobs:
             --model claude-opus-4-7
             --allowedTools "Bash(task:*),Bash(node:*),Bash(npm:*),Bash(pnpm:*),Bash(gh pr:*),Bash(gh issue:*),Bash(gh repo:*)"
             --mcp-config '{"mcpServers":{"context7":{"command":"npx","args":["-y","@upstash/context7-mcp@latest"]}}}'
-          prompt: |
-            **IMPORTANT - WHEN WORKING ON ISSUES:**
-            After you finish implementing the code changes and committing them, create a pull request:
-            ```
-            gh pr create --title "Your descriptive title" --body "## Summary
-            Your summary of what was implemented.
-             
-            Closes #${{ github.event.issue.number }}"
-            ```
-            Always include a summary of changes AND "Closes #${{ github.event.issue.number }}" in the body.
-             
-            **COMMIT RULES:**
-            - Do NOT add "Co-authored-by" lines to commits
-            - Do NOT add "Generated with Claude Code" or similar attributions
-            - Keep commits clean and professional
-          
-            **WHEN WORKING ON PR FEEDBACK:**
-            Make the requested changes and commit. The PR will automatically update - do NOT create a new PR.
-           
-            **WHEN FIXING CI FAILURES:**
-            Fix the issues, commit the fix. The CI will automatically re-run.
-           
-            **OUTPUT RULES:**
-          
-            ## Commit Message Requirements (max 72 chars)
-            - Use conventional commit format with lowercase type (e.g., "fix:", "feat:", "refactor:")
+            --system-prompt-file ${{ runner.temp }}/claude-system-prompt.txt
           track_progress: true
