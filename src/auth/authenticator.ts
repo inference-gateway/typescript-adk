@@ -1,5 +1,6 @@
 import type { Context, MiddlewareHandler, Next } from 'hono';
 import type { JWTPayload, JWTVerifyResult } from 'jose';
+import { NOOP_LOGGER, type Logger as LoggingLogger } from '../logging/index.js';
 import {
   JSONRPC_VERSION,
   type JSONRPCErrorResponse,
@@ -30,23 +31,11 @@ export const AUTHENTICATION_REQUIRED_ERROR_CODE = -32001;
 export const AUTH_CONTEXT_KEY = 'auth';
 
 /**
- * Structural logger interface compatible with `console`/`pino`/`zap`-style
- * loggers. Mirrors `Logger` in `server/server-builder.ts` so callers can pass
- * the same instance.
+ * Structural logger interface. Re-exported alias of the canonical
+ * {@link LoggingLogger} so existing imports from `./authenticator` keep
+ * working without callers having to know about the `logging` module.
  */
-export interface Logger {
-  debug(message: string, ...args: readonly unknown[]): void;
-  info(message: string, ...args: readonly unknown[]): void;
-  warn(message: string, ...args: readonly unknown[]): void;
-  error(message: string, ...args: readonly unknown[]): void;
-}
-
-const NOOP_LOGGER: Logger = Object.freeze({
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-});
+export type Logger = LoggingLogger;
 
 /**
  * Information about a successfully authenticated request. Attached to the

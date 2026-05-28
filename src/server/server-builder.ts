@@ -10,6 +10,10 @@ import type { ArtifactService } from '../artifacts/artifact-service.js';
 import type { Authenticator } from '../auth/authenticator.js';
 import { decorateAgentCardWithAuth } from '../auth/card-decoration.js';
 import type { AuthConfig } from '../auth/config.js';
+import {
+  NOOP_LOGGER as LOGGING_NOOP_LOGGER,
+  type Logger as LoggingLogger,
+} from '../logging/index.js';
 import { InMemoryTaskStorage } from '../storage/in-memory.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type { AgentCard, Message } from '../types/generated/a2a.js';
@@ -49,32 +53,18 @@ import {
 } from './task-resubscribe.js';
 
 /**
- * Structural logger interface. Compatible with `console`, `pino`, the standard
- * shape of `zap`-style wrappers, etc. The builder calls these synchronously
- * with a short message and any number of trailing arguments; each
- * implementation is free to format them however it likes.
+ * Structural logger interface. Re-exported from `../logging` so existing
+ * imports from `./server-builder` keep working. See the canonical definition
+ * in {@link LoggingLogger} for the full contract (including the optional
+ * `child(bindings)` method used to attach per-request and per-task context).
  */
-export interface Logger {
-  debug(message: string, ...args: readonly unknown[]): void;
-  info(message: string, ...args: readonly unknown[]): void;
-  warn(message: string, ...args: readonly unknown[]): void;
-  error(message: string, ...args: readonly unknown[]): void;
-}
+export type Logger = LoggingLogger;
 
 /**
- * No-op logger used when the builder is constructed without one. Drops every
- * call. Exported so tests and callers can install it explicitly.
+ * No-op logger used when the builder is constructed without one. Re-exported
+ * from `../logging` so existing imports from `./server-builder` keep working.
  */
-export const NOOP_LOGGER: Logger = Object.freeze({
-  debug: noop,
-  info: noop,
-  warn: noop,
-  error: noop,
-});
-
-function noop(): void {
-  // intentionally empty
-}
+export const NOOP_LOGGER: Logger = LOGGING_NOOP_LOGGER;
 
 export type { OpenAICompatibleAgent };
 
@@ -494,6 +484,9 @@ export class A2AServerBuilder<
         : {}),
       ...(this.authenticator !== undefined
         ? { authenticator: this.authenticator }
+        : {}),
+      ...(this.builderLogger !== NOOP_LOGGER
+        ? { logger: this.builderLogger }
         : {}),
     };
 

@@ -4,6 +4,11 @@ import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { ArtifactStorageProvider } from '../artifacts/artifact-storage.js';
 import type { Authenticator } from '../auth/index.js';
+import {
+  NOOP_LOGGER,
+  createRequestLoggerMiddleware,
+  type Logger,
+} from '../logging/index.js';
 import type { AgentCard } from '../types/generated/a2a.js';
 import {
   GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
@@ -108,6 +113,24 @@ export interface A2AServerConfig {
    * omitted.
    */
   readonly artifactsPath?: string;
+  /**
+   * Structural logger used for request-level logs. When provided, the server
+   * installs a request-logging middleware that:
+   *
+   *  - Generates (or honors an incoming) `x-request-id` correlation header.
+   *  - Stores a child logger bound with `{ requestId }` under
+   *    `c.get('logger')` so downstream method handlers can re-bind it with
+   *    `{ taskId }` and emit task-scoped logs.
+   *  - Emits `request received` / `request completed` lines with method,
+   *    path, status, and duration.
+   *  - Skips logging for {@link HEALTH_PATH} by default; override via
+   *    `SERVER_DISABLE_HEALTHCHECK_LOG=false`.
+   *
+   * Defaults to a no-op logger (zero overhead). Pass a logger built with
+   * {@link import('../logging/index.js').createLogger} for the
+   * pino-backed production default.
+   */
+  readonly logger?: Logger;
 }
 
 type NodeServer = Server;
@@ -130,6 +153,7 @@ export class A2AServer {
   private readonly authenticator: Authenticator | undefined;
   private readonly artifactStorage: ArtifactStorageProvider | undefined;
   private readonly artifactsPath: string;
+  private readonly logger: Logger;
   private readonly registry = new MethodRegistry();
   private readonly streamingRegistry = new Map<
     string,
@@ -145,6 +169,7 @@ export class A2AServer {
     this.authenticator = config.authenticator;
     this.artifactStorage = config.artifactStorage;
     this.artifactsPath = config.artifactsPath ?? DEFAULT_ARTIFACTS_PATH;
+    this.logger = config.logger ?? NOOP_LOGGER;
 
     if (config.extendedCard !== undefined) {
       this.registry.register(
@@ -161,8 +186,23 @@ export class A2AServer {
     }) as NodeServer;
   }
 
+  /** Logger configured on this server (or `NOOP_LOGGER` if none was supplied). */
+  getLogger(): Logger {
+    return this.logger;
+  }
+
   private buildApp(): Hono {
     const app = new Hono();
+
+    if (this.logger !== NOOP_LOGGER) {
+      app.use(
+        '*',
+        createRequestLoggerMiddleware({
+          logger: this.logger,
+          healthPath: HEALTH_PATH,
+        })
+      );
+    }
 
     app.get(AGENT_CARD_PATH, () => {
       return new Response(JSON.stringify(this.card), {
