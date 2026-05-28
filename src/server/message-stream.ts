@@ -78,7 +78,11 @@ export interface MessageStreamParams {
  *    Does not change task state.
  *  - `statusChanged`: transition the task to the requested state, persist it,
  *    and emit an `adk.agent.task.status.changed` SSE frame. Terminal states
- *    (`COMPLETED`/`FAILED`/`CANCELLED`) end the stream.
+ *    (`COMPLETED`/`FAILED`/`CANCELLED`) end the stream. When `metadata` is
+ *    supplied the keys are shallow-merged into `task.metadata` before the
+ *    transition is persisted - this is the path used by
+ *    `DefaultStreamingTaskHandler` to attach `usage` / `execution_stats` on
+ *    completion when `setEnableUsageMetadata(true)` is set.
  *  - `inputRequired`: transition to `INPUT_REQUIRED`, emit the status event,
  *    and end the stream. Equivalent to `{ type: 'statusChanged', state:
  *    INPUT_REQUIRED, message }`, kept separate for ergonomics since this is a
@@ -104,8 +108,13 @@ export type StreamingTaskEvent =
       readonly type: 'statusChanged';
       readonly state: ManagedTaskState;
       readonly message?: Message;
+      readonly metadata?: Struct;
     }
-  | { readonly type: 'inputRequired'; readonly message: Message }
+  | {
+      readonly type: 'inputRequired';
+      readonly message: Message;
+      readonly metadata?: Struct;
+    }
   | { readonly type: 'inputRequiredNotice'; readonly message: Message }
   | {
       readonly type: 'iterationCompleted';
@@ -508,10 +517,16 @@ function handleExecutorEvent(
       return task;
     }
     case 'statusChanged': {
-      const next = transitionAndPersist(task, event.state, storage, {
-        now: clock,
-        ...(event.message !== undefined ? { message: event.message } : {}),
-      });
+      const taskWithMetadata = mergeMetadata(task, event.metadata);
+      const next = transitionAndPersist(
+        taskWithMetadata,
+        event.state,
+        storage,
+        {
+          now: clock,
+          ...(event.message !== undefined ? { message: event.message } : {}),
+        }
+      );
       emitStatusEvent(writer, next, isTerminal(next.state), emitOptions);
       return next;
     }
@@ -523,8 +538,9 @@ function handleExecutorEvent(
         ...task,
         messages: [...task.messages, event.message],
       };
+      const withMetadata = mergeMetadata(withPrompt, event.metadata);
       const next = transitionAndPersist(
-        withPrompt,
+        withMetadata,
         TASK_STATE.INPUT_REQUIRED,
         storage,
         { now: clock, message: event.message }
@@ -585,6 +601,7 @@ function emitStatusEvent(
     contextId: task.contextId,
     status,
     final,
+    ...(task.metadata !== undefined ? { metadata: task.metadata } : {}),
   };
   const emitted = writer.emit({
     type: AGENT_EVENT_TYPE.TASK_STATUS_CHANGED satisfies AgentEventType,
@@ -821,6 +838,20 @@ function transitionAndPersist(
   const transitioned = transitionTask(task, next, transitionOpts);
   storage.updateActive(transitioned);
   return transitioned;
+}
+
+function mergeMetadata(
+  task: ManagedTask,
+  metadata: Struct | undefined
+): ManagedTask {
+  if (metadata === undefined) {
+    return task;
+  }
+  const merged: Struct = {
+    ...((task.metadata ?? {}) as Record<string, unknown>),
+    ...metadata,
+  };
+  return { ...task, metadata: merged };
 }
 
 function buildErrorMessage(err: unknown, newId: () => string): Message {

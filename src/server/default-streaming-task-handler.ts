@@ -9,7 +9,7 @@ import {
   type Callbacks,
 } from '../agent/callbacks.js';
 import { TASK_STATE, isTerminal, type ManagedTask } from '../agent/task.js';
-import type { Message } from '../types/generated/a2a.js';
+import type { Message, Struct } from '../types/generated/a2a.js';
 import {
   DEFAULT_MAX_CONVERSATION_HISTORY,
   INPUT_REQUIRED_TOOL,
@@ -158,9 +158,14 @@ export class DefaultStreamingTaskHandler {
   }
 
   /**
-   * Toggle attaching token-usage / execution-stats to the final assistant
-   * message metadata. Off by default. Parallel to
+   * Toggle attaching token-usage / execution-stats to `task.metadata` when the
+   * stream reaches a terminal state. Off by default. Parallel to
    * {@link import('./default-background-task-handler.js').DefaultBackgroundTaskHandler.setEnableUsageMetadata}.
+   *
+   * When on, the handler emits the accumulated counters via the optional
+   * `metadata` field on the terminal `statusChanged` / `inputRequired` event;
+   * the streaming pipeline shallow-merges them into `task.metadata` before
+   * persisting the transition.
    */
   setEnableUsageMetadata(enabled: boolean): void {
     this.enableUsageMetadata = enabled;
@@ -225,10 +230,12 @@ export class DefaultStreamingTaskHandler {
     );
     if (beforeAgentOverride !== undefined) {
       yield { type: 'delta', message: beforeAgentOverride };
+      const metadata = this.finalUsageMetadata(tracker);
       yield {
         type: 'statusChanged',
         state: TASK_STATE.COMPLETED,
         message: beforeAgentOverride,
+        ...(metadata !== undefined ? { metadata } : {}),
       };
       return;
     }
@@ -316,6 +323,15 @@ export class DefaultStreamingTaskHandler {
           iteration: iteration + 1,
           message: finalMessage,
         };
+        const metadata = this.finalUsageMetadata(tracker);
+        if (metadata !== undefined) {
+          yield {
+            type: 'statusChanged',
+            state: TASK_STATE.COMPLETED,
+            message: finalMessage,
+            metadata,
+          };
+        }
         return;
       }
 
@@ -346,7 +362,12 @@ export class DefaultStreamingTaskHandler {
           iteration: iteration + 1,
           message: promptMessage,
         };
-        yield { type: 'inputRequired', message: promptMessage };
+        const metadata = this.finalUsageMetadata(tracker);
+        yield {
+          type: 'inputRequired',
+          message: promptMessage,
+          ...(metadata !== undefined ? { metadata } : {}),
+        };
         return;
       }
 
@@ -475,11 +496,20 @@ export class DefaultStreamingTaskHandler {
       context.task,
       `Iteration cap reached (${this.maxIterations}) without completion.`
     );
+    const failureMetadata = this.finalUsageMetadata(tracker);
     yield {
       type: 'statusChanged',
       state: TASK_STATE.FAILED,
       message: failureMessage,
+      ...(failureMetadata !== undefined ? { metadata: failureMetadata } : {}),
     };
+  }
+
+  private finalUsageMetadata(tracker: UsageTracker): Struct | undefined {
+    if (!this.enableUsageMetadata || !tracker.hasUsage()) {
+      return undefined;
+    }
+    return tracker.getMetadata() as Struct;
   }
 
   private buildInitialConversation(task: ManagedTask): ChatMessage[] {
