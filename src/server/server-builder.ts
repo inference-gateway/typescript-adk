@@ -6,6 +6,7 @@ import {
   transitionTask,
   type ManagedTask,
 } from '../agent/task.js';
+import type { ArtifactService } from '../artifacts/artifact-service.js';
 import type { Authenticator } from '../auth/authenticator.js';
 import { decorateAgentCardWithAuth } from '../auth/card-decoration.js';
 import type { AuthConfig } from '../auth/config.js';
@@ -76,16 +77,6 @@ function noop(): void {
 }
 
 export type { OpenAICompatibleAgent };
-
-/**
- * Marker interface for an artifact-storage service. Concrete service
- * implementations live in a future iteration (mirrors the Go ADK's
- * `ArtifactService`).
- */
-export interface ArtifactService {
-  /** Stable identifier; used for diagnostics. */
-  readonly name: string;
-}
 
 /**
  * Post-processor invoked once a background task reaches a candidate terminal

@@ -12,6 +12,7 @@ export const packageMetadata: PackageMetadata = Object.freeze({
 
 export * from './types/index.js';
 export * from './agent/index.js';
+export * from './artifacts/index.js';
 export * from './auth/index.js';
 export * from './server/index.js';
 export * from './storage/index.js';

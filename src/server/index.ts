@@ -157,7 +157,6 @@ export {
 } from './server-builder.js';
 export type {
   A2AServerBuilderConfig,
-  ArtifactService,
   BackgroundTaskContext,
   BackgroundTaskHandler,
   Logger,
