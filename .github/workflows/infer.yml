@@ -15,10 +15,6 @@ permissions:
   contents: write
   pull-requests: write
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.issue.number }}
-  cancel-in-progress: true
-
 jobs:
   infer:
     if: |
