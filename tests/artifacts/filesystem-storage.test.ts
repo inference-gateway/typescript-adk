@@ -282,7 +282,6 @@ describe('FilesystemArtifactStorage', () => {
       new TextEncoder().encode('old'),
       'text/plain'
     );
-    // Backdate the data file's mtime so we don't have to wait real time.
     const oldPath = join(root, 'abc', 'old.txt');
     const old = new Date('2025-12-31T23:00:00Z');
     await import('node:fs/promises').then((fs) => fs.utimes(oldPath, old, old));
@@ -326,7 +325,6 @@ describe('FilesystemArtifactStorage', () => {
     const storage = new FilesystemArtifactStorage({ root });
     const utimes = await import('node:fs/promises').then((m) => m.utimes);
 
-    // Stage three files with explicit mtimes so ordering is deterministic.
     const stamps = [
       new Date('2026-01-01T00:00:01Z'),
       new Date('2026-01-01T00:00:02Z'),
@@ -365,15 +363,13 @@ describe('FilesystemArtifactStorage', () => {
       new Uint8Array(),
       'application/octet-stream'
     );
-    // Create a stray directory directly on disk (bypassing the storage API).
     await import('node:fs/promises').then((fs) =>
       fs.mkdir(join(root, 'has space'), { recursive: true })
     );
     await writeFile(join(root, 'has space', 'rogue'), new Uint8Array());
 
     const removed = await storage.cleanupOldest(0);
-    expect(removed).toBe(1); // only the 'abc' artifact is touched
-    // Stray directory still exists (storage refuses to consider it).
+    expect(removed).toBe(1);
     await expect(stat(join(root, 'has space'))).resolves.toBeDefined();
   });
 

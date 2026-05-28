@@ -195,7 +195,6 @@ describe('A2AServer artifacts download endpoint', () => {
       const started = await startServer(server);
       close = started.close;
 
-      // Path-traversal artifact id — provider throws, route maps to 404.
       const res = await fetch(
         `${started.baseUrl}${DEFAULT_ARTIFACTS_PATH}/${encodeURIComponent('../etc')}/passwd`
       );

@@ -95,8 +95,5 @@ function decodeParam(raw: string | undefined): string | null {
 }
 
 function sanitiseHeaderValue(value: string): string {
-  // Strip characters that would break the header (CR/LF, double quotes,
-  // backslash). Keeps the filename usable in a quoted `Content-Disposition`
-  // value without trying to do full RFC 5987 encoding.
   return value.replace(/[\r\n"\\]/g, '_');
 }
