@@ -1,0 +1,24 @@
+{
+  "name": "@inference-gateway/adk-example-artifacts-minio",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MinIO/S3-backed artifact example for @inference-gateway/adk - persists artifacts to an S3-compatible object store via MinioArtifactStorage. Ships docker-compose.yml for local MinIO.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx server.ts",
+    "start:server": "tsx server.ts",
+    "start:client": "tsx client.ts",
+    "minio:up": "docker compose up -d",
+    "minio:down": "docker compose down -v",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@inference-gateway/adk": "workspace:*",
+    "@aws-sdk/client-s3": "^3.1055.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.19.2",
+    "typescript": "^6.0.3"
+  }
+}
