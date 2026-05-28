@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0](https://github.com/inference-gateway/typescript-adk/compare/v0.9.0...v0.10.0) (2026-05-28)
+
+### ✨ Features
+
+* add RedisTaskStorage backend for horizontal scaling ([#95](https://github.com/inference-gateway/typescript-adk/issues/95)) ([bff62bc](https://github.com/inference-gateway/typescript-adk/commit/bff62bc8ac82d9017e0b76ce5d0e448943931781)), closes [#40](https://github.com/inference-gateway/typescript-adk/issues/40)
+* **artifacts:** add ArtifactService abstraction ([#97](https://github.com/inference-gateway/typescript-adk/issues/97)) ([a9afeca](https://github.com/inference-gateway/typescript-adk/commit/a9afecad728d877d94b1f6e49c008a70da7ad240)), closes [#42](https://github.com/inference-gateway/typescript-adk/issues/42)
+* **artifacts:** add filesystem storage and HTTP download route ([#98](https://github.com/inference-gateway/typescript-adk/issues/98)) ([35b369f](https://github.com/inference-gateway/typescript-adk/commit/35b369f14763671096c2ae9c24358bf48cd38ea6))
+* **artifacts:** add S3/MinIO storage backend ([#99](https://github.com/inference-gateway/typescript-adk/issues/99)) ([79cb5b5](https://github.com/inference-gateway/typescript-adk/commit/79cb5b59d301183dcf7620242c76e27b634a5e73))
+* **examples:** add queue-storage in-memory and redis variants ([#96](https://github.com/inference-gateway/typescript-adk/issues/96)) ([ec6d0d1](https://github.com/inference-gateway/typescript-adk/commit/ec6d0d16e38f5cfe4af18a7c6a3efff0f93ea893)), closes [#41](https://github.com/inference-gateway/typescript-adk/issues/41)
+* implement agent/getAuthenticatedExtendedCard JSON-RPC method ([#91](https://github.com/inference-gateway/typescript-adk/issues/91)) ([d5e1087](https://github.com/inference-gateway/typescript-adk/commit/d5e1087cddc655309264deb5165cc1580330ae6d)), closes [#36](https://github.com/inference-gateway/typescript-adk/issues/36)
+* implement HTTP push notification delivery ([#93](https://github.com/inference-gateway/typescript-adk/issues/93)) ([bd99530](https://github.com/inference-gateway/typescript-adk/commit/bd99530de73f1740cb306708a0493c249bda7d62)), closes [#38](https://github.com/inference-gateway/typescript-adk/issues/38)
+* implement push notification config CRUD methods ([#92](https://github.com/inference-gateway/typescript-adk/issues/92)) ([3fdd35b](https://github.com/inference-gateway/typescript-adk/commit/3fdd35b13aad08c7b0a9a38d42cc563579eaefbc)), closes [#37](https://github.com/inference-gateway/typescript-adk/issues/37)
+* **logging:** add structured logging via pino ([#104](https://github.com/inference-gateway/typescript-adk/issues/104)) ([d7f419f](https://github.com/inference-gateway/typescript-adk/commit/d7f419f5eb362b154cf1a4793a10b8fe3ffec341))
+* **server:** autonomous create_artifact reserved tool ([#100](https://github.com/inference-gateway/typescript-adk/issues/100)) ([c13e7b1](https://github.com/inference-gateway/typescript-adk/commit/c13e7b1ada6cffdb7830a6e363561250a49f64b2))
+* **storage:** add TaskStorage conformance suite and `./testing` subpath ([#94](https://github.com/inference-gateway/typescript-adk/issues/94)) ([7146f4b](https://github.com/inference-gateway/typescript-adk/commit/7146f4b4045b62e61051f3bfba4c9325d999768e)), closes [#39](https://github.com/inference-gateway/typescript-adk/issues/39)
+
+### 🐛 Bug Fixes
+
+* **infer:** remove concurrency cancel in progress protection ([8f1b918](https://github.com/inference-gateway/typescript-adk/commit/8f1b918d8ed67de645f37bbcd91cf1075ec3c91c))
+
+### 👷 CI
+
+* **claude:** add instructions to create a pr ([9ab4465](https://github.com/inference-gateway/typescript-adk/commit/9ab4465d812487c85439578fa1b71b9d96a4b1a9))
+* **claude:** download all maintainer skill assets ([6f8b69b](https://github.com/inference-gateway/typescript-adk/commit/6f8b69b163a4ad12b271daa156efa4f6783e2521))
+* **claude:** improve system prompt ([ecd8728](https://github.com/inference-gateway/typescript-adk/commit/ecd8728e38567330ac8db8a2369eac092017c912))
+* **claude:** try a different approach ([696a150](https://github.com/inference-gateway/typescript-adk/commit/696a150a91f7a970c97857e9b7edb89ce26a373e))
+* **claude:** try a different approach ([8a8c87d](https://github.com/inference-gateway/typescript-adk/commit/8a8c87d617611183a1ca105ecc33ad0efbdfafc8))
+* **deps:** bump infer-action version v0.5.0 -> v0.5.1 ([757cf56](https://github.com/inference-gateway/typescript-adk/commit/757cf56fb12f5c47e6b538d4cc2e283b51df76db))
+* **infer:** add infer action ([51f9a62](https://github.com/inference-gateway/typescript-adk/commit/51f9a622f312f7641568823284da5d05f6f18b10))
+* **infer:** test mock agent behavior ([d965bfa](https://github.com/inference-gateway/typescript-adk/commit/d965bfab401069d945487feee7878d1c7655e75b))
+
+### 📚 Documentation
+
+* **examples:** add artifact examples for filesystem, minio, autonomous tool, and default handlers ([#101](https://github.com/inference-gateway/typescript-adk/issues/101)) ([a23dba6](https://github.com/inference-gateway/typescript-adk/commit/a23dba6aab853b40df6edd147a54c8bc456f68c0))
+
+### 🔧 Miscellaneous
+
+* add whitelisted commands ([019abb1](https://github.com/inference-gateway/typescript-adk/commit/019abb1d3db8ef0732759e871cb161e82aa1d963))
+
 ## [0.9.0](https://github.com/inference-gateway/typescript-adk/compare/v0.8.0...v0.9.0) (2026-05-27)
 
 ### ✨ Features
