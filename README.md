@@ -187,7 +187,7 @@ Each example ships its own README with setup instructions.
 - 📬 **Built-in Handlers** - Drop-in `message/send`, `tasks/get`, and `tasks/list` JSON-RPC handlers backed by any `TaskStorage`
 - 🔌 **Extensible JSON-RPC** - Register custom methods on the per-server `MethodRegistry`
 - 🔁 **Task Lifecycle** - Strict state machine (`SUBMITTED → WORKING → {INPUT_REQUIRED | COMPLETED | FAILED | CANCELLED}`) with `TaskTransitionError` on invalid transitions
-- 🗄️ **Pluggable Storage** - Small `TaskStorage` interface with `InMemoryTaskStorage` included; queue / active / dead-letter semantics out of the box
+- 🗄️ **Pluggable Storage** - Small `TaskStorage` interface with `InMemoryTaskStorage` included; queue / active / dead-letter semantics out of the box, plus a `runTaskStorageConformance` test factory (exported from `@inference-gateway/adk/testing`) so any backend can verify itself against the contract
 - 🛰️ **A2A Client** - `A2AClient` with `sendMessage`, `getTask`, `getAgentCard`, `getHealth`, configurable timeout, retry with exponential backoff, and a typed error taxonomy
 - 📇 **AgentCard Loading** - Load from file or JSON with `${VAR}` env-placeholder resolution, optional shallow overrides, and required-field validation
 - 🏷️ **Build-Time Metadata** - Inject `name` / `description` / `version` at bundle or runtime (mirrors the Go ADK's `BuildAgent*` LD flags)
@@ -264,6 +264,125 @@ The included `InMemoryTaskStorage` is suitable for tests, local development, and
 - `cleanupCompleted()`, `deleteContext(id)` - cleanup helpers
 
 To plug in a different backend (Redis, Postgres, S3-backed), implement `TaskStorage` and pass your implementation to the message-send and task-get handlers.
+
+#### Writing a custom storage backend
+
+`TaskStorage` is the contract. Anything that satisfies the interface drops into the built-in handlers. A skeleton implementation looks like:
+
+```ts
+import type {
+  ManagedTask,
+  PushNotificationConfig,
+  StoredPushNotificationConfig,
+  TaskListFilter,
+  TaskStorage,
+  TaskStorageStats,
+} from '@inference-gateway/adk';
+
+export class MyTaskStorage implements TaskStorage {
+  enqueue(task: ManagedTask): void {
+    /* push onto the FIFO queue + register as active */
+  }
+  dequeue(signal?: AbortSignal): Promise<ManagedTask> {
+    /* await the head of the queue, abort on signal */
+  }
+  queueLength(): number {
+    /* current FIFO length */
+  }
+  removeFromQueue(taskId: string): boolean {
+    /* drop a PENDING task before it is picked up */
+  }
+
+  createActive(task: ManagedTask): void {
+    /* register without enqueueing; throw if id is already active */
+  }
+  getActive(taskId: string): ManagedTask | undefined {
+    /* look up an active task */
+  }
+  updateActive(task: ManagedTask): void {
+    /* persist a state transition; throw if id is unknown */
+  }
+  storeDeadLetter(task: ManagedTask): void {
+    /* move out of active and into dead-letter */
+  }
+
+  getTask(taskId: string): ManagedTask | undefined {
+    /* read across active + dead-letter */
+  }
+  listTasks(filter?: TaskListFilter): ManagedTask[] {
+    /* FIFO-ordered by createdAt, offset/limit pagination */
+  }
+
+  getContexts(): string[] {
+    /* every context with at least one task */
+  }
+  deleteContext(contextId: string): number {
+    /* cascade-delete queue + active + dead-letter; return count */
+  }
+  cleanupCompleted(): number {
+    /* drop terminal dead-letter tasks; return count */
+  }
+
+  getStats(): TaskStorageStats {
+    /* counts grouped by state, queue length, context stats */
+  }
+
+  setPushConfig(
+    taskId: string,
+    config: PushNotificationConfig
+  ): StoredPushNotificationConfig {
+    /* persist; mint UUID when caller omits config.id */
+  }
+  getPushConfig(
+    taskId: string,
+    configId: string
+  ): StoredPushNotificationConfig | undefined {
+    /* ... */
+  }
+  listPushConfigs(taskId: string): StoredPushNotificationConfig[] {
+    /* fresh array, insertion order */
+  }
+  deletePushConfig(taskId: string, configId: string): boolean {
+    /* return whether anything was removed */
+  }
+}
+```
+
+Three contract details that are easy to miss when porting from another stack:
+
+1. **Enqueue registers the task as active.** A single `enqueue(task)` call must make the task visible to `getActive(task.id)` _and_ to `dequeue()`. The dequeued task stays active until the caller transitions it to a terminal state and calls `storeDeadLetter`.
+2. **`dequeue` blocks.** When the queue is empty, return a `Promise` that resolves on the next `enqueue`. Multiple parked waiters must be handed off in FIFO arrival order. An aborted waiter must not consume the next enqueued task. The included `InMemoryTaskStorage` shows the pattern.
+3. **`setPushConfig` assigns ids.** If the caller omits `config.id` (or passes an empty string), generate a UUID and populate it on the returned value. Callers that need the generated id read it from the return value.
+
+Then verify against the conformance suite. The `@inference-gateway/adk/testing` subpath exports a `runTaskStorageConformance` factory that the in-memory backend runs against itself; any custom backend can run the same suite:
+
+```ts
+import { describe } from 'vitest';
+import { runTaskStorageConformance } from '@inference-gateway/adk/testing';
+import { MyTaskStorage } from './my-task-storage.js';
+
+describe('MyTaskStorage - conformance', () => {
+  runTaskStorageConformance({
+    createStorage: () => new MyTaskStorage(),
+    // Optional - close connections, flush state, etc.
+    cleanup: (storage) => (storage as MyTaskStorage).close(),
+  });
+});
+```
+
+`createStorage` is called from `beforeEach`, so each test gets a fresh, empty storage. The factory may be async to allow opening a Redis or Postgres connection before returning. `vitest` is a peer dependency of the testing subpath - install it alongside `@inference-gateway/adk` to use the conformance suite.
+
+Plug your backend into the built-in handlers exactly like the in-memory one:
+
+```ts
+const storage = new MyTaskStorage();
+server.registerMethod(
+  MESSAGE_SEND_METHOD,
+  createMessageSendHandler({ storage })
+);
+server.registerMethod(TASK_GET_METHOD, createTaskGetHandler({ storage }));
+server.registerMethod(TASK_LIST_METHOD, createTaskListHandler({ storage }));
+```
 
 #### `A2AClient` / `createA2AClient`
 
