@@ -448,8 +448,6 @@ export class HTTPPushNotificationSender implements PushNotificationSender {
 function resolveAuthorization(
   config: PushNotificationConfig
 ): string | undefined {
-  // `config.authentication.schemes` takes precedence over the bare `token`
-  // field when both are set - matches the Go ADK's last-write-wins ordering.
   let header: string | undefined;
   if (typeof config.token === 'string' && config.token.length > 0) {
     header = `Bearer ${config.token}`;

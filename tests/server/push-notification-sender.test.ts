@@ -61,7 +61,6 @@ function fakeFetch(spec: FakeFetchResponse | FakeFetchResponse[]): {
       throw r.throw;
     }
     const status = r.status ?? 200;
-    // 204/205/304 responses must not carry a body per the Fetch spec.
     const noBody = status === 204 || status === 205 || status === 304;
     const bodyText = noBody
       ? null
@@ -291,7 +290,6 @@ describe('HTTPPushNotificationSender.sendTaskUpdate', () => {
     const pnErr = err as PushNotificationSendError;
     expect(pnErr.url).toBe('https://example.com/hook');
     expect(pnErr.status).toBe(503);
-    // 1 initial + 2 retries = 3 attempts.
     expect(calls).toHaveLength(3);
     expect(pnErr.attempts).toBe(3);
   });
@@ -316,7 +314,6 @@ describe('HTTPPushNotificationSender.sendTaskUpdate', () => {
     );
     controller.abort();
     await expect(promise).rejects.toBeInstanceOf(PushNotificationSendError);
-    // The single attempt was started before abort, so one call was recorded.
     expect(calls).toHaveLength(1);
   });
 
@@ -369,7 +366,6 @@ describe('HTTPPushNotificationSender.deliverTaskUpdate', () => {
   });
 
   it('logs and surfaces per-config failures without throwing', async () => {
-    // First two URLs fail with non-retryable 4xx; third succeeds.
     const { fetch } = mixedFakeFetch([
       ['https://example.com/a', { status: 400 }],
       ['https://example.com/b', { status: 200 }],
@@ -566,7 +562,6 @@ describe('HTTPPushNotificationSender against a real localhost webhook', () => {
       }
       return c.body(null, 204);
     });
-    // Tear down the original beforeEach server and stand a fresh one up.
     await new Promise<void>((resolve, reject) => {
       server!.close((err) => (err ? reject(err) : resolve()));
     });
