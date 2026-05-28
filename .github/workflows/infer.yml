@@ -63,7 +63,7 @@ jobs:
         run: npm install -g markdownlint-cli
 
       - name: Run Infer Agent
-        uses: inference-gateway/infer-action@v0.5.1
+        uses: inference-gateway/infer-action@v0.6.0-rc.1
         with:
           github-token: ${{ steps.app_token.outputs.token }}
           trigger-phrase: "@infer"
@@ -82,3 +82,5 @@ jobs:
           cohere-api-key: ${{ secrets.COHERE_API_KEY }}
           ollama-api-key: ${{ secrets.OLLAMA_API_KEY }}
           ollama-cloud-api-key: ${{ secrets.OLLAMA_CLOUD_API_KEY }}
+          use-mock-agent: true
+          mock-agent-scenario: failures # happy | failures | no-todos | empty
