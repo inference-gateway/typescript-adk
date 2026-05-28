@@ -1,0 +1,21 @@
+{
+  "name": "@inference-gateway/adk-example-usage-metadata",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Usage-metadata example for @inference-gateway/adk - shows per-task token usage and execution stats attached to task.metadata when the default handlers run with setEnableUsageMetadata(true).",
+  "type": "module",
+  "scripts": {
+    "start": "tsx server.ts",
+    "start:server": "tsx server.ts",
+    "start:client": "tsx client.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@inference-gateway/adk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.19.2",
+    "typescript": "^6.0.3"
+  }
+}

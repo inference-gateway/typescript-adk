@@ -577,6 +577,135 @@ describe('DefaultStreamingTaskHandler usage metadata', () => {
     handler.setEnableUsageMetadata(true);
     expect(handler.isUsageMetadataEnabled()).toBe(true);
   });
+
+  it('does not emit a terminal statusChanged when disabled', async () => {
+    const { client } = scriptedClient([
+      assistantText('hi', { promptTokens: 3, completionTokens: 4 }),
+    ]);
+    const handler = new DefaultStreamingTaskHandler({ llmClient: client });
+    const events = await drain(handler.handle(buildContext()));
+    expect(events.map((e) => e.type)).toEqual(['delta', 'iterationCompleted']);
+  });
+
+  it('emits a terminal statusChanged with usage and execution_stats on natural completion', async () => {
+    const { client } = scriptedClient([
+      assistantText('done', {
+        promptTokens: 5,
+        completionTokens: 7,
+        totalTokens: 12,
+      }),
+    ]);
+    const handler = new DefaultStreamingTaskHandler({ llmClient: client });
+    handler.setEnableUsageMetadata(true);
+    const events = await drain(handler.handle(buildContext()));
+    expect(events.map((e) => e.type)).toEqual([
+      'delta',
+      'iterationCompleted',
+      'statusChanged',
+    ]);
+    const status = events[2] as Extract<
+      StreamingTaskEvent,
+      { type: 'statusChanged' }
+    >;
+    expect(status.state).toBe(TASK_STATE.COMPLETED);
+    const metadata = status.metadata as Record<string, unknown> | undefined;
+    expect(metadata).toBeDefined();
+    expect(metadata?.['usage']).toEqual({
+      prompt_tokens: 5,
+      completion_tokens: 7,
+      total_tokens: 12,
+    });
+    expect(metadata?.['execution_stats']).toEqual({
+      iterations: 1,
+      tool_calls: 0,
+      failed_tools: 0,
+    });
+  });
+
+  it('attaches metadata on the inputRequired terminal event', async () => {
+    const { client } = scriptedClient([
+      assistantToolCalls(
+        [
+          {
+            id: 'ir-1',
+            name: INPUT_REQUIRED_TOOL,
+            arguments: JSON.stringify({ message: 'need clarification' }),
+          },
+        ],
+        { promptTokens: 4, completionTokens: 2 }
+      ),
+    ]);
+    const handler = new DefaultStreamingTaskHandler({ llmClient: client });
+    handler.setEnableUsageMetadata(true);
+    const events = await drain(handler.handle(buildContext()));
+    const inputRequired = events.find((e) => e.type === 'inputRequired') as
+      | Extract<StreamingTaskEvent, { type: 'inputRequired' }>
+      | undefined;
+    expect(inputRequired).toBeDefined();
+    const metadata = inputRequired?.metadata as
+      | Record<string, unknown>
+      | undefined;
+    expect(metadata?.['usage']).toEqual({
+      prompt_tokens: 4,
+      completion_tokens: 2,
+      total_tokens: 6,
+    });
+    expect(metadata?.['execution_stats']).toEqual({
+      iterations: 1,
+      tool_calls: 0,
+      failed_tools: 0,
+    });
+  });
+
+  it('attaches metadata on the iteration-cap FAILED terminal event', async () => {
+    const { client } = scriptedClient([
+      assistantToolCalls([{ id: 'a', name: 'noop', arguments: '{}' }], {
+        promptTokens: 1,
+        completionTokens: 1,
+      }),
+    ]);
+    const toolBox = fakeToolBox({
+      tools: [{ name: 'noop', description: 'noop', parameters: {} }],
+      executeTool: async () => 'ok',
+    });
+    const handler = new DefaultStreamingTaskHandler({
+      llmClient: client,
+      toolBox,
+      maxIterations: 1,
+    });
+    handler.setEnableUsageMetadata(true);
+    const events = await drain(handler.handle(buildContext()));
+    const status = events.find((e) => e.type === 'statusChanged') as
+      | Extract<StreamingTaskEvent, { type: 'statusChanged' }>
+      | undefined;
+    expect(status?.state).toBe(TASK_STATE.FAILED);
+    const metadata = status?.metadata as Record<string, unknown> | undefined;
+    expect(metadata?.['execution_stats']).toEqual({
+      iterations: 1,
+      tool_calls: 1,
+      failed_tools: 0,
+    });
+  });
+
+  it('skips metadata when tracker has no usage even if toggle is on', async () => {
+    const { client } = scriptedClient([assistantText('done')]);
+    const handler = new DefaultStreamingTaskHandler({ llmClient: client });
+    handler.setEnableUsageMetadata(true);
+    const events = await drain(handler.handle(buildContext()));
+    // Tracker has iterations > 0 so hasUsage() is true; metadata still appears.
+    expect(events.map((e) => e.type)).toEqual([
+      'delta',
+      'iterationCompleted',
+      'statusChanged',
+    ]);
+    const status = events[2] as Extract<
+      StreamingTaskEvent,
+      { type: 'statusChanged' }
+    >;
+    const metadata = status.metadata as Record<string, unknown> | undefined;
+    expect(metadata?.['execution_stats']).toBeDefined();
+    expect(metadata?.['usage']).toBeUndefined();
+  });
 });
 
 describe('DefaultStreamingTaskHandler callbacks', () => {

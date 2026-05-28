@@ -345,6 +345,99 @@ describe('createMessageStreamHandler', () => {
     expect(stored.state).toBe(TASK_STATE.INPUT_REQUIRED);
   });
 
+  it('shallow-merges statusChanged.metadata into task.metadata on terminal transition', async () => {
+    const storage = new InMemoryTaskStorage();
+    const executor: StreamingTaskExecutor = async function* () {
+      yield {
+        type: 'statusChanged',
+        state: TASK_STATE.COMPLETED,
+        message: {
+          messageId: 'final-m',
+          role: 'ROLE_AGENT',
+          parts: [{ text: 'done' }],
+        },
+        metadata: {
+          usage: {
+            prompt_tokens: 5,
+            completion_tokens: 7,
+            total_tokens: 12,
+          },
+          execution_stats: { iterations: 1, tool_calls: 0, failed_tools: 0 },
+        },
+      };
+    };
+
+    const handler = createMessageStreamHandler({
+      storage,
+      executor,
+      idGenerator: sequentialIdGenerator(),
+      env: { [STREAMING_STATUS_UPDATE_INTERVAL_ENV]: '0' },
+      heartbeatMs: 0,
+    });
+
+    const result = handler(
+      { message: makeMessage({ contextId: 'ctx-metadata' }) },
+      { signal: new AbortController().signal }
+    );
+    await drainFrames(result.readable);
+    await result.done;
+
+    const stored = storage.getTask('id-1') as ManagedTask;
+    expect(stored.metadata).toBeDefined();
+    const metadata = stored.metadata as Record<string, unknown>;
+    expect(metadata['usage']).toEqual({
+      prompt_tokens: 5,
+      completion_tokens: 7,
+      total_tokens: 12,
+    });
+    expect(metadata['execution_stats']).toEqual({
+      iterations: 1,
+      tool_calls: 0,
+      failed_tools: 0,
+    });
+  });
+
+  it('shallow-merges inputRequired.metadata into task.metadata before pausing', async () => {
+    const storage = new InMemoryTaskStorage();
+    const executor: StreamingTaskExecutor = async function* () {
+      yield {
+        type: 'inputRequired',
+        message: {
+          messageId: 'ask-2',
+          role: 'ROLE_AGENT',
+          parts: [{ text: 'need more info' }],
+        },
+        metadata: {
+          execution_stats: { iterations: 1, tool_calls: 0, failed_tools: 0 },
+        },
+      };
+    };
+
+    const handler = createMessageStreamHandler({
+      storage,
+      executor,
+      idGenerator: sequentialIdGenerator(),
+      env: { [STREAMING_STATUS_UPDATE_INTERVAL_ENV]: '0' },
+      heartbeatMs: 0,
+    });
+
+    const result = handler(
+      { message: makeMessage({ contextId: 'ctx-input-meta' }) },
+      { signal: new AbortController().signal }
+    );
+    await drainFrames(result.readable);
+    await result.done;
+
+    const stored = storage.getTask('id-1') as ManagedTask;
+    expect(stored.state).toBe(TASK_STATE.INPUT_REQUIRED);
+    const metadata = stored.metadata as Record<string, unknown>;
+    expect(metadata['execution_stats']).toEqual({
+      iterations: 1,
+      tool_calls: 0,
+      failed_tools: 0,
+    });
+  });
+
   it('transitions to FAILED and emits a final status event when the executor throws', async () => {
     const storage = new InMemoryTaskStorage();
     const executor: StreamingTaskExecutor = async function* () {
