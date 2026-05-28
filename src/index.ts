@@ -10,6 +10,24 @@ export const packageMetadata: PackageMetadata = Object.freeze({
   version: pkg.version,
 });
 
+export {
+  DEBUG_ENV,
+  NODE_ENV_ENV,
+  NOOP_LOGGER,
+  REQUEST_ID_CONTEXT_KEY,
+  REQUEST_ID_HEADER,
+  REQUEST_LOGGER_CONTEXT_KEY,
+  SERVER_DISABLE_HEALTHCHECK_LOG_ENV,
+  childLogger,
+  createLogger,
+  createRequestLoggerMiddleware,
+} from './logging/index.js';
+export type {
+  CreateLoggerOptions,
+  Logger,
+  RequestLoggerMiddlewareOptions,
+} from './logging/index.js';
+
 export * from './types/index.js';
 export * from './agent/index.js';
 export * from './artifacts/index.js';
