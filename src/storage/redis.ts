@@ -1,10 +1,12 @@
 import type { Redis, RedisOptions } from 'ioredis';
 import { isTerminal, type ManagedTask } from '../agent/task.js';
 import type { PushNotificationConfig } from '../types/generated/a2a.js';
+import { selectTasksForEviction } from './retention.js';
 import {
   TaskStorageError,
   type StoredPushNotificationConfig,
   type TaskListFilter,
+  type TaskRetentionPolicy,
   type TaskStorage,
   type TaskStorageStats,
 } from './task-storage.js';
@@ -512,6 +514,19 @@ export class RedisTaskStorage implements TaskStorage {
     }
     this.execAsync(multi.exec(), 'cleanupCompleted');
     return removed;
+  }
+
+  cleanupTasksWithRetention(policy: TaskRetentionPolicy): number {
+    const evict = selectTasksForEviction(this.deadLetterTasks.values(), policy);
+    if (evict.length === 0) return 0;
+    const multi = this.commandClient.multi();
+    for (const task of evict) {
+      this.deadLetterTasks.delete(task.id);
+      this.unindexContext(task.contextId, task.id, multi);
+      multi.del(this.deadLetterKey(task.id));
+    }
+    this.execAsync(multi.exec(), 'cleanupTasksWithRetention');
+    return evict.length;
   }
 
   getStats(): TaskStorageStats {

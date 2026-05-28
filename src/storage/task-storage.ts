@@ -41,6 +41,24 @@ export type StoredPushNotificationConfig = PushNotificationConfig & {
 };
 
 /**
+ * Per-state caps for the dead-letter store. Passed to
+ * {@link TaskStorage.cleanupTasksWithRetention} to prune the oldest terminal
+ * tasks beyond each cap.
+ *
+ * `CANCELLED` tasks are counted alongside `FAILED` against
+ * {@link maxRetainedFailedTasks} since both are non-success terminals.
+ *
+ * - A non-negative integer caps the bucket at that many tasks.
+ * - A negative number (or omitted field) disables the cap for that bucket -
+ *   no pruning happens there.
+ * - Zero prunes the bucket entirely on the next sweep.
+ */
+export interface TaskRetentionPolicy {
+  readonly maxRetainedCompletedTasks?: number;
+  readonly maxRetainedFailedTasks?: number;
+}
+
+/**
  * Queue-centric task storage contract.
  *
  * Tasks flow through three locations:
@@ -153,6 +171,17 @@ export interface TaskStorage {
    * tasks removed.
    */
   cleanupCompleted(): number;
+
+  /**
+   * Bound the dead-letter store by retaining at most `policy.maxRetainedCompletedTasks`
+   * `COMPLETED` tasks and at most `policy.maxRetainedFailedTasks` `FAILED`/`CANCELLED`
+   * tasks. The oldest tasks (by `completedAt`, falling back to `updatedAt`, then
+   * `createdAt`) are pruned first. Active tasks are untouched.
+   *
+   * A cap of `0` prunes that bucket entirely; a negative cap is treated as
+   * "no cap" (the bucket is left alone). Returns the number of tasks removed.
+   */
+  cleanupTasksWithRetention(policy: TaskRetentionPolicy): number;
 
   /** Snapshot of storage health. */
   getStats(): TaskStorageStats;
