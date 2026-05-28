@@ -89,6 +89,8 @@
   },
   "sideEffects": false,
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1055.0",
+    "@aws-sdk/s3-request-presigner": "^3.1055.0",
     "@hono/node-server": "^2.0.4",
     "@inference-gateway/sdk": "^0.8.6",
     "ajv": "^8.20.0",
