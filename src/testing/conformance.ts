@@ -85,6 +85,7 @@ export function runTaskStorageConformance(
   registerListTasksTests(ctx);
   registerContextTests(ctx);
   registerCleanupCompletedTests(ctx);
+  registerRetentionTests(ctx);
   registerRemoveFromQueueTests(ctx);
   registerGetStatsTests(ctx);
   registerPushConfigTests(ctx);
@@ -129,6 +130,20 @@ function complete(ctx: Context, task: ManagedTask): ManagedTask {
   const working =
     task.state === TASK_STATE.IN_PROGRESS ? task : inProgress(ctx, task);
   return transitionTask(working, TASK_STATE.COMPLETED, {
+    now: fixedClock(nextIso(ctx)),
+  });
+}
+
+function fail(ctx: Context, task: ManagedTask): ManagedTask {
+  const working =
+    task.state === TASK_STATE.IN_PROGRESS ? task : inProgress(ctx, task);
+  return transitionTask(working, TASK_STATE.FAILED, {
+    now: fixedClock(nextIso(ctx)),
+  });
+}
+
+function cancel(ctx: Context, task: ManagedTask): ManagedTask {
+  return transitionTask(task, TASK_STATE.CANCELLED, {
     now: fixedClock(nextIso(ctx)),
   });
 }
@@ -442,6 +457,119 @@ function registerCleanupCompletedTests(ctx: Context): void {
     it('returns 0 when there is nothing to clean', () => {
       ctx.storage.createActive(makeTask(ctx, { id: 'a' }));
       expect(ctx.storage.cleanupCompleted()).toBe(0);
+    });
+  });
+}
+
+function registerRetentionTests(ctx: Context): void {
+  describe('cleanupTasksWithRetention', () => {
+    it('keeps the newest N COMPLETED tasks and prunes the rest', () => {
+      for (const id of ['c1', 'c2', 'c3', 'c4', 'c5']) {
+        ctx.storage.storeDeadLetter(complete(ctx, makeTask(ctx, { id })));
+      }
+      const removed = ctx.storage.cleanupTasksWithRetention({
+        maxRetainedCompletedTasks: 2,
+      });
+      expect(removed).toBe(3);
+      expect(ctx.storage.getTask('c1')).toBeUndefined();
+      expect(ctx.storage.getTask('c2')).toBeUndefined();
+      expect(ctx.storage.getTask('c3')).toBeUndefined();
+      expect(ctx.storage.getTask('c4')).toMatchObject({ id: 'c4' });
+      expect(ctx.storage.getTask('c5')).toMatchObject({ id: 'c5' });
+    });
+
+    it('counts FAILED and CANCELLED against the failed cap', () => {
+      ctx.storage.storeDeadLetter(fail(ctx, makeTask(ctx, { id: 'f1' })));
+      ctx.storage.storeDeadLetter(fail(ctx, makeTask(ctx, { id: 'f2' })));
+      ctx.storage.storeDeadLetter(cancel(ctx, makeTask(ctx, { id: 'x1' })));
+      ctx.storage.storeDeadLetter(cancel(ctx, makeTask(ctx, { id: 'x2' })));
+
+      const removed = ctx.storage.cleanupTasksWithRetention({
+        maxRetainedFailedTasks: 1,
+      });
+      expect(removed).toBe(3);
+      expect(ctx.storage.getTask('f1')).toBeUndefined();
+      expect(ctx.storage.getTask('f2')).toBeUndefined();
+      expect(ctx.storage.getTask('x1')).toBeUndefined();
+      expect(ctx.storage.getTask('x2')).toMatchObject({ id: 'x2' });
+    });
+
+    it('treats buckets independently', () => {
+      ctx.storage.storeDeadLetter(complete(ctx, makeTask(ctx, { id: 'c1' })));
+      ctx.storage.storeDeadLetter(complete(ctx, makeTask(ctx, { id: 'c2' })));
+      ctx.storage.storeDeadLetter(fail(ctx, makeTask(ctx, { id: 'f1' })));
+      ctx.storage.storeDeadLetter(fail(ctx, makeTask(ctx, { id: 'f2' })));
+
+      const removed = ctx.storage.cleanupTasksWithRetention({
+        maxRetainedCompletedTasks: 1,
+        maxRetainedFailedTasks: 1,
+      });
+      expect(removed).toBe(2);
+      expect(ctx.storage.getTask('c1')).toBeUndefined();
+      expect(ctx.storage.getTask('c2')).toMatchObject({ id: 'c2' });
+      expect(ctx.storage.getTask('f1')).toBeUndefined();
+      expect(ctx.storage.getTask('f2')).toMatchObject({ id: 'f2' });
+    });
+
+    it('never touches active tasks', () => {
+      ctx.storage.createActive(makeTask(ctx, { id: 'live-1' }));
+      ctx.storage.createActive(makeTask(ctx, { id: 'live-2' }));
+      ctx.storage.storeDeadLetter(complete(ctx, makeTask(ctx, { id: 'd1' })));
+
+      ctx.storage.cleanupTasksWithRetention({
+        maxRetainedCompletedTasks: 0,
+        maxRetainedFailedTasks: 0,
+      });
+      expect(ctx.storage.getActive('live-1')).toMatchObject({ id: 'live-1' });
+      expect(ctx.storage.getActive('live-2')).toMatchObject({ id: 'live-2' });
+      expect(ctx.storage.getTask('d1')).toBeUndefined();
+    });
+
+    it('treats negative caps as "no cap" for that bucket', () => {
+      ctx.storage.storeDeadLetter(complete(ctx, makeTask(ctx, { id: 'c1' })));
+      ctx.storage.storeDeadLetter(complete(ctx, makeTask(ctx, { id: 'c2' })));
+      ctx.storage.storeDeadLetter(fail(ctx, makeTask(ctx, { id: 'f1' })));
+      ctx.storage.storeDeadLetter(fail(ctx, makeTask(ctx, { id: 'f2' })));
+
+      const removed = ctx.storage.cleanupTasksWithRetention({
+        maxRetainedCompletedTasks: -1,
+        maxRetainedFailedTasks: 1,
+      });
+      expect(removed).toBe(1);
+      expect(ctx.storage.getTask('c1')).toMatchObject({ id: 'c1' });
+      expect(ctx.storage.getTask('c2')).toMatchObject({ id: 'c2' });
+      expect(ctx.storage.getTask('f1')).toBeUndefined();
+    });
+
+    it('is a no-op when the policy has neither cap set', () => {
+      ctx.storage.storeDeadLetter(complete(ctx, makeTask(ctx, { id: 'c1' })));
+      ctx.storage.storeDeadLetter(fail(ctx, makeTask(ctx, { id: 'f1' })));
+      expect(ctx.storage.cleanupTasksWithRetention({})).toBe(0);
+      expect(ctx.storage.getTask('c1')).toMatchObject({ id: 'c1' });
+      expect(ctx.storage.getTask('f1')).toMatchObject({ id: 'f1' });
+    });
+
+    it('returns 0 when bucket size is within its cap', () => {
+      ctx.storage.storeDeadLetter(complete(ctx, makeTask(ctx, { id: 'c1' })));
+      ctx.storage.storeDeadLetter(complete(ctx, makeTask(ctx, { id: 'c2' })));
+      expect(
+        ctx.storage.cleanupTasksWithRetention({
+          maxRetainedCompletedTasks: 10,
+        })
+      ).toBe(0);
+      expect(ctx.storage.getTask('c1')).toMatchObject({ id: 'c1' });
+      expect(ctx.storage.getTask('c2')).toMatchObject({ id: 'c2' });
+    });
+
+    it('cap of 0 prunes the entire bucket', () => {
+      ctx.storage.storeDeadLetter(complete(ctx, makeTask(ctx, { id: 'c1' })));
+      ctx.storage.storeDeadLetter(complete(ctx, makeTask(ctx, { id: 'c2' })));
+      const removed = ctx.storage.cleanupTasksWithRetention({
+        maxRetainedCompletedTasks: 0,
+      });
+      expect(removed).toBe(2);
+      expect(ctx.storage.getTask('c1')).toBeUndefined();
+      expect(ctx.storage.getTask('c2')).toBeUndefined();
     });
   });
 }

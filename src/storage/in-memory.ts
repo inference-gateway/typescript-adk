@@ -4,9 +4,11 @@ import {
   TaskStorageError,
   type StoredPushNotificationConfig,
   type TaskListFilter,
+  type TaskRetentionPolicy,
   type TaskStorage,
   type TaskStorageStats,
 } from './task-storage.js';
+import { selectTasksForEviction } from './retention.js';
 
 interface DequeueWaiter {
   resolve(task: ManagedTask): void;
@@ -218,6 +220,15 @@ export class InMemoryTaskStorage implements TaskStorage {
       }
     }
     return removed;
+  }
+
+  cleanupTasksWithRetention(policy: TaskRetentionPolicy): number {
+    const evict = selectTasksForEviction(this.deadLetterTasks.values(), policy);
+    for (const task of evict) {
+      this.deadLetterTasks.delete(task.id);
+      this.unindexContext(task.contextId, task.id);
+    }
+    return evict.length;
   }
 
   getStats(): TaskStorageStats {
