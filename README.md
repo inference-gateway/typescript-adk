@@ -178,6 +178,7 @@ Complete, runnable examples live under [`examples/`](./examples/):
 - **[`examples/ai-powered/`](./examples/ai-powered/)** - LLM-backed A2A agent with weather and time tools. Wires `AgentBuilder` + `OpenAICompatibleLLMClient` into `DefaultBackgroundTaskHandler`, dispatches tool calls in a chat-completion loop, and answers natural-language prompts through any OpenAI-compatible provider routed via the Inference Gateway. Mirrors the Go ADK's [`examples/ai-powered/`](https://github.com/inference-gateway/adk/tree/main/examples/ai-powered).
 - **[`examples/queue-storage/`](./examples/queue-storage/)** - Two variants of the same echo agent showing how to swap storage backends: [`in-memory/`](./examples/queue-storage/in-memory/) uses `InMemoryTaskStorage` (zero ops, no persistence) and [`redis/`](./examples/queue-storage/redis/) uses `RedisTaskStorage.connect()` with a bundled `docker-compose.yml` for local Redis (queue and dead-letter survive restarts, multi-instance fan-out via `BRPOP`). Mirrors the Go ADK's [`examples/queue-storage/`](https://github.com/inference-gateway/adk/tree/main/examples/queue-storage).
 - **[`examples/usage-metadata/`](./examples/usage-metadata/)** - Per-task token usage and execution stats serialized into `task.metadata.usage` / `task.metadata.execution_stats` on completion. Exercises both `DefaultBackgroundTaskHandler` and `DefaultStreamingTaskHandler` with `setEnableUsageMetadata(true)`; the client prints the resulting metadata from both `tasks/get` and the terminal SSE status frame. Mirrors the Go ADK's [`examples/usage-metadata/`](https://github.com/inference-gateway/adk/tree/main/examples/usage-metadata).
+- **[`examples/tls-server/`](./examples/tls-server/)** - A2A server + client over HTTPS with a self-signed cert. Boots `A2AServer` with `tls: loadServerTLSConfigFromEnv()`, drives the client over HTTPS via `tls: { caPath }`, and includes a `generate-certs.sh` helper plus Docker / Kubernetes cert-mount recipes. Mirrors the Go ADK's [`examples/tls-server/`](https://github.com/inference-gateway/adk/tree/main/examples/tls-server).
 
 Each example ships its own README with setup instructions.
 
@@ -195,6 +196,7 @@ Each example ships its own README with setup instructions.
 - 🏷️ **Build-Time Metadata** - Inject `name` / `description` / `version` at bundle or runtime (mirrors the Go ADK's `BuildAgent*` LD flags)
 - ☁️ **CloudEvents v1.0** - `createCloudEvent` helper for wrapping agent events in a spec-compliant envelope
 - 📡 **SSE Streaming** - `SSEStreamWriter` for emitting Server-Sent Events with a configurable heartbeat
+- 🔒 **TLS** - Server-side HTTPS termination via `tls: { certPath, keyPath }` (driven by `TLS_ENABLE` / `TLS_CERT_PATH` / `TLS_KEY_PATH` env vars); outbound `ClientTLSConfig` on both `A2AClient` and `OpenAICompatibleLLMClient` for self-signed or mTLS peers. Built on `node:https` / `node:tls` - no third-party TLS dependency.
 
 ### Developer Experience
 
@@ -206,7 +208,7 @@ Each example ships its own README with setup instructions.
 
 ### Status & Roadmap
 
-The TypeScript ADK currently focuses on the core A2A protocol surface: `message/send`, `tasks/get`, `tasks/list`, AgentCard discovery, the task lifecycle state machine, in-memory and Redis-backed storage, the retrying client, CloudEvents, and SSE. Capabilities that exist in the [Go ADK](https://github.com/inference-gateway/adk) but are **not yet implemented** here include: LLM client / multi-provider chat completion, streaming task handlers, additional JSON-RPC methods (`tasks/cancel`, `tasks/resubscribe`, `tasks/pushNotificationConfig/*`, `agent/getAuthenticatedExtendedCard`), file artifacts (filesystem & MinIO), OIDC/OAuth authentication, TLS configuration, push notifications, and OpenTelemetry-based observability. The TS ADK tracks the Go ADK as the long-term feature target - contributions toward parity are welcome.
+The TypeScript ADK currently focuses on the core A2A protocol surface: `message/send`, `tasks/get`, `tasks/list`, AgentCard discovery, the task lifecycle state machine, in-memory and Redis-backed storage, the retrying client, CloudEvents, and SSE. Capabilities that exist in the [Go ADK](https://github.com/inference-gateway/adk) but are **not yet implemented** here include: LLM client / multi-provider chat completion, streaming task handlers, additional JSON-RPC methods (`tasks/cancel`, `tasks/resubscribe`, `tasks/pushNotificationConfig/*`, `agent/getAuthenticatedExtendedCard`), file artifacts (filesystem & MinIO), OIDC/OAuth authentication, push notifications, and OpenTelemetry-based observability. The TS ADK tracks the Go ADK as the long-term feature target - contributions toward parity are welcome.
 
 ## 📖 API Reference
 
@@ -571,6 +573,83 @@ For everything else - port, host, JSON-RPC path, agent-card cache-control, handl
 - **Tuning client behavior** - `A2AClientConfig` exposes `timeoutMs`, `retry` (a partial `RetryConfig` or `false`), `headers`, `fetch`, `userAgent`, and overrides for `jsonRpcPath` / `agentCardPath` / `healthPath`. Call `withRetry` directly when you want to apply the same retry policy outside the client.
 - **Bundle-time metadata injection** - use `tsup`'s `define` option to bake `BUILD_AGENT_NAME` / `_DESCRIPTION` / `_VERSION` into the bundled output instead of relying on the runtime environment. See [Build-Time Agent Metadata](#build-time-agent-metadata) above.
 - **CloudEvents forwarding** - wrap your task-state transitions in `createCloudEvent` and POST them to a webhook or message bus for downstream subscribers, using the spec-compliant `CLOUDEVENTS_CONTENT_TYPE`.
+- **TLS termination** - boot the server over HTTPS by passing `tls: { certPath, keyPath }` into `createA2AServer` (or `loadServerTLSConfigFromEnv()` to read the same paths from `TLS_ENABLE` / `TLS_CERT_PATH` / `TLS_KEY_PATH`). For mTLS, add `caPath` and `requestCert: true`. See [TLS](#tls) below.
+
+### TLS
+
+#### Server: HTTPS termination
+
+Pass a `tls` config to `createA2AServer` and the server listens over HTTPS instead of plaintext HTTP. The cert / key files are read synchronously during construction - a missing path fails fast with `TLSConfigError` before `listen()` is called.
+
+```ts
+import {
+  createA2AServer,
+  loadServerTLSConfigFromEnv,
+  type AgentCard,
+} from '@inference-gateway/adk';
+
+const card: AgentCard = /* ... */;
+
+const server = createA2AServer({
+  card,
+  tls: loadServerTLSConfigFromEnv(), // reads TLS_ENABLE / TLS_CERT_PATH / TLS_KEY_PATH
+});
+
+await server.listen(8443, '0.0.0.0');
+```
+
+`loadServerTLSConfigFromEnv()` returns `undefined` when `TLS_ENABLE` is falsy, so the same code drops back to plaintext for local dev without a branch in the caller. The recognized env vars are:
+
+| Env var           |    Required     | Purpose                                                                |
+| ----------------- | :-------------: | ---------------------------------------------------------------------- |
+| `TLS_ENABLE`      | (master toggle) | Truthy: `true`, `1`, `yes`, `on`. Anything else returns `undefined`.   |
+| `TLS_CERT_PATH`   |   ✓ (when on)   | Server certificate (PEM).                                              |
+| `TLS_KEY_PATH`    |   ✓ (when on)   | Server private key (PEM).                                              |
+| `TLS_CA_PATH`     |                 | CA bundle used to verify client certs (mTLS only).                     |
+| `TLS_PASSPHRASE`  |                 | Passphrase unlocking the private key.                                  |
+| `TLS_CLIENT_AUTH` |                 | When truthy, request + require a client cert. Pair with `TLS_CA_PATH`. |
+
+For container deployments, mount cert / key files from a secrets backend rather than baking them into the image:
+
+```sh
+docker run --rm -p 8443:8443 \
+  -v /etc/tls/cert.pem:/run/secrets/tls/cert.pem:ro \
+  -v /etc/tls/key.pem:/run/secrets/tls/key.pem:ro \
+  -e TLS_ENABLE=true \
+  -e TLS_CERT_PATH=/run/secrets/tls/cert.pem \
+  -e TLS_KEY_PATH=/run/secrets/tls/key.pem \
+  my-agent:latest
+```
+
+The [`examples/tls-server/`](./examples/tls-server/) example ships a `generate-certs.sh` helper and a runnable end-to-end demo (server + client over HTTPS with a self-signed cert), plus a Kubernetes `Secret` + `volumeMount` recipe.
+
+#### Client: outbound TLS for `A2AClient` and `OpenAICompatibleLLMClient`
+
+Both clients accept a `tls?: ClientTLSConfig` field. Setting it routes outbound HTTPS through a `node:https.Agent` configured with the supplied cert / key / CA, so you can talk to a self-signed or private-CA-signed peer without disabling system trust.
+
+```ts
+import {
+  createA2AClient,
+  loadClientTLSConfigFromEnv,
+} from '@inference-gateway/adk';
+
+const client = createA2AClient({
+  baseURL: 'https://peer-agent.internal:8443',
+  tls: loadClientTLSConfigFromEnv() ?? {
+    caPath: '/etc/internal-ca.pem',
+  },
+});
+```
+
+`ClientTLSConfig` fields:
+
+- `caPath` - bundle to trust (for self-signed / private-CA peers)
+- `certPath` + `keyPath` - client cert for mTLS (both must be set together)
+- `passphrase` - unlocks an encrypted private key
+- `insecureSkipVerify` - **dev only.** Disables cert verification; vulnerable to MITM. Use `caPath` in production.
+- `servername` - override the SNI hostname
+
+`tls` and `fetch` are mutually exclusive on both clients - passing both throws (`A2AClientError` / `LLMConfigurationError`). To layer your own fetch wrapper over TLS, build the inner fetch yourself via `createTLSFetch(config)` and pass it via `fetch`.
 
 ### Custom task handlers
 

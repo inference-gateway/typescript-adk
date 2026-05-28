@@ -16,6 +16,7 @@ import {
 } from '../logging/index.js';
 import { InMemoryTaskStorage } from '../storage/in-memory.js';
 import type { TaskStorage } from '../storage/task-storage.js';
+import type { ServerTLSConfig } from '../tls/index.js';
 import type { AgentCard, Message } from '../types/generated/a2a.js';
 import {
   MESSAGE_SEND_METHOD,
@@ -126,6 +127,14 @@ export interface A2AServerBuilderConfig {
    * Override the agent card `Cache-Control` header passed to {@link A2AServer}.
    */
   readonly cacheControl?: string;
+  /**
+   * Optional TLS configuration. When set, the built {@link A2AServer} listens
+   * over HTTPS using the supplied cert/key (and optionally CA bundle for
+   * mTLS). Pair with
+   * {@link import('../tls/index.js').loadServerTLSConfigFromEnv} to drive
+   * TLS from environment variables.
+   */
+  readonly tls?: ServerTLSConfig;
 }
 
 /**
@@ -487,6 +496,9 @@ export class A2AServerBuilder<
         : {}),
       ...(this.builderLogger !== NOOP_LOGGER
         ? { logger: this.builderLogger }
+        : {}),
+      ...(this.builderConfig.tls !== undefined
+        ? { tls: this.builderConfig.tls }
         : {}),
     };
 

@@ -1,9 +1,11 @@
 import { createAdaptorServer } from '@hono/node-server';
 import { Hono } from 'hono';
 import type { Server } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import type { ArtifactStorageProvider } from '../artifacts/artifact-storage.js';
 import type { Authenticator } from '../auth/index.js';
+import { buildServerTLSOptions, type ServerTLSConfig } from '../tls/index.js';
 import {
   NOOP_LOGGER,
   createRequestLoggerMiddleware,
@@ -153,6 +155,18 @@ export interface A2AServerConfig {
    * overhead is the tracer lookup only.
    */
   readonly telemetry?: TelemetryProvider;
+  /**
+   * Optional TLS configuration. When supplied, the server listens over HTTPS
+   * with the supplied cert/key (and optionally CA bundle for mTLS). Cert and
+   * key files are read synchronously during construction; an unreadable
+   * path throws `TLSConfigError` before {@link A2AServer.listen} is ever
+   * called.
+   *
+   * Pair with {@link import('../tls/index.js').loadServerTLSConfigFromEnv}
+   * to drive TLS from `TLS_ENABLE` / `TLS_CERT_PATH` / `TLS_KEY_PATH`
+   * environment variables.
+   */
+  readonly tls?: ServerTLSConfig;
 }
 
 type NodeServer = Server;
@@ -177,6 +191,7 @@ export class A2AServer {
   private readonly artifactsPath: string;
   private readonly logger: Logger;
   private readonly telemetry: TelemetryProvider | undefined;
+  private readonly tlsEnabled: boolean;
   private readonly registry = new MethodRegistry();
   private readonly streamingRegistry = new Map<
     string,
@@ -194,6 +209,7 @@ export class A2AServer {
     this.artifactsPath = config.artifactsPath ?? DEFAULT_ARTIFACTS_PATH;
     this.logger = config.logger ?? NOOP_LOGGER;
     this.telemetry = config.telemetry;
+    this.tlsEnabled = config.tls !== undefined;
 
     if (config.extendedCard !== undefined) {
       this.registry.register(
@@ -205,9 +221,22 @@ export class A2AServer {
     }
 
     this.app = this.buildApp();
-    this.httpServer = createAdaptorServer({
-      fetch: this.app.fetch,
-    }) as NodeServer;
+    if (config.tls !== undefined) {
+      this.httpServer = createAdaptorServer({
+        fetch: this.app.fetch,
+        createServer: createHttpsServer,
+        serverOptions: buildServerTLSOptions(config.tls),
+      }) as NodeServer;
+    } else {
+      this.httpServer = createAdaptorServer({
+        fetch: this.app.fetch,
+      }) as NodeServer;
+    }
+  }
+
+  /** Whether this server is listening with TLS (HTTPS) enabled. */
+  isTLSEnabled(): boolean {
+    return this.tlsEnabled;
   }
 
   /** Logger configured on this server (or `NOOP_LOGGER` if none was supplied). */
