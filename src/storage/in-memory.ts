@@ -1,6 +1,8 @@
 import { isTerminal, type ManagedTask } from '../agent/task.js';
+import type { PushNotificationConfig } from '../types/generated/a2a.js';
 import {
   TaskStorageError,
+  type StoredPushNotificationConfig,
   type TaskListFilter,
   type TaskStorage,
   type TaskStorageStats,
@@ -30,6 +32,10 @@ export class InMemoryTaskStorage implements TaskStorage {
   private readonly contextIndex = new Map<string, Set<string>>();
   private readonly queue: ManagedTask[] = [];
   private readonly waiters: DequeueWaiter[] = [];
+  private readonly pushConfigs = new Map<
+    string,
+    Map<string, StoredPushNotificationConfig>
+  >();
 
   enqueue(task: ManagedTask): void {
     this.activeTasks.set(task.id, task);
@@ -188,6 +194,7 @@ export class InMemoryTaskStorage implements TaskStorage {
       if (this.deadLetterTasks.delete(id)) {
         removed++;
       }
+      this.pushConfigs.delete(id);
     }
 
     for (let i = this.queue.length - 1; i >= 0; i--) {
@@ -235,6 +242,51 @@ export class InMemoryTaskStorage implements TaskStorage {
       averageTasksPerContext,
       queueLength: this.queue.length,
     };
+  }
+
+  setPushConfig(
+    taskId: string,
+    config: PushNotificationConfig
+  ): StoredPushNotificationConfig {
+    let bucket = this.pushConfigs.get(taskId);
+    if (bucket === undefined) {
+      bucket = new Map();
+      this.pushConfigs.set(taskId, bucket);
+    }
+    const id =
+      typeof config.id === 'string' && config.id.length > 0
+        ? config.id
+        : crypto.randomUUID();
+    const stored: StoredPushNotificationConfig = { ...config, id };
+    bucket.set(id, stored);
+    return stored;
+  }
+
+  getPushConfig(
+    taskId: string,
+    configId: string
+  ): StoredPushNotificationConfig | undefined {
+    return this.pushConfigs.get(taskId)?.get(configId);
+  }
+
+  listPushConfigs(taskId: string): StoredPushNotificationConfig[] {
+    const bucket = this.pushConfigs.get(taskId);
+    if (bucket === undefined) {
+      return [];
+    }
+    return [...bucket.values()];
+  }
+
+  deletePushConfig(taskId: string, configId: string): boolean {
+    const bucket = this.pushConfigs.get(taskId);
+    if (bucket === undefined) {
+      return false;
+    }
+    const removed = bucket.delete(configId);
+    if (removed && bucket.size === 0) {
+      this.pushConfigs.delete(taskId);
+    }
+    return removed;
   }
 
   private indexContext(contextId: string, taskId: string): void {
