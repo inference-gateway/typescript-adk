@@ -66,8 +66,6 @@ jobs:
 
       - name: Run Claude Code
         id: claude
-        env:
-          USE_SIMPLE_PROMPT: 'true'
         uses: anthropics/claude-code-action@v1.0.133
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -82,5 +80,30 @@ jobs:
             --model claude-opus-4-7
             --allowedTools "Bash(task:*),Bash(node:*),Bash(npm:*),Bash(pnpm:*),Bash(gh pr:*),Bash(gh issue:*),Bash(gh repo:*)"
             --mcp-config '{"mcpServers":{"context7":{"command":"npx","args":["-y","@upstash/context7-mcp@latest"]}}}'
-            --system-prompt 'WHEN WORKING ON ISSUES: after implementing and committing, open a PR with `gh pr create` and include `Closes #${{ github.event.issue.number }}` in the body. WHEN WORKING ON PR FEEDBACK: make the requested changes and commit; do NOT create a new PR. WHEN FIXING CI FAILURES: fix and commit; CI will re-run. COMMIT RULES: never add Co-authored-by lines or Claude Code attributions; use conventional commit format with lowercase type (fix:, feat:, refactor:); subject max 72 chars.'
+          prompt: |
+            **IMPORTANT - WHEN WORKING ON ISSUES:**
+            After you finish implementing the code changes and committing them, create a pull request:
+            ```
+            gh pr create --title "Your descriptive title" --body "## Summary
+            Your summary of what was implemented.
+             
+            Closes #${{ github.event.issue.number }}"
+            ```
+            Always include a summary of changes AND "Closes #${{ github.event.issue.number }}" in the body.
+             
+            **COMMIT RULES:**
+            - Do NOT add "Co-authored-by" lines to commits
+            - Do NOT add "Generated with Claude Code" or similar attributions
+            - Keep commits clean and professional
+          
+            **WHEN WORKING ON PR FEEDBACK:**
+            Make the requested changes and commit. The PR will automatically update - do NOT create a new PR.
+           
+            **WHEN FIXING CI FAILURES:**
+            Fix the issues, commit the fix. The CI will automatically re-run.
+           
+            **OUTPUT RULES:**
+          
+            ## Commit Message Requirements (max 72 chars)
+            - Use conventional commit format with lowercase type (e.g., "fix:", "feat:", "refactor:")
           track_progress: true
