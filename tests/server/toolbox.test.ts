@@ -1,17 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
+import { InMemoryArtifactStorage } from '../../src/artifacts/in-memory-storage.js';
+import { DefaultArtifactService } from '../../src/artifacts/default-artifact-service.js';
 import { createTask } from '../../src/agent/task.js';
 import {
+  CREATE_ARTIFACT_ENV,
   CREATE_ARTIFACT_TOOL,
   DefaultToolBox,
   INPUT_REQUIRED_TOOL,
   INPUT_REQUIRED_TOOL_DESCRIPTION,
   INPUT_REQUIRED_TOOL_PARAMETERS,
+  PENDING_ARTIFACTS_STATE_KEY,
   RESERVED_TOOL_NAMES,
   ReservedToolNameError,
   ToolNotFoundError,
   ToolSchemaValidationError,
   createTool,
   createToolContext,
+  drainPendingArtifacts,
 } from '../../src/server/toolbox.js';
 import type { Tool } from '../../src/server/toolbox.js';
 
@@ -44,25 +49,50 @@ describe('DefaultToolBox reserved input_required tool', () => {
   });
 });
 
+function buildArtifactService() {
+  const storage = new InMemoryArtifactStorage({ baseUrl: 'http://artifacts' });
+  const service = new DefaultArtifactService({ storage });
+  return { service, storage };
+}
+
 describe('DefaultToolBox create_artifact opt-in', () => {
   it('is OFF by default', () => {
-    const toolbox = new DefaultToolBox();
+    const toolbox = new DefaultToolBox({ env: {} });
     expect(toolbox.hasTool(CREATE_ARTIFACT_TOOL)).toBe(false);
     expect(toolbox.getToolNames()).not.toContain(CREATE_ARTIFACT_TOOL);
   });
 
   it('is registered when enableCreateArtifact is true', () => {
-    const toolbox = new DefaultToolBox({ enableCreateArtifact: true });
+    const { service } = buildArtifactService();
+    const toolbox = new DefaultToolBox({
+      enableCreateArtifact: true,
+      artifactService: service,
+    });
     expect(toolbox.hasTool(CREATE_ARTIFACT_TOOL)).toBe(true);
     const def = toolbox.getTools().find((t) => t.name === CREATE_ARTIFACT_TOOL);
     expect(def?.parameters).toMatchObject({
       type: 'object',
-      required: ['name', 'parts'],
+      required: ['content', 'filename'],
     });
   });
 
+  it(`reads the ${CREATE_ARTIFACT_ENV} env var when no explicit option is set`, () => {
+    const { service } = buildArtifactService();
+    const toolbox = new DefaultToolBox({
+      env: { [CREATE_ARTIFACT_ENV]: 'true' },
+      artifactService: service,
+    });
+    expect(toolbox.hasTool(CREATE_ARTIFACT_TOOL)).toBe(true);
+  });
+
+  it('throws when enableCreateArtifact is true without an artifactService', () => {
+    expect(() => new DefaultToolBox({ enableCreateArtifact: true })).toThrow(
+      /artifactService/
+    );
+  });
+
   it('still refuses user tools that shadow create_artifact even when disabled', () => {
-    const toolbox = new DefaultToolBox();
+    const toolbox = new DefaultToolBox({ env: {} });
     expect(() =>
       toolbox.addTool(
         createTool({
@@ -73,6 +103,96 @@ describe('DefaultToolBox create_artifact opt-in', () => {
         })
       )
     ).toThrow(ReservedToolNameError);
+  });
+});
+
+describe('DefaultToolBox create_artifact executor', () => {
+  it('stores the content, stashes the artifact in state, and returns the URI', async () => {
+    const { service, storage } = buildArtifactService();
+    const toolbox = new DefaultToolBox({
+      enableCreateArtifact: true,
+      artifactService: service,
+    });
+
+    const context = ctx();
+    const result = await toolbox.executeTool(
+      CREATE_ARTIFACT_TOOL,
+      JSON.stringify({
+        content: 'hello world',
+        filename: 'note.txt',
+        name: 'My note',
+      }),
+      context
+    );
+
+    const payload = JSON.parse(result) as Record<string, unknown>;
+    expect(payload['success']).toBe(true);
+    expect(payload['filename']).toBe('note.txt');
+    expect(payload['url']).toEqual(expect.stringContaining('http://artifacts'));
+    expect(typeof payload['artifact_id']).toBe('string');
+
+    const pending = drainPendingArtifacts(context.state);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.artifactId).toBe(payload['artifact_id']);
+    expect(pending[0]?.name).toBe('My note');
+
+    expect(await storage.exists(pending[0]?.artifactId ?? '', 'note.txt')).toBe(
+      true
+    );
+  });
+
+  it('defaults the artifact name when omitted and honours mimeType override', async () => {
+    const { service } = buildArtifactService();
+    const toolbox = new DefaultToolBox({
+      enableCreateArtifact: true,
+      artifactService: service,
+    });
+    const context = ctx();
+    await toolbox.executeTool(
+      CREATE_ARTIFACT_TOOL,
+      JSON.stringify({
+        content: '{"k":1}',
+        filename: 'data.bin',
+        mimeType: 'application/json',
+      }),
+      context
+    );
+    const pending = drainPendingArtifacts(context.state);
+    expect(pending[0]?.name).toBe('Generated Content');
+    expect(pending[0]?.parts[0]?.file?.mediaType).toBe('application/json');
+  });
+
+  it('returns success:false JSON when the schema does not match (no exception)', async () => {
+    const { service } = buildArtifactService();
+    const toolbox = new DefaultToolBox({
+      enableCreateArtifact: true,
+      artifactService: service,
+    });
+    await expect(
+      toolbox.executeTool(
+        CREATE_ARTIFACT_TOOL,
+        JSON.stringify({ content: 'x' }),
+        ctx()
+      )
+    ).rejects.toBeInstanceOf(ToolSchemaValidationError);
+  });
+});
+
+describe('drainPendingArtifacts', () => {
+  it('returns an empty array when nothing is stashed', () => {
+    expect(drainPendingArtifacts({})).toEqual([]);
+  });
+
+  it('returns and clears the stashed artifacts', () => {
+    const state: Record<string, unknown> = {
+      [PENDING_ARTIFACTS_STATE_KEY]: [
+        { artifactId: 'a', parts: [] },
+        { artifactId: 'b', parts: [] },
+      ],
+    };
+    const first = drainPendingArtifacts(state);
+    expect(first.map((a) => a.artifactId)).toEqual(['a', 'b']);
+    expect(drainPendingArtifacts(state)).toEqual([]);
   });
 });
 

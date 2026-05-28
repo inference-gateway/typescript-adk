@@ -189,19 +189,24 @@ export type {
 export { DefaultStreamingTaskHandler } from './default-streaming-task-handler.js';
 export type { DefaultStreamingTaskHandlerOptions } from './default-streaming-task-handler.js';
 export {
+  CREATE_ARTIFACT_ENV,
   CREATE_ARTIFACT_TOOL,
   CREATE_ARTIFACT_TOOL_DESCRIPTION,
   CREATE_ARTIFACT_TOOL_PARAMETERS,
+  DEFAULT_GENERATED_ARTIFACT_NAME,
   DefaultToolBox,
   INPUT_REQUIRED_TOOL,
   INPUT_REQUIRED_TOOL_DESCRIPTION,
   INPUT_REQUIRED_TOOL_PARAMETERS,
+  PENDING_ARTIFACTS_STATE_KEY,
   RESERVED_TOOL_NAMES,
   ReservedToolNameError,
   ToolNotFoundError,
   ToolSchemaValidationError,
+  createCreateArtifactExecutor,
   createTool,
   createToolContext,
+  drainPendingArtifacts,
 } from './toolbox.js';
 export type {
   DefaultToolBoxOptions,

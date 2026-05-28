@@ -9,9 +9,11 @@ import {
 } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
+  Artifact,
   Message,
   SendMessageConfiguration,
   Struct,
+  TaskArtifactUpdateEvent,
   TaskStatus,
   TaskStatusUpdateEvent,
 } from '../types/generated/a2a.js';
@@ -133,6 +135,12 @@ export type StreamingTaskEvent =
       readonly toolName: string;
       readonly result: string;
       readonly isError: boolean;
+    }
+  | {
+      readonly type: 'artifactCreated';
+      readonly artifact: Artifact;
+      readonly append?: boolean;
+      readonly lastChunk?: boolean;
     }
   | { readonly type: 'rawCloudEvent'; readonly event: CloudEvent };
 
@@ -548,6 +556,15 @@ function handleExecutorEvent(
       emitToolResultEvent(writer, task, event, emitOptions);
       return task;
     }
+    case 'artifactCreated': {
+      const next: ManagedTask = {
+        ...task,
+        artifacts: [...task.artifacts, event.artifact],
+      };
+      storage.updateActive(next);
+      emitArtifactUpdatedEvent(writer, next, event, emitOptions);
+      return next;
+    }
     case 'rawCloudEvent': {
       writer.emitCloudEvent(event.event);
       emitOptions.bus?.publish(event.event);
@@ -744,6 +761,35 @@ function emitToolResultEvent(
   };
   const emitted = writer.emit({
     type: AGENT_EVENT_TYPE.TOOL_RESULT satisfies AgentEventType,
+    data,
+    subject: task.id,
+    ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),
+  });
+  if (emitted !== undefined) {
+    emitOptions.bus?.publish(emitted);
+  }
+  return emitted;
+}
+
+function emitArtifactUpdatedEvent(
+  writer: SSEStreamWriter,
+  task: ManagedTask,
+  event: {
+    readonly artifact: Artifact;
+    readonly append?: boolean;
+    readonly lastChunk?: boolean;
+  },
+  emitOptions: EmitOptions
+): CloudEvent<TaskArtifactUpdateEvent> | undefined {
+  const data: TaskArtifactUpdateEvent = {
+    taskId: task.id,
+    contextId: task.contextId,
+    artifact: event.artifact,
+    ...(event.append !== undefined ? { append: event.append } : {}),
+    ...(event.lastChunk !== undefined ? { lastChunk: event.lastChunk } : {}),
+  };
+  const emitted = writer.emit({
+    type: AGENT_EVENT_TYPE.TASK_ARTIFACT_UPDATED satisfies AgentEventType,
     data,
     subject: task.id,
     ...(emitOptions.source !== undefined ? { source: emitOptions.source } : {}),

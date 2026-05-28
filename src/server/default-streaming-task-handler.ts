@@ -32,7 +32,7 @@ import type {
   StreamingTaskExecutor,
 } from './message-stream.js';
 import { NOOP_LOGGER, type Logger } from './server-builder.js';
-import { createToolContext } from './toolbox.js';
+import { createToolContext, drainPendingArtifacts } from './toolbox.js';
 
 /** Constructor options for {@link DefaultStreamingTaskHandler}. */
 export interface DefaultStreamingTaskHandlerOptions {
@@ -456,6 +456,10 @@ export class DefaultStreamingTaskHandler {
           toolCallId: call.id,
           content: toolResult.content,
         });
+      }
+
+      for (const artifact of drainPendingArtifacts(toolState)) {
+        yield { type: 'artifactCreated', artifact };
       }
 
       yield {

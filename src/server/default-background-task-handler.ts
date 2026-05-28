@@ -14,7 +14,12 @@ import {
   transitionTask,
   type ManagedTask,
 } from '../agent/task.js';
-import type { Message, Part, Struct } from '../types/generated/a2a.js';
+import type {
+  Artifact,
+  Message,
+  Part,
+  Struct,
+} from '../types/generated/a2a.js';
 import { NOOP_LOGGER, type Logger } from './server-builder.js';
 import type {
   BackgroundTaskContext,
@@ -23,6 +28,7 @@ import type {
 import {
   INPUT_REQUIRED_TOOL,
   createToolContext,
+  drainPendingArtifacts,
   type ToolBox,
   type ToolDefinition,
 } from './toolbox.js';
@@ -357,6 +363,7 @@ export class DefaultBackgroundTaskHandler {
     const tracker = new UsageTracker();
     const conversation: ChatMessage[] = this.buildInitialConversation(task);
     const toolState: Record<string, unknown> = {};
+    const accumulatedArtifacts: Artifact[] = [];
     const callbackContext = this.buildCallbackContext(
       task,
       context.signal,
@@ -366,12 +373,19 @@ export class DefaultBackgroundTaskHandler {
     try {
       const override = await runBeforeAgent(this.callbacks, callbackContext);
       if (override !== undefined) {
-        return this.finalizeWithMessage(task, override, tracker);
+        accumulatedArtifacts.push(...drainPendingArtifacts(toolState));
+        return this.finalizeWithMessage(
+          task,
+          override,
+          tracker,
+          accumulatedArtifacts
+        );
       }
 
       for (let iteration = 0; iteration < this.maxIterations; iteration++) {
         if (context.signal.aborted) {
-          return this.finalizeCancelled(task, tracker);
+          accumulatedArtifacts.push(...drainPendingArtifacts(toolState));
+          return this.finalizeCancelled(task, tracker, accumulatedArtifacts);
         }
         tracker.incrementIteration();
 
@@ -419,11 +433,13 @@ export class DefaultBackgroundTaskHandler {
 
         const toolCalls = assistant.toolCalls ?? [];
         if (toolCalls.length === 0) {
+          accumulatedArtifacts.push(...drainPendingArtifacts(toolState));
           return await this.finalizeCompletedWithCallbacks(
             task,
             assistant,
             tracker,
-            callbackContext
+            callbackContext,
+            accumulatedArtifacts
           );
         }
 
@@ -431,7 +447,13 @@ export class DefaultBackgroundTaskHandler {
           (c) => c.name === INPUT_REQUIRED_TOOL
         );
         if (inputRequired !== undefined) {
-          return this.finalizeInputRequired(task, inputRequired, tracker);
+          accumulatedArtifacts.push(...drainPendingArtifacts(toolState));
+          return this.finalizeInputRequired(
+            task,
+            inputRequired,
+            tracker,
+            accumulatedArtifacts
+          );
         }
 
         tracker.incrementToolCalls(toolCalls.length);
@@ -465,7 +487,8 @@ export class DefaultBackgroundTaskHandler {
         );
         const results = await Promise.all(dispatches);
         if (context.signal.aborted) {
-          return this.finalizeCancelled(task, tracker);
+          accumulatedArtifacts.push(...drainPendingArtifacts(toolState));
+          return this.finalizeCancelled(task, tracker, accumulatedArtifacts);
         }
         for (let i = 0; i < toolCalls.length; i++) {
           const call = toolCalls[i] as ToolCall;
@@ -482,20 +505,23 @@ export class DefaultBackgroundTaskHandler {
             content: toolResult.content,
           });
         }
+        accumulatedArtifacts.push(...drainPendingArtifacts(toolState));
       }
 
       return this.finalizeFailed(
         task,
         `Iteration cap reached (${this.maxIterations}) without completion.`,
-        tracker
+        tracker,
+        accumulatedArtifacts
       );
     } catch (err) {
+      accumulatedArtifacts.push(...drainPendingArtifacts(toolState));
       if (context.signal.aborted) {
-        return this.finalizeCancelled(task, tracker);
+        return this.finalizeCancelled(task, tracker, accumulatedArtifacts);
       }
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error('background task failed', { error: message });
-      return this.finalizeFailed(task, message, tracker);
+      return this.finalizeFailed(task, message, tracker, accumulatedArtifacts);
     }
   }
 
@@ -519,7 +545,8 @@ export class DefaultBackgroundTaskHandler {
     task: ManagedTask,
     assistant: AssistantMessage,
     tracker: UsageTracker,
-    callbackContext: CallbackContext
+    callbackContext: CallbackContext,
+    artifacts: readonly Artifact[]
   ): Promise<ManagedTask> {
     const text = assistant.content ?? '';
     const message = buildAgentMessage(task, text.length > 0 ? text : 'Done.');
@@ -529,17 +556,21 @@ export class DefaultBackgroundTaskHandler {
       message
     );
     const finalMessage = override ?? message;
-    return this.finalizeWithMessage(task, finalMessage, tracker);
+    return this.finalizeWithMessage(task, finalMessage, tracker, artifacts);
   }
 
   private finalizeWithMessage(
     task: ManagedTask,
     message: Message,
-    tracker: UsageTracker
+    tracker: UsageTracker,
+    artifacts: readonly Artifact[] = []
   ): ManagedTask {
     const withMessage: ManagedTask = {
       ...task,
       messages: [...task.messages, message],
+      ...(artifacts.length > 0
+        ? { artifacts: [...task.artifacts, ...artifacts] }
+        : {}),
     };
     const next = transitionTask(withMessage, TASK_STATE.COMPLETED, { message });
     return this.attachMetadata(next, tracker);
@@ -643,13 +674,17 @@ export class DefaultBackgroundTaskHandler {
   private finalizeInputRequired(
     task: ManagedTask,
     call: ToolCall,
-    tracker: UsageTracker
+    tracker: UsageTracker,
+    artifacts: readonly Artifact[] = []
   ): ManagedTask {
     const prompt = extractInputRequiredPrompt(call.arguments);
     const message = buildAgentMessage(task, prompt);
     const withMessage: ManagedTask = {
       ...task,
       messages: [...task.messages, message],
+      ...(artifacts.length > 0
+        ? { artifacts: [...task.artifacts, ...artifacts] }
+        : {}),
     };
     const next = transitionTask(withMessage, TASK_STATE.INPUT_REQUIRED, {
       message,
@@ -660,7 +695,8 @@ export class DefaultBackgroundTaskHandler {
   private finalizeFailed(
     task: ManagedTask,
     text: string,
-    tracker: UsageTracker
+    tracker: UsageTracker,
+    artifacts: readonly Artifact[] = []
   ): ManagedTask {
     const baseTask = isTerminal(task.state)
       ? task
@@ -671,19 +707,30 @@ export class DefaultBackgroundTaskHandler {
       return baseTask;
     }
     const message = buildAgentMessage(baseTask, text);
-    const next = transitionTask(baseTask, TASK_STATE.FAILED, { message });
+    const withArtifacts: ManagedTask =
+      artifacts.length > 0
+        ? { ...baseTask, artifacts: [...baseTask.artifacts, ...artifacts] }
+        : baseTask;
+    const next = transitionTask(withArtifacts, TASK_STATE.FAILED, { message });
     return this.attachMetadata(next, tracker);
   }
 
   private finalizeCancelled(
     task: ManagedTask,
-    tracker: UsageTracker
+    tracker: UsageTracker,
+    artifacts: readonly Artifact[] = []
   ): ManagedTask {
     if (isTerminal(task.state)) {
       return task;
     }
     const message = buildAgentMessage(task, 'Task cancelled.');
-    const next = transitionTask(task, TASK_STATE.CANCELLED, { message });
+    const withArtifacts: ManagedTask =
+      artifacts.length > 0
+        ? { ...task, artifacts: [...task.artifacts, ...artifacts] }
+        : task;
+    const next = transitionTask(withArtifacts, TASK_STATE.CANCELLED, {
+      message,
+    });
     return this.attachMetadata(next, tracker);
   }
 
