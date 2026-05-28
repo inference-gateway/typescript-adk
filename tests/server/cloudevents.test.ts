@@ -9,7 +9,7 @@ import {
 } from '../../src/server/cloudevents.js';
 
 describe('AGENT_EVENT_TYPE constants', () => {
-  it('matches the Go ADK adk.agent.* event-type set verbatim', () => {
+  it('covers the Go ADK adk.agent.* event-type set plus TS extensions', () => {
     expect(AGENT_EVENT_TYPE).toEqual({
       DELTA: 'adk.agent.delta',
       ITERATION_COMPLETED: 'adk.agent.iteration.completed',
@@ -19,6 +19,11 @@ describe('AGENT_EVENT_TYPE constants', () => {
       TOOL_RESULT: 'adk.agent.tool.result',
       INPUT_REQUIRED: 'adk.agent.input.required',
       TASK_STATUS_CHANGED: 'adk.agent.task.status.changed',
+      // TS-only: emitted when the streaming handler attaches an artifact
+      // (e.g. via the reserved `create_artifact` tool) to the task. The Go
+      // ADK currently surfaces artifact updates only through the A2A
+      // `TaskArtifactUpdateEvent` payload, not a dedicated CE type.
+      TASK_ARTIFACT_UPDATED: 'adk.agent.task.artifact.updated',
       TASK_INTERRUPTED: 'adk.agent.task.interrupted',
       STREAM_FAILED: 'adk.agent.stream.failed',
     });

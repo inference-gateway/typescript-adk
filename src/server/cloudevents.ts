@@ -50,6 +50,7 @@ export const AGENT_EVENT_TYPE = {
   TOOL_RESULT: 'adk.agent.tool.result',
   INPUT_REQUIRED: 'adk.agent.input.required',
   TASK_STATUS_CHANGED: 'adk.agent.task.status.changed',
+  TASK_ARTIFACT_UPDATED: 'adk.agent.task.artifact.updated',
   TASK_INTERRUPTED: 'adk.agent.task.interrupted',
   STREAM_FAILED: 'adk.agent.stream.failed',
 } as const;

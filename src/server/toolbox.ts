@@ -1,6 +1,7 @@
 import { Ajv, type ErrorObject, type ValidateFunction } from 'ajv';
+import type { ArtifactService } from '../artifacts/artifact-service.js';
 import type { ManagedTask } from '../agent/task.js';
-import type { Struct } from '../types/generated/a2a.js';
+import type { Artifact, Struct } from '../types/generated/a2a.js';
 import { NOOP_LOGGER, type Logger } from './server-builder.js';
 
 /**
@@ -59,39 +60,89 @@ export const INPUT_REQUIRED_TOOL_PARAMETERS: Struct = {
 
 /**
  * Description advertised to the LLM for the reserved {@link CREATE_ARTIFACT_TOOL}.
- * Mirrors the Go ADK's `create_artifact` reserved tool.
+ * Mirrors the Go ADK's `create_artifact` reserved tool in
+ * `server/agent_toolbox.go`.
  */
 export const CREATE_ARTIFACT_TOOL_DESCRIPTION =
-  'Create a named artifact attached to the current task. Use this to surface a discrete output (a document, a code snippet, a report) that the caller can fetch separately from the conversation transcript. Prefer this over inlining large outputs into the assistant message.';
+  'Create a named artifact attached to the current task by storing the supplied content via the configured artifact service. Use this to surface a discrete output (a document, a code snippet, a report) that the caller can fetch via the returned URI separately from the conversation transcript. Prefer this over inlining large outputs into the assistant message.';
 
 /**
  * JSON Schema advertised to the LLM for the reserved {@link CREATE_ARTIFACT_TOOL}.
- * The handler/artifact service consuming the call is responsible for turning
- * `parts` into A2A `Part`s; this schema is intentionally permissive so it
- * does not constrain the downstream implementation.
+ * Matches the cross-language wire shape: `content` is the artifact body,
+ * `filename` is the on-disk/blob name (used for MIME inference when
+ * `mimeType` is omitted), `name` is a human-readable label, and `mimeType`
+ * forces the media type.
  */
 export const CREATE_ARTIFACT_TOOL_PARAMETERS: Struct = {
   type: 'object',
   properties: {
+    content: {
+      type: 'string',
+      description: 'The text content to save as the artifact file.',
+    },
+    filename: {
+      type: 'string',
+      description:
+        'Filename with extension used by the storage backend and for MIME-type inference (e.g. "report.md", "data.json").',
+    },
     name: {
       type: 'string',
       description:
-        'Short human-readable name of the artifact (e.g. "summary.md", "design-diagram").',
+        'Optional human-readable label for the artifact (e.g. "Quarterly report"). Defaults to "Generated Content" when omitted.',
     },
-    description: {
+    mimeType: {
       type: 'string',
       description:
-        'Optional one-sentence description of the artifact contents.',
-    },
-    parts: {
-      type: 'array',
-      description:
-        'Ordered array of A2A Parts forming the artifact body. Each item should be either a text part (`{type:"text", text:"..."}`) or a file part.',
-      items: { type: 'object' },
+        'Optional MIME type override. When omitted the type is inferred from the filename extension, falling back to application/octet-stream.',
     },
   },
-  required: ['name', 'parts'],
+  required: ['content', 'filename'],
 };
+
+/**
+ * Name of the environment variable that opts into auto-registering the
+ * reserved {@link CREATE_ARTIFACT_TOOL}. Mirrors the Go ADK's
+ * `AGENT_CLIENT_TOOLS_CREATE_ARTIFACT` (`server/config/config.go`); accepts
+ * `'true'` or `'1'` as truthy values.
+ */
+export const CREATE_ARTIFACT_ENV =
+  'AGENT_CLIENT_TOOLS_CREATE_ARTIFACT' as const;
+
+/**
+ * Well-known key on {@link ToolContext.state} under which the reserved
+ * `create_artifact` executor stashes newly-created {@link Artifact}s for the
+ * surrounding task handler to drain and attach to the task. Exported so custom
+ * task handlers that consume this toolbox can pick up artifacts the same way
+ * the default handlers do.
+ */
+export const PENDING_ARTIFACTS_STATE_KEY = '__adk_pending_artifacts__' as const;
+
+/**
+ * Default `Artifact.name` used when the LLM omits the optional `name` field
+ * on a {@link CREATE_ARTIFACT_TOOL} call. Mirrors the Go ADK fallback.
+ */
+export const DEFAULT_GENERATED_ARTIFACT_NAME = 'Generated Content';
+
+/**
+ * Pop every pending artifact from the shared tool state bag and return them.
+ * After this call the state slot is empty. Safe to call when no
+ * `create_artifact` tool has run - returns an empty array.
+ *
+ * The task handlers (`DefaultBackgroundTaskHandler`, `DefaultStreamingTaskHandler`)
+ * use this to surface artifacts onto the task; custom handlers that bundle
+ * the {@link DefaultToolBox} should do the same.
+ */
+export function drainPendingArtifacts(
+  state: Record<string, unknown>
+): Artifact[] {
+  const pending = state[PENDING_ARTIFACTS_STATE_KEY];
+  if (!Array.isArray(pending) || pending.length === 0) {
+    return [];
+  }
+  const drained = pending as Artifact[];
+  state[PENDING_ARTIFACTS_STATE_KEY] = [];
+  return [...drained];
+}
 
 /**
  * OpenAI-compatible tool definition advertised to the LLM. `parameters` is the
@@ -288,15 +339,24 @@ function parseToolArguments(args: string): unknown {
 export interface DefaultToolBoxOptions {
   /**
    * Pre-register the reserved {@link CREATE_ARTIFACT_TOOL} so the LLM is told
-   * it can create named artifacts. Off by default because downstream pipelines
-   * that do not handle the call have no way to act on it; opt in only when
-   * the surrounding task handler / artifact service knows how to materialize
-   * an artifact from the tool call.
-   *
-   * Like {@link INPUT_REQUIRED_TOOL}, the call is intercepted by the handler
-   * before reaching the toolbox executor.
+   * it can create named artifacts. When set to `true`, {@link artifactService}
+   * MUST also be provided; the constructor throws {@link TypeError} otherwise.
+   * When left `undefined`, the toolbox falls back to the
+   * {@link CREATE_ARTIFACT_ENV} environment variable (`'true'` or `'1'`
+   * enables the tool). An explicit `false` always disables.
    */
   readonly enableCreateArtifact?: boolean;
+  /**
+   * Artifact service used by the reserved {@link CREATE_ARTIFACT_TOOL}
+   * executor to persist content and produce the URI returned to the LLM.
+   * Ignored when `create_artifact` is disabled. Required when enabled.
+   */
+  readonly artifactService?: ArtifactService;
+  /**
+   * Read environment variables from this object instead of `process.env` for
+   * the {@link CREATE_ARTIFACT_ENV} fallback. Test seam.
+   */
+  readonly env?: Readonly<Record<string, string | undefined>>;
   /**
    * Optional ajv instance to reuse across the toolbox. The default ajv is
    * constructed in strict mode with `allErrors: true`. Inject a custom
@@ -352,28 +412,50 @@ export class DefaultToolBox implements ToolBox {
         strictSchema: false,
       });
 
-    this.registerReserved({
-      name: INPUT_REQUIRED_TOOL,
-      description: INPUT_REQUIRED_TOOL_DESCRIPTION,
-      parameters: INPUT_REQUIRED_TOOL_PARAMETERS,
-    });
-    if (options.enableCreateArtifact === true) {
-      this.registerReserved({
-        name: CREATE_ARTIFACT_TOOL,
-        description: CREATE_ARTIFACT_TOOL_DESCRIPTION,
-        parameters: CREATE_ARTIFACT_TOOL_PARAMETERS,
-      });
+    this.registerReserved(
+      {
+        name: INPUT_REQUIRED_TOOL,
+        description: INPUT_REQUIRED_TOOL_DESCRIPTION,
+        parameters: INPUT_REQUIRED_TOOL_PARAMETERS,
+      },
+      async () => ''
+    );
+
+    const createArtifactEnabled = resolveCreateArtifactEnabled(options);
+    if (createArtifactEnabled) {
+      const artifactService = options.artifactService;
+      if (artifactService === undefined) {
+        if (options.enableCreateArtifact === true) {
+          throw new TypeError(
+            'DefaultToolBox: enableCreateArtifact requires an artifactService'
+          );
+        }
+        // Env-driven opt-in without a service: silently skip so a stray env
+        // var in the environment cannot crash callers that didn't ask for it.
+      } else {
+        this.registerReserved(
+          {
+            name: CREATE_ARTIFACT_TOOL,
+            description: CREATE_ARTIFACT_TOOL_DESCRIPTION,
+            parameters: CREATE_ARTIFACT_TOOL_PARAMETERS,
+          },
+          createCreateArtifactExecutor(artifactService)
+        );
+      }
     }
   }
 
-  private registerReserved(definition: {
-    readonly name: string;
-    readonly description: string;
-    readonly parameters: Struct;
-  }): void {
+  private registerReserved(
+    definition: {
+      readonly name: string;
+      readonly description: string;
+      readonly parameters: Struct;
+    },
+    execute: Tool['execute']
+  ): void {
     const tool: Tool = {
       ...definition,
-      execute: async () => '',
+      execute,
     };
     this.tools.set(tool.name, tool);
     this.validators.set(tool.name, this.ajv.compile(tool.parameters));
@@ -532,3 +614,134 @@ export function createToolContext(input: {
  * the shared `ManagedTask` type.
  */
 export type { ManagedTask };
+
+function resolveCreateArtifactEnabled(options: DefaultToolBoxOptions): boolean {
+  if (typeof options.enableCreateArtifact === 'boolean') {
+    return options.enableCreateArtifact;
+  }
+  const env = options.env ?? process.env;
+  const raw = env[CREATE_ARTIFACT_ENV];
+  return raw === 'true' || raw === '1';
+}
+
+/**
+ * Builds the active executor used by the auto-registered
+ * {@link CREATE_ARTIFACT_TOOL}. Exported separately so callers that want to
+ * register the tool on a custom toolbox (without subclassing
+ * {@link DefaultToolBox}) can reuse the canonical implementation.
+ *
+ * The executor expects `{content, filename, name?, mimeType?}` JSON, persists
+ * `content` via `artifactService.createFileArtifact`, pushes the resulting
+ * {@link Artifact} onto `context.state[PENDING_ARTIFACTS_STATE_KEY]` so the
+ * surrounding task handler can attach it to the task, and returns a JSON
+ * string with `{success, message, artifact_id, url?, filename}` for the LLM.
+ */
+export function createCreateArtifactExecutor(
+  artifactService: ArtifactService
+): Tool['execute'] {
+  return async (args, context) => {
+    let parsed: CreateArtifactArgs;
+    try {
+      parsed = parseCreateArtifactArgs(args);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return JSON.stringify({
+        success: false,
+        message: `Invalid create_artifact arguments: ${message}`,
+      });
+    }
+
+    const name = parsed.name ?? DEFAULT_GENERATED_ARTIFACT_NAME;
+    const description = `Artifact created by ${CREATE_ARTIFACT_TOOL} tool: ${name}`;
+    const data = new TextEncoder().encode(parsed.content);
+
+    let artifact: Artifact;
+    try {
+      artifact = await artifactService.createFileArtifact(
+        name,
+        description,
+        parsed.filename,
+        data,
+        {
+          ...(parsed.mimeType !== undefined
+            ? { mimeType: parsed.mimeType }
+            : {}),
+          signal: context.signal,
+        }
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      context.logger.warn('create_artifact tool: storage write failed', {
+        filename: parsed.filename,
+        error: message,
+      });
+      return JSON.stringify({
+        success: false,
+        message: `Failed to store artifact "${parsed.filename}": ${message}`,
+        filename: parsed.filename,
+      });
+    }
+
+    const pending = context.state[PENDING_ARTIFACTS_STATE_KEY];
+    if (Array.isArray(pending)) {
+      (pending as Artifact[]).push(artifact);
+    } else {
+      context.state[PENDING_ARTIFACTS_STATE_KEY] = [artifact];
+    }
+
+    const uri = extractArtifactUri(artifact);
+    const result: Record<string, unknown> = {
+      success: true,
+      message: `Artifact "${name}" created successfully`,
+      artifact_id: artifact.artifactId,
+      filename: parsed.filename,
+    };
+    if (uri !== undefined) {
+      result['url'] = uri;
+    }
+    return JSON.stringify(result);
+  };
+}
+
+interface CreateArtifactArgs {
+  readonly content: string;
+  readonly filename: string;
+  readonly name?: string;
+  readonly mimeType?: string;
+}
+
+function parseCreateArtifactArgs(args: string): CreateArtifactArgs {
+  const raw = args.length === 0 ? {} : JSON.parse(args);
+  if (raw === null || typeof raw !== 'object') {
+    throw new Error('arguments must be a JSON object');
+  }
+  const obj = raw as Record<string, unknown>;
+  const content = obj['content'];
+  const filename = obj['filename'];
+  if (typeof content !== 'string') {
+    throw new Error('"content" must be a string');
+  }
+  if (typeof filename !== 'string' || filename.length === 0) {
+    throw new Error('"filename" must be a non-empty string');
+  }
+  const name = obj['name'];
+  const mimeType = obj['mimeType'];
+  return {
+    content,
+    filename,
+    ...(typeof name === 'string' && name.length > 0 ? { name } : {}),
+    ...(typeof mimeType === 'string' && mimeType.length > 0
+      ? { mimeType }
+      : {}),
+  };
+}
+
+function extractArtifactUri(artifact: Artifact): string | undefined {
+  for (const part of artifact.parts ?? []) {
+    const uri = part.file?.fileWithUri;
+    if (typeof uri === 'string' && uri.length > 0) {
+      return uri;
+    }
+  }
+  return undefined;
+}
