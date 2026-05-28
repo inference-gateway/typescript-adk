@@ -82,5 +82,5 @@ jobs:
           cohere-api-key: ${{ secrets.COHERE_API_KEY }}
           ollama-api-key: ${{ secrets.OLLAMA_API_KEY }}
           ollama-cloud-api-key: ${{ secrets.OLLAMA_CLOUD_API_KEY }}
-          use-mock-agent: true
-          mock-agent-scenario: failures # happy | failures | no-todos | empty
+          # use-mock-agent: true
+          # mock-agent-scenario: happy # happy | failures | no-todos | empty
