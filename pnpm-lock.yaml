@@ -172,6 +172,41 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
+  examples/queue-storage/in-memory:
+    dependencies:
+      '@inference-gateway/adk':
+        specifier: workspace:*
+        version: link:../../..
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      tsx:
+        specifier: ^4.19.2
+        version: 4.22.3
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
+  examples/queue-storage/redis:
+    dependencies:
+      '@inference-gateway/adk':
+        specifier: workspace:*
+        version: link:../../..
+      ioredis:
+        specifier: ^5.11.0
+        version: 5.11.0
+    devDependencies:
+      '@types/node':
+        specifier: ^25.9.1
+        version: 25.9.1
+      tsx:
+        specifier: ^4.19.2
+        version: 4.22.3
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+
   examples/streaming:
     dependencies:
       '@inference-gateway/adk':

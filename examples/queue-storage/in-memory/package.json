@@ -1,0 +1,21 @@
+{
+  "name": "@inference-gateway/adk-example-queue-storage-in-memory",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Queue storage example: A2A echo agent backed by InMemoryTaskStorage.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx server.ts",
+    "start:server": "tsx server.ts",
+    "start:client": "tsx client.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@inference-gateway/adk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.19.2",
+    "typescript": "^6.0.3"
+  }
+}
