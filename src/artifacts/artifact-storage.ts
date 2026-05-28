@@ -86,6 +86,21 @@ export interface ArtifactStorageProvider {
   ): Promise<boolean>;
 
   /**
+   * Return the metadata recorded for `(artifactId, filename)`, or `undefined`
+   * when nothing is stored under that pair. Used by HTTP download endpoints
+   * to set `Content-Type` and `Content-Length` headers without buffering the
+   * payload.
+   *
+   * Implementations should be cheap — at most a single `stat`/sidecar read —
+   * and must not throw on a missing file (return `undefined` instead).
+   */
+  getMetadata(
+    artifactId: string,
+    filename: string,
+    signal?: AbortSignal
+  ): Promise<ArtifactMetadata | undefined>;
+
+  /**
    * Build the public URL that {@link store} would emit for
    * `(artifactId, filename)`, without storing anything. Used by the service
    * to wire up `FilePart.fileWithUri` when content is already addressable.

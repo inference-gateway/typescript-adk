@@ -8,6 +8,11 @@ export {
 } from './server.js';
 export type { A2AServerConfig } from './server.js';
 export {
+  DEFAULT_ARTIFACTS_PATH,
+  registerArtifactsRoute,
+} from './artifacts-route.js';
+export type { ArtifactsRouteOptions } from './artifacts-route.js';
+export {
   JSONRPC_ERROR_CODES,
   JSONRPC_VERSION,
   JSONRPCError,

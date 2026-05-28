@@ -127,6 +127,17 @@ export class InMemoryArtifactStorage implements ArtifactStorageProvider {
     return this.entries.has(makeKey(artifactId, filename));
   }
 
+  async getMetadata(
+    artifactId: string,
+    filename: string,
+    signal?: AbortSignal
+  ): Promise<ArtifactMetadata | undefined> {
+    this.ensureOpen();
+    this.assertNotAborted(signal);
+    const entry = this.entries.get(makeKey(artifactId, filename));
+    return entry?.metadata;
+  }
+
   getUrl(artifactId: string, filename: string): string {
     return `${this.baseUrl}/${encodeURIComponent(artifactId)}/${encodeURIComponent(filename)}`;
   }
