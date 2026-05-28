@@ -692,7 +692,6 @@ describe('DefaultStreamingTaskHandler usage metadata', () => {
     const handler = new DefaultStreamingTaskHandler({ llmClient: client });
     handler.setEnableUsageMetadata(true);
     const events = await drain(handler.handle(buildContext()));
-    // Tracker has iterations > 0 so hasUsage() is true; metadata still appears.
     expect(events.map((e) => e.type)).toEqual([
       'delta',
       'iterationCompleted',
