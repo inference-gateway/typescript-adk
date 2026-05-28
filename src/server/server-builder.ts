@@ -33,6 +33,16 @@ import type {
   TaskHandlerContext,
 } from './task-handler.js';
 import {
+  TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD,
+  TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD,
+  TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD,
+  TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD,
+  createTaskPushNotificationConfigDeleteHandler,
+  createTaskPushNotificationConfigGetHandler,
+  createTaskPushNotificationConfigListHandler,
+  createTaskPushNotificationConfigSetHandler,
+} from './push-notification-config.js';
+import {
   TASK_RESUBSCRIBE_METHOD,
   createTaskResubscribeHandler,
 } from './task-resubscribe.js';
@@ -531,6 +541,25 @@ export class A2AServerBuilder<
         registry: cancellationRegistry,
       })
     );
+
+    if (card.capabilities.pushNotifications === true) {
+      server.registerMethod(
+        TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD,
+        createTaskPushNotificationConfigSetHandler({ storage })
+      );
+      server.registerMethod(
+        TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD,
+        createTaskPushNotificationConfigGetHandler({ storage })
+      );
+      server.registerMethod(
+        TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD,
+        createTaskPushNotificationConfigListHandler({ storage })
+      );
+      server.registerMethod(
+        TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD,
+        createTaskPushNotificationConfigDeleteHandler({ storage })
+      );
+    }
 
     return server;
   }

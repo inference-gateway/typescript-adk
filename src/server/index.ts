@@ -59,6 +59,24 @@ export type {
 } from './message-stream.js';
 export { TASK_GET_METHOD, createTaskGetHandler } from './task-get.js';
 export type { TaskGetHandlerOptions, TaskGetParams } from './task-get.js';
+export {
+  TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD,
+  TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD,
+  TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD,
+  TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD,
+  createTaskPushNotificationConfigDeleteHandler,
+  createTaskPushNotificationConfigGetHandler,
+  createTaskPushNotificationConfigListHandler,
+  createTaskPushNotificationConfigSetHandler,
+} from './push-notification-config.js';
+export type {
+  TaskPushNotificationConfigDeleteParams,
+  TaskPushNotificationConfigGetParams,
+  TaskPushNotificationConfigHandlerOptions,
+  TaskPushNotificationConfigListParams,
+  TaskPushNotificationConfigListResult,
+  TaskPushNotificationConfigSetParams,
+} from './push-notification-config.js';
 export { TASK_CANCEL_METHOD, createTaskCancelHandler } from './task-cancel.js';
 export type {
   TaskCancelHandlerOptions,

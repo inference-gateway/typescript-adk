@@ -1,4 +1,5 @@
 import type { ManagedTask, ManagedTaskState } from '../agent/task.js';
+import type { PushNotificationConfig } from '../types/generated/a2a.js';
 
 /**
  * Filter passed to {@link TaskStorage.listTasks}. All fields are optional:
@@ -28,6 +29,16 @@ export interface TaskStorageStats {
   readonly averageTasksPerContext: number;
   readonly queueLength: number;
 }
+
+/**
+ * A {@link PushNotificationConfig} after it has been persisted - its `id` is
+ * guaranteed to be set (storage assigns one when the caller omits it). Use
+ * this rather than the wire `PushNotificationConfig` whenever the post-store
+ * id is load-bearing (resource name encoding, return values to the caller).
+ */
+export type StoredPushNotificationConfig = PushNotificationConfig & {
+  readonly id: string;
+};
 
 /**
  * Queue-centric task storage contract.
@@ -145,6 +156,48 @@ export interface TaskStorage {
 
   /** Snapshot of storage health. */
   getStats(): TaskStorageStats;
+
+  /**
+   * Persist a push-notification config for `taskId`. The stored value has
+   * `config.id` populated - either with the caller-supplied id (when set) or
+   * with a freshly minted UUID. The returned config is the value that was
+   * persisted; callers that need the generated id should read it from the
+   * return value.
+   *
+   * If a config with the same `id` already exists under `taskId`, it is
+   * replaced. Multiple distinct configs may coexist under a single task.
+   *
+   * Storage does not validate that `taskId` corresponds to a known task -
+   * this matches the Go ADK's behaviour and lets clients pre-register configs
+   * before the task is materialised.
+   */
+  setPushConfig(
+    taskId: string,
+    config: PushNotificationConfig
+  ): StoredPushNotificationConfig;
+
+  /**
+   * Look up a single push-notification config by `(taskId, configId)`. Returns
+   * `undefined` if either the task has no configs or no config under that id.
+   */
+  getPushConfig(
+    taskId: string,
+    configId: string
+  ): StoredPushNotificationConfig | undefined;
+
+  /**
+   * Return every push-notification config registered for `taskId`, in
+   * insertion order. The returned array is a fresh snapshot - callers may
+   * sort or mutate it without affecting storage. Returns `[]` when the task
+   * has no configs.
+   */
+  listPushConfigs(taskId: string): StoredPushNotificationConfig[];
+
+  /**
+   * Remove a push-notification config by `(taskId, configId)`. Returns `true`
+   * if a config was removed, `false` if no config existed under that key.
+   */
+  deletePushConfig(taskId: string, configId: string): boolean;
 }
 
 /**

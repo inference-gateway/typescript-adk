@@ -9,6 +9,10 @@ import {
   MESSAGE_SEND_METHOD,
   MESSAGE_STREAM_METHOD,
   NOOP_LOGGER,
+  TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD,
+  TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD,
+  TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD,
+  TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD,
   type ArtifactService,
   type BackgroundTaskHandler,
   type Logger,
@@ -223,6 +227,46 @@ describe('A2AServerBuilder.build success paths', () => {
       .build();
     expect(server.hasMethod(MESSAGE_SEND_METHOD)).toBe(true);
     expect(server.hasMethod(MESSAGE_STREAM_METHOD)).toBe(true);
+  });
+
+  it('does not register push notification methods when capability is absent', () => {
+    const server = new A2AServerBuilder({})
+      .withAgentCard(backgroundCard())
+      .withBackgroundTaskHandler(noopBackgroundHandler)
+      .build();
+    expect(server.hasMethod(TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD)).toBe(
+      false
+    );
+    expect(server.hasMethod(TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD)).toBe(
+      false
+    );
+    expect(server.hasMethod(TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD)).toBe(
+      false
+    );
+    expect(server.hasMethod(TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD)).toBe(
+      false
+    );
+  });
+
+  it('registers all four push notification methods when capability is enabled', () => {
+    const server = new A2AServerBuilder({})
+      .withAgentCard(
+        backgroundCard({ capabilities: { pushNotifications: true } })
+      )
+      .withBackgroundTaskHandler(noopBackgroundHandler)
+      .build();
+    expect(server.hasMethod(TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD)).toBe(
+      true
+    );
+    expect(server.hasMethod(TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD)).toBe(
+      true
+    );
+    expect(server.hasMethod(TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD)).toBe(
+      true
+    );
+    expect(server.hasMethod(TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD)).toBe(
+      true
+    );
   });
 
   it('passes the storage override through to the underlying handlers', async () => {
