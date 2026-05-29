@@ -1,0 +1,26 @@
+{
+  "name": "${A2A_AGENT_NAME}",
+  "description": "${A2A_AGENT_DESCRIPTION}",
+  "version": "${A2A_AGENT_VERSION}",
+  "url": "http://${A2A_SERVER_HOST}:${A2A_SERVER_PORT}",
+  "protocolVersion": "0.3.0",
+  "defaultInputModes": ["text/plain"],
+  "defaultOutputModes": ["text/plain"],
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": false
+  },
+  "skills": [
+    {
+      "id": "echo",
+      "name": "Echo",
+      "description": "Echoes the user message back unchanged with context about the static agent card configuration."
+    },
+    {
+      "id": "config-info",
+      "name": "Configuration Info",
+      "description": "Returns metadata about the agent card loaded from the JSON file, including which build-time placeholders were substituted."
+    }
+  ]
+}
