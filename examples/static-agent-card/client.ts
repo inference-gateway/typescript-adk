@@ -48,10 +48,10 @@ console.log(`final task:\n${JSON.stringify(completed, null, 2)}`);
 
 console.log('\n=== Static agent card demonstration completed ===');
 console.log(
-  'The agent card above was loaded from agent-card.json using withAgentCardFromFile().',
+  'The agent card above was loaded from agent-card.json using withAgentCardFromFile().'
 );
 console.log(
-  '${VAR} placeholders in that JSON were resolved against process.env at server startup.',
+  '${VAR} placeholders in that JSON were resolved against process.env at server startup.'
 );
 
 // ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ async function pollUntilTerminal(taskId: string): Promise<Task> {
     await sleep(POLL_INTERVAL_MS);
   }
   throw new Error(
-    `task ${taskId} did not reach a terminal state within ${POLL_MAX_ATTEMPTS * POLL_INTERVAL_MS}ms`,
+    `task ${taskId} did not reach a terminal state within ${POLL_MAX_ATTEMPTS * POLL_INTERVAL_MS}ms`
   );
 }
 

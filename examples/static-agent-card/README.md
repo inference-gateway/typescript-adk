@@ -20,11 +20,11 @@ validated and used.
 
 **Behaviour:**
 
-| Scenario | Result |
-|---|---|
-| Environment variable is set | Placeholder is replaced with the variable's value |
-| Variable is not set | `AgentCardLoadError` is thrown — the server refuses to boot |
-| No placeholders in the value | Value is used verbatim |
+| Scenario                     | Result                                                      |
+| ---------------------------- | ----------------------------------------------------------- |
+| Environment variable is set  | Placeholder is replaced with the variable's value           |
+| Variable is not set          | `AgentCardLoadError` is thrown — the server refuses to boot |
+| No placeholders in the value | Value is used verbatim                                      |
 
 This "fail loud" approach catches missing configuration at startup instead of
 producing a silently broken agent card.
@@ -129,29 +129,29 @@ A2A_AGENT_CARD_FILE=./my-custom-card.json pnpm --filter @inference-gateway/adk-e
 
 Server (`server.ts`):
 
-| Env var | Required | Default | Description |
-|---|---|---|---|
-| `A2A_AGENT_CARD_FILE` | no | `agent-card.json` | Path to the agent card JSON file. |
-| `A2A_SERVER_HOST` | no | `127.0.0.1` | Listen host. |
-| `A2A_SERVER_PORT` | no | `8080` | Listen port. |
+| Env var               | Required | Default           | Description                       |
+| --------------------- | -------- | ----------------- | --------------------------------- |
+| `A2A_AGENT_CARD_FILE` | no       | `agent-card.json` | Path to the agent card JSON file. |
+| `A2A_SERVER_HOST`     | no       | `127.0.0.1`       | Listen host.                      |
+| `A2A_SERVER_PORT`     | no       | `8080`            | Listen port.                      |
 
 The following variables are consumed by `${VAR}` placeholders in the default
 `agent-card.json` and **must** be set when using the checked-in file:
 
-| Env var | Example value |
-|---|---|
-| `A2A_AGENT_NAME` | `static-card-agent` |
+| Env var                 | Example value                                                                |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `A2A_AGENT_NAME`        | `static-card-agent`                                                          |
 | `A2A_AGENT_DESCRIPTION` | `A demonstration agent that loads its configuration from a static JSON file` |
-| `A2A_AGENT_VERSION` | `0.1.0` |
-| `A2A_SERVER_HOST` | `127.0.0.1` |
-| `A2A_SERVER_PORT` | `8080` |
+| `A2A_AGENT_VERSION`     | `0.1.0`                                                                      |
+| `A2A_SERVER_HOST`       | `127.0.0.1`                                                                  |
+| `A2A_SERVER_PORT`       | `8080`                                                                       |
 
 Client (`client.ts`):
 
-| Env var | Default | Description |
-|---|---|---|
-| `SERVER_URL` | `http://127.0.0.1:8080` | Base URL of the A2A server. |
-| `PROMPT` | `Hello! Tell me about your static configuration.` | Text to send. |
+| Env var      | Default                                           | Description                 |
+| ------------ | ------------------------------------------------- | --------------------------- |
+| `SERVER_URL` | `http://127.0.0.1:8080`                           | Base URL of the A2A server. |
+| `PROMPT`     | `Hello! Tell me about your static configuration.` | Text to send.               |
 
 ## Expected output
 

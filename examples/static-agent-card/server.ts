@@ -11,8 +11,7 @@ import {
   type Message,
 } from '@inference-gateway/adk';
 
-const AGENT_CARD_FILE =
-  process.env['A2A_AGENT_CARD_FILE'] ?? 'agent-card.json';
+const AGENT_CARD_FILE = process.env['A2A_AGENT_CARD_FILE'] ?? 'agent-card.json';
 const HOST = process.env['A2A_SERVER_HOST'] ?? '127.0.0.1';
 const PORT = Number.parseInt(process.env['A2A_SERVER_PORT'] ?? '8080', 10);
 
@@ -38,7 +37,9 @@ server.registerMethod(TASK_GET_METHOD, createTaskGetHandler({ storage }));
 
 const backgroundHandler = builder.getBackgroundTaskHandler();
 if (backgroundHandler === undefined) {
-  throw new Error('expected withDefaultBackgroundTaskHandler() to install a handler');
+  throw new Error(
+    'expected withDefaultBackgroundTaskHandler() to install a handler'
+  );
 }
 
 const abort = new AbortController();
@@ -72,7 +73,7 @@ process.once('SIGTERM', shutdown);
 // ---------------------------------------------------------------------------
 async function runEchoWorker(
   signal: AbortSignal,
-  handler: BackgroundTaskHandler,
+  handler: BackgroundTaskHandler
 ): Promise<void> {
   while (!signal.aborted) {
     let task: ManagedTask;
@@ -97,7 +98,7 @@ async function runEchoWorker(
     if (!isTerminal(result.state)) {
       result = transitionTask(result, TASK_STATE.FAILED);
       console.warn(
-        `task ${task.id.slice(0, 8)} did not reach a terminal state; recorded as FAILED`,
+        `task ${task.id.slice(0, 8)} did not reach a terminal state; recorded as FAILED`
       );
     }
     storage.storeDeadLetter(result);
