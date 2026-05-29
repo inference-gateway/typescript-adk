@@ -63,7 +63,7 @@ jobs:
         run: npm install -g markdownlint-cli
 
       - name: Run Infer Agent
-        uses: inference-gateway/infer-action@v0.6.0
+        uses: inference-gateway/infer-action@v0.6.1
         with:
           debug: "true"
           compact-auto-at: "50"
