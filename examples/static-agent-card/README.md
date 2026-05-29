@@ -7,9 +7,10 @@ Mirrors the Go ADK's [`examples/static-agent-card/`](https://github.com/inferenc
 ## What this example shows
 
 - Store agent configuration in a version-controlled JSON file instead of hardcoding it in TypeScript.
-- Load it at boot time via `A2AServerBuilder.withAgentCardFromFile()`.
+- Load it at boot time via `loadAgentCardFromFile()` (or the one-liner sugar `A2AServerBuilder.withAgentCardFromFile()`).
 - Use `${VAR}` placeholders in the JSON that are resolved against `process.env` — no code changes needed for environment-specific config.
-- Dynamically override fields at runtime via the `overrides` parameter of `withAgentCardFromFile()`.
+- Dynamically override fields at runtime via the `overrides` parameter of either loader.
+- Route incoming messages to the correct skill declared on the agent card.
 
 ## The `${VAR}` placeholder convention
 
@@ -53,16 +54,31 @@ With `A2A_AGENT_NAME=my-agent`, `A2A_SERVER_HOST=127.0.0.1`, and
 
 ## Runtime overrides
 
-The second argument to `withAgentCardFromFile(filePath, overrides?)` lets you
-pin specific fields **after** placeholder resolution. This is useful for
-fields that are genuinely runtime (e.g., a dynamically-assigned port):
+Both `loadAgentCardFromFile(filePath, { overrides })` and the sugar
+`withAgentCardFromFile(filePath, overrides?)` accept an `overrides` map that
+wins over values from the JSON file **after** placeholder resolution. This is
+useful for fields that are genuinely runtime (e.g., a dynamically-assigned
+port):
 
 ```ts
+// Sugar — when you don't need the resolved card outside the builder:
 const builder = new A2AServerBuilder({ storage })
   .withAgentCardFromFile('agent-card.json', {
     url: `http://${HOST}:${PORT}`,
   })
   .withDefaultBackgroundTaskHandler();
+```
+
+```ts
+// Explicit — when you do need the card (e.g., for skill routing, as in this
+// example's server.ts):
+const card = loadAgentCardFromFile('agent-card.json', {
+  overrides: { url: `http://${HOST}:${PORT}` },
+});
+
+const builder = new A2AServerBuilder({ storage })
+  .withAgentCard(card)
+  .withBackgroundTaskHandler(createStaticCardHandler(card));
 ```
 
 Override fields always win over values in the JSON file.
@@ -71,6 +87,7 @@ Override fields always win over values in the JSON file.
 
 ```text
 examples/static-agent-card/
+├── .env.example        # Template for the env vars referenced from agent-card.json
 ├── README.md           # This file
 ├── agent-card.json     # Agent metadata with ${VAR} placeholders
 ├── client.ts           # Fetches the card and sends a test message
@@ -97,11 +114,14 @@ export A2A_SERVER_HOST=127.0.0.1
 export A2A_SERVER_PORT=8080
 ```
 
-Or use a `.env` file:
+Or copy the checked-in template and source it:
 
 ```sh
+cp examples/static-agent-card/.env.example examples/static-agent-card/.env
 set -a; source examples/static-agent-card/.env; set +a
 ```
+
+(`.env` is git-ignored; `.env.example` is the version-controlled template.)
 
 In one terminal, start the server:
 
@@ -148,17 +168,32 @@ The following variables are consumed by `${VAR}` placeholders in the default
 
 Client (`client.ts`):
 
-| Env var      | Default                                           | Description                 |
-| ------------ | ------------------------------------------------- | --------------------------- |
-| `SERVER_URL` | `http://127.0.0.1:8080`                           | Base URL of the A2A server. |
-| `PROMPT`     | `Hello! Tell me about your static configuration.` | Text to send.               |
+| Env var      | Default                                    | Description                                                                                                                                |
+| ------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SERVER_URL` | `http://127.0.0.1:8080`                    | Base URL of the A2A server.                                                                                                                |
+| `PROMPT`     | `Tell me about your static configuration.` | Text for the first message. The second prompt (`Please echo this sentence back to me verbatim.`) is hard-coded to demonstrate both skills. |
+
+## Skill routing
+
+The A2A wire protocol does not carry a skill id on each message — skills are
+metadata advertised on the agent card. The example server routes by matching
+keywords in the user text against the two skills declared in
+[`agent-card.json`](./agent-card.json):
+
+| User text contains                         | Routed skill  | Response                                                          |
+| ------------------------------------------ | ------------- | ----------------------------------------------------------------- |
+| `config`, `configuration`, `info`, `about` | `config-info` | Echoes the resolved card metadata (name, version, description, …) |
+| anything else                              | `echo`        | Echoes the user text verbatim                                     |
+
+The client sends one message per skill on startup so you can see both
+responses without setting `PROMPT` manually.
 
 ## Expected output
 
 Server:
 
 ```text
-static-agent-card listening on http://127.0.0.1:8080
+static-card-agent listening on http://127.0.0.1:8080
   card:   http://127.0.0.1:8080/.well-known/agent-card.json
   health: http://127.0.0.1:8080/health
   rpc:    POST http://127.0.0.1:8080/
@@ -182,8 +217,30 @@ Client:
 Agent: static-card-agent
 Version: 0.1.0
 ...
+
+=== Sending message ===
+POST http://127.0.0.1:8080/  message/send  "Tell me about your static configuration."
+created task id=… state=TASK_STATE_SUBMITTED
+final state: TASK_STATE_COMPLETED
+agent reply:
+[skill=config-info] Configuration loaded from agent-card.json:
+  name:        static-card-agent
+  version:     0.1.0
+  description: A demonstration agent that loads its configuration from a static JSON file
+  url:         http://127.0.0.1:8080
+  skills:
+    - echo: Echo
+    - config-info: Configuration Info
+
+=== Sending message ===
+POST http://127.0.0.1:8080/  message/send  "Please echo this sentence back to me verbatim."
+created task id=… state=TASK_STATE_SUBMITTED
+final state: TASK_STATE_COMPLETED
+agent reply:
+[skill=echo] You said: Please echo this sentence back to me verbatim.
+
 === Static agent card demonstration completed ===
-The agent card above was loaded from agent-card.json using withAgentCardFromFile().
+The agent card above was loaded from agent-card.json using loadAgentCardFromFile().
 ${VAR} placeholders in that JSON were resolved against process.env at server startup.
 ```
 

@@ -5,7 +5,9 @@ import {
   TASK_STATE,
   createTaskGetHandler,
   isTerminal,
+  loadAgentCardFromFile,
   transitionTask,
+  type AgentCard,
   type BackgroundTaskHandler,
   type ManagedTask,
   type Message,
@@ -18,39 +20,41 @@ const PORT = Number.parseInt(process.env['A2A_SERVER_PORT'] ?? '8080', 10);
 const storage = new InMemoryTaskStorage();
 
 // ---------------------------------------------------------------------------
-// The agent card is loaded from a JSON file instead of being hardcoded in
-// TypeScript.  `${VAR}` placeholders in the JSON are resolved against
-// `process.env` at the time `withAgentCardFromFile` is called — see
-// `loadAgentCardFromFile` in `src/agent/card.ts`.
+// Load the agent card up front so the skill-routing handler below can close
+// over the resolved card. `${VAR}` placeholders are resolved against
+// `process.env` at load time — see `loadAgentCardFromFile` in
+// `src/agent/card.ts`. The `overrides` map wins over values from the JSON
+// after placeholder substitution, which is useful for genuinely-runtime
+// fields like `url`.
 //
-// The `overrides` parameter lets you pin fields (like `url`) at runtime
-// regardless of what the file contains after placeholder resolution.
+// `builder.withAgentCardFromFile(filePath, overrides)` is the one-liner sugar
+// when you don't need the card outside the builder.
 // ---------------------------------------------------------------------------
+const card = loadAgentCardFromFile(AGENT_CARD_FILE, {
+  overrides: { url: `http://${HOST}:${PORT}` },
+});
+
 const builder = new A2AServerBuilder({ storage })
-  .withAgentCardFromFile(AGENT_CARD_FILE, {
-    url: `http://${HOST}:${PORT}`,
-  })
-  .withDefaultBackgroundTaskHandler();
+  .withAgentCard(card)
+  .withBackgroundTaskHandler(createStaticCardHandler(card));
 const server = builder.build();
 
 server.registerMethod(TASK_GET_METHOD, createTaskGetHandler({ storage }));
 
 const backgroundHandler = builder.getBackgroundTaskHandler();
 if (backgroundHandler === undefined) {
-  throw new Error(
-    'expected withDefaultBackgroundTaskHandler() to install a handler'
-  );
+  throw new Error('expected withBackgroundTaskHandler() to install a handler');
 }
 
 const abort = new AbortController();
-const worker = runEchoWorker(abort.signal, backgroundHandler).catch((err) => {
+const worker = runWorker(abort.signal, backgroundHandler).catch((err) => {
   if (abort.signal.aborted) return;
   console.error('worker crashed:', err);
   process.exitCode = 1;
 });
 
 await server.listen(PORT, HOST);
-console.log(`static-agent-card listening on http://${HOST}:${PORT}`);
+console.log(`${card.name} listening on http://${HOST}:${PORT}`);
 console.log(`  card:   http://${HOST}:${PORT}/.well-known/agent-card.json`);
 console.log(`  health: http://${HOST}:${PORT}/health`);
 console.log(`  rpc:    POST http://${HOST}:${PORT}/`);
@@ -67,11 +71,10 @@ process.once('SIGINT', shutdown);
 process.once('SIGTERM', shutdown);
 
 // ---------------------------------------------------------------------------
-// Minimal echo worker — same pattern as the other examples.  Each dequeued
-// task is walked through PENDING → IN_PROGRESS → COMPLETED with an echo
-// response that mentions the static-card configuration.
+// Worker — dequeues each pending task and dispatches it to the configured
+// background handler. The handler implements skill-id routing.
 // ---------------------------------------------------------------------------
-async function runEchoWorker(
+async function runWorker(
   signal: AbortSignal,
   handler: BackgroundTaskHandler
 ): Promise<void> {
@@ -104,4 +107,89 @@ async function runEchoWorker(
     storage.storeDeadLetter(result);
     console.log(`task ${task.id.slice(0, 8)} -> ${result.state}`);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Skill-aware background handler.
+//
+// The A2A wire protocol does not carry a skill id on each Message — skills are
+// metadata advertised on the agent card. So this example routes by matching
+// keywords in the user text against the two skills declared in
+// `agent-card.json`:
+//
+//   - "config" / "configuration" / "info" / "about"  → config-info
+//   - anything else                                  → echo
+//
+// The handler closes over the resolved `AgentCard` so the config-info branch
+// can surface the values that `${VAR}` placeholders were substituted with.
+// ---------------------------------------------------------------------------
+function createStaticCardHandler(card: AgentCard): BackgroundTaskHandler {
+  return ({ task, message }) => {
+    let next = task;
+    if (next.state === TASK_STATE.PENDING) {
+      next = transitionTask(next, TASK_STATE.IN_PROGRESS);
+    }
+
+    const userText = extractText(message.parts);
+    const skillId = routeSkill(userText);
+    const responseText = renderResponse(skillId, userText, card);
+
+    const responseMessage: Message = {
+      messageId: crypto.randomUUID(),
+      role: 'ROLE_AGENT',
+      contextId: next.contextId,
+      taskId: next.id,
+      parts: [{ text: responseText }],
+    };
+
+    const withResponse: ManagedTask = {
+      ...next,
+      messages: [...next.messages, responseMessage],
+    };
+    return transitionTask(withResponse, TASK_STATE.COMPLETED, {
+      message: responseMessage,
+    });
+  };
+}
+
+function routeSkill(userText: string): 'config-info' | 'echo' {
+  const lower = userText.toLowerCase();
+  if (
+    lower.includes('config') ||
+    lower.includes('info') ||
+    lower.includes('about')
+  ) {
+    return 'config-info';
+  }
+  return 'echo';
+}
+
+function renderResponse(
+  skillId: 'config-info' | 'echo',
+  userText: string,
+  card: AgentCard
+): string {
+  if (skillId === 'config-info') {
+    const skillList = card.skills
+      .map((s) => `  - ${s.id}: ${s.name}`)
+      .join('\n');
+    return [
+      '[skill=config-info] Configuration loaded from agent-card.json:',
+      `  name:        ${card.name}`,
+      `  version:     ${card.version}`,
+      `  description: ${card.description}`,
+      `  url:         ${card.url ?? '(unset)'}`,
+      `  skills:`,
+      skillList,
+    ].join('\n');
+  }
+  const body = userText.length > 0 ? userText : '(empty message)';
+  return `[skill=echo] You said: ${body}`;
+}
+
+function extractText(parts: Message['parts']): string {
+  return parts
+    .map((p) => (typeof p.text === 'string' ? p.text : ''))
+    .filter((s) => s.length > 0)
+    .join('\n');
 }
