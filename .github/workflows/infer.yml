@@ -63,8 +63,10 @@ jobs:
         run: npm install -g markdownlint-cli
 
       - name: Run Infer Agent
-        uses: inference-gateway/infer-action@v0.6.0-rc.3
+        uses: inference-gateway/infer-action@v0.6.0
         with:
+          debug: "true"
+          compact-auto-at: "50"
           github-token: ${{ steps.app_token.outputs.token }}
           trigger-phrase: "@infer"
           model: deepseek/deepseek-v4-flash
