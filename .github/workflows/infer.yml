@@ -66,7 +66,7 @@ jobs:
         uses: inference-gateway/infer-action@v0.8.0
         with:
           debug: "true"
-          compact-auto-at: "20"
+          compact-auto-at: "50"
           github-token: ${{ steps.app_token.outputs.token }}
           trigger-phrase: "@infer"
           model: deepseek/deepseek-v4-flash
