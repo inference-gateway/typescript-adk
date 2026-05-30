@@ -1,0 +1,21 @@
+{
+  "name": "@inference-gateway/adk-example-protocol-methods",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Comprehensive protocol-methods walkthrough for @inference-gateway/adk - exercises every JSON-RPC method with assertions.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx server.ts",
+    "start:server": "tsx server.ts",
+    "start:client": "tsx client.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@inference-gateway/adk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "tsx": "^4.19.2",
+    "typescript": "^6.0.3"
+  }
+}
