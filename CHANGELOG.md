@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0](https://github.com/inference-gateway/typescript-adk/compare/v0.10.0...v0.11.0) (2026-05-30)
+
+### ✨ Features
+
+* add Prometheus metrics endpoint ([#108](https://github.com/inference-gateway/typescript-adk/issues/108)) ([b67a3a6](https://github.com/inference-gateway/typescript-adk/commit/b67a3a630cc08c1e9b4fa19653f8615bbb1d8293))
+* add protocol-methods walkthrough example ([#112](https://github.com/inference-gateway/typescript-adk/issues/112)) ([362411f](https://github.com/inference-gateway/typescript-adk/commit/362411fe09a0bb9efc400024f07970c3e8a1e408))
+* add static agent card example ([#111](https://github.com/inference-gateway/typescript-adk/issues/111)) ([01dbc3c](https://github.com/inference-gateway/typescript-adk/commit/01dbc3cb722985b9907b5275a3c094d795635385)), closes [#53](https://github.com/inference-gateway/typescript-adk/issues/53)
+* add task retention policies and cleanup ([#110](https://github.com/inference-gateway/typescript-adk/issues/110)) ([87560a2](https://github.com/inference-gateway/typescript-adk/commit/87560a27b6d7a405641d3c4a087781fdb9929029))
+* add TLS server support and client config ([#109](https://github.com/inference-gateway/typescript-adk/issues/109)) ([d5eed96](https://github.com/inference-gateway/typescript-adk/commit/d5eed96233b81d4860da308fdfb92292a13e92d6))
+* add usage metadata tracking and example ([#107](https://github.com/inference-gateway/typescript-adk/issues/107)) ([91ba0e0](https://github.com/inference-gateway/typescript-adk/commit/91ba0e04fa6111a274dc2a7587ee1bd17760d23c))
+* **telemetry:** add OpenTelemetry observability integration ([#106](https://github.com/inference-gateway/typescript-adk/issues/106)) ([aa4142c](https://github.com/inference-gateway/typescript-adk/commit/aa4142c8f3fc86ac58ca4fa85d772db44fe745b3)), closes [#48](https://github.com/inference-gateway/typescript-adk/issues/48)
+
+### 👷 CI
+
+* **deps:** bump infer-action version 0.7.0 -> 0.7.1 ([fbfe663](https://github.com/inference-gateway/typescript-adk/commit/fbfe66396edecc2b1f32c5d5ec0ff9edabdf5c8a))
+* **deps:** bump infer-action version 0.7.1 -> 0.8.0 ([0769d4b](https://github.com/inference-gateway/typescript-adk/commit/0769d4b6f87463994198b676d9b9815e8572d741))
+* **deps:** bump infer-action version v0.6.0.-rc.1 -> v0.6.0.-rc.2 ([ff8a473](https://github.com/inference-gateway/typescript-adk/commit/ff8a473401a14c71bf36cfff86d66bc1dbecef9f))
+* **infer:** use the new bash-whitelisted-commands-append to just append a few more commands to the list ([1a830ac](https://github.com/inference-gateway/typescript-adk/commit/1a830acb5823c95a7b051c380c7e0db644535fe7))
+
+### 🔧 Miscellaneous
+
+* **deps:** bump infer-action to version 0.6.0 ([fdbbd61](https://github.com/inference-gateway/typescript-adk/commit/fdbbd61f83012fbeca0f69da914716b6940d1e6f))
+* **deps:** bump infer-action version 0.6.0 -> 0.7.0 ([b18fe03](https://github.com/inference-gateway/typescript-adk/commit/b18fe0337d0863089b108aa12b09cb5e1a46989d))
+* **deps:** bump infer-action version v0.6.0-rc.2 -> v0.6.0-rc.3 ([9c94be0](https://github.com/inference-gateway/typescript-adk/commit/9c94be077e16461b57bb403a1f61064e5fa35a32))
+* **deps:** bump inference-gateway/infer-action version 0.6.0 -> 0.6.1 ([1e20fef](https://github.com/inference-gateway/typescript-adk/commit/1e20fefeadf3fdb07793efdd83f43ab8963a9d04))
+* **deps:** bump inference-gateway/infer-action version 0.6.1 -> 0.6.2 ([775c810](https://github.com/inference-gateway/typescript-adk/commit/775c810cfb19d6a1a0c96d48ab51bbaadd6d7435))
+* **infer:** add git to bash whitelist commands ([0305225](https://github.com/inference-gateway/typescript-adk/commit/0305225b284d75f8c58202c2f6f6c5cf49f02f76))
+* **infer:** add mkdir to whitelisted commands ([919c4f3](https://github.com/inference-gateway/typescript-adk/commit/919c4f307fe5eff26dd8675e6d35dcd9db71ea61))
+* **infer:** broaden bash whitelist for read-only discovery commands ([#105](https://github.com/inference-gateway/typescript-adk/issues/105)) ([a9588ad](https://github.com/inference-gateway/typescript-adk/commit/a9588ad0fa01db3a6c7447708393b80cb02ee284)), closes [#48](https://github.com/inference-gateway/typescript-adk/issues/48)
+
 ## [0.10.0](https://github.com/inference-gateway/typescript-adk/compare/v0.9.0...v0.10.0) (2026-05-28)
 
 ### ✨ Features
