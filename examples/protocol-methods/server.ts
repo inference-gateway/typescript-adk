@@ -330,7 +330,9 @@ async function runWorker(signal: AbortSignal): Promise<void> {
 }
 
 function extractText(
-  messages: readonly { readonly parts?: ReadonlyArray<{ readonly text?: string }> }[]
+  messages: readonly {
+    readonly parts?: ReadonlyArray<{ readonly text?: string }>;
+  }[]
 ): string {
   for (const msg of messages) {
     if (msg.parts !== undefined) {

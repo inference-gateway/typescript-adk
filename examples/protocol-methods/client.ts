@@ -50,22 +50,6 @@ function assert(condition: boolean, label: string, detail?: string): void {
   }
 }
 
-function assertEqual<T>(actual: T, expected: T, label: string): void {
-  if (actual === expected) {
-    pass(label);
-  } else {
-    fail(label, `expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
-  }
-}
-
-function assertNotEqual<T>(actual: T, unexpected: T, label: string): void {
-  if (actual !== unexpected) {
-    pass(label);
-  } else {
-    fail(label, `unexpectedly got ${JSON.stringify(actual)}`);
-  }
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -156,7 +140,9 @@ async function* readSSEEvents(
         try {
           yield JSON.parse(payload) as CloudEvent;
         } catch (err) {
-          console.error(`  [warn] failed to parse SSE frame: ${(err as Error).message}`);
+          console.error(
+            `  [warn] failed to parse SSE frame: ${(err as Error).message}`
+          );
         }
       }
     }
@@ -185,7 +171,10 @@ let agentCard: AgentCard;
 try {
   agentCard = await client.getAgentCard();
   assert(typeof agentCard.name === 'string', 'card.name is a string');
-  assert(agentCard.capabilities.streaming === true, 'card.capabilities.streaming === true');
+  assert(
+    agentCard.capabilities.streaming === true,
+    'card.capabilities.streaming === true'
+  );
   assert(
     agentCard.capabilities.pushNotifications === true,
     'card.capabilities.pushNotifications === true'
@@ -206,7 +195,6 @@ try {
   console.log(`  pushNotes:   ${agentCard.capabilities.pushNotifications}`);
 } catch (err) {
   fail('getAgentCard', String(err));
-  agentCard = { name: '', description: '', version: '', protocolVersion: '', url: '', defaultInputModes: [], defaultOutputModes: [], capabilities: {} };
 }
 
 // -----------------------------------------------------------------------
@@ -446,10 +434,7 @@ try {
     typeof setResult.name === 'string' && setResult.name.length > 0,
     'set: returned resource name'
   );
-  assert(
-    setResult.pushNotificationConfig.url === PUSH_URL,
-    'set: url matches'
-  );
+  assert(setResult.pushNotificationConfig.url === PUSH_URL, 'set: url matches');
   const configId = setResult.pushNotificationConfig.id;
   assert(
     typeof configId === 'string' && configId.length > 0,
@@ -465,10 +450,7 @@ try {
       pushNotificationConfigId: configId,
     }
   );
-  assert(
-    getResult.pushNotificationConfig.url === PUSH_URL,
-    'get: url matches'
-  );
+  assert(getResult.pushNotificationConfig.url === PUSH_URL, 'get: url matches');
   assert(
     getResult.pushNotificationConfig.token === PUSH_TOKEN,
     'get: token matches'
@@ -579,7 +561,9 @@ try {
     terminalEvent!.status.state === TASK_STATE.COMPLETED,
     `stream: final state is COMPLETED (got ${terminalEvent!.status.state})`
   );
-  console.log(`  stream complete: ${deltaCount} delta(s), task ${streamTaskId}`);
+  console.log(
+    `  stream complete: ${deltaCount} delta(s), task ${streamTaskId}`
+  );
 } catch (err) {
   fail('message/stream', String(err));
 }
@@ -619,7 +603,9 @@ if (streamTaskId !== null) {
       if (event.type === AGENT_EVENT_TYPE.TASK_STATUS_CHANGED) {
         resubEvents += 1;
         const data = event.data as TaskStatusUpdateEvent;
-        console.log(`  [resubscribe] task=${data.taskId} state=${data.status.state} final=${data.final}`);
+        console.log(
+          `  [resubscribe] task=${data.taskId} state=${data.status.state} final=${data.final}`
+        );
       }
     }
     assert(resubEvents > 0, `resubscribe: received ${resubEvents} event(s)`);

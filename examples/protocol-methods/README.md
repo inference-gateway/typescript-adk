@@ -60,21 +60,21 @@ pnpm --filter @inference-gateway/adk-example-protocol-methods start:client
 
 Server (`server.ts`):
 
-| Env var                 | Default                  | Description                                    |
-| ----------------------- | ------------------------ | ---------------------------------------------- |
-| `A2A_AGENT_NAME`        | `protocol-methods-agent` | Agent card `name`.                             |
-| `A2A_AGENT_DESCRIPTION` | `A full-featured A2A ...`| Agent card `description`.                      |
-| `A2A_AGENT_VERSION`     | `0.0.0`                  | Agent card `version`.                          |
-| `A2A_SERVER_HOST`       | `127.0.0.1`              | Listen host.                                   |
-| `A2A_SERVER_PORT`       | `8080`                   | Listen port.                                   |
-| `DELTA_DELAY_MS`        | `100`                    | Sleep between delta frames (0 disables).       |
+| Env var                 | Default                   | Description                              |
+| ----------------------- | ------------------------- | ---------------------------------------- |
+| `A2A_AGENT_NAME`        | `protocol-methods-agent`  | Agent card `name`.                       |
+| `A2A_AGENT_DESCRIPTION` | `A full-featured A2A ...` | Agent card `description`.                |
+| `A2A_AGENT_VERSION`     | `0.0.0`                   | Agent card `version`.                    |
+| `A2A_SERVER_HOST`       | `127.0.0.1`               | Listen host.                             |
+| `A2A_SERVER_PORT`       | `8080`                    | Listen port.                             |
+| `DELTA_DELAY_MS`        | `100`                     | Sleep between delta frames (0 disables). |
 
 Client (`client.ts`):
 
-| Env var      | Default                             | Description                 |
-| ------------ | ----------------------------------- | --------------------------- |
-| `SERVER_URL` | `http://127.0.0.1:8080`             | Base URL of the A2A server. |
-| `PROMPT`     | `Hello, protocol-methods agent!`    | Text to send.               |
+| Env var      | Default                          | Description                 |
+| ------------ | -------------------------------- | --------------------------- |
+| `SERVER_URL` | `http://127.0.0.1:8080`          | Base URL of the A2A server. |
+| `PROMPT`     | `Hello, protocol-methods agent!` | Text to send.               |
 
 ## Method-by-method documentation
 
@@ -112,6 +112,7 @@ The server exposes its public `AgentCard` at `GET /.well-known/agent-card.json`.
 ```
 
 **Client assertions:**
+
 - `card.name` is a non-empty string
 - `card.capabilities.streaming === true`
 - `card.capabilities.pushNotifications === true`
@@ -134,6 +135,7 @@ The server exposes a health endpoint at `GET /health`. Returns `{ status: "healt
 ```
 
 **Client assertions:**
+
 - `health.status === "healthy"`
 
 ---
@@ -168,6 +170,7 @@ The server exposes an extended agent card via the `agent/getAuthenticatedExtende
 ```
 
 **Client assertions:**
+
 - Extended card name includes "(extended)"
 - Capabilities match the public card
 
@@ -215,6 +218,7 @@ Creates a new task from a user message. The server enqueues it as `PENDING` and 
 ```
 
 **Client assertions:**
+
 - `task.id` is a non-empty string
 - `task.status.state === "SUBMITTED"`
 
@@ -246,6 +250,7 @@ Retrieves the task by id. Called immediately after `message/send`, the task may 
 ```
 
 **Client assertions:**
+
 - `fetched.id === createdTask.id`
 
 ---
@@ -279,6 +284,7 @@ The client polls `tasks/get` every `POLL_INTERVAL_MS` until `isTerminal()` retur
 ```
 
 **Client assertions:**
+
 - `task.status.state === "COMPLETED"`
 - `task.status.message` is present with non-empty text
 
@@ -300,6 +306,7 @@ Retrieves the same task but caps the returned `history` to the most recent 1 mes
 ```
 
 **Client assertions:**
+
 - `history.length <= 1`
 
 ---
@@ -333,6 +340,7 @@ Lists tasks across the active and dead-letter stores. Results are FIFO-ordered b
 ```
 
 **Client assertions:**
+
 - `tasks` is a non-empty array
 - `nextCursor` is present when there are more tasks than fit on a page
 
@@ -354,6 +362,7 @@ Lists only tasks whose `status.state` equals `COMPLETED`.
 ```
 
 **Client assertions:**
+
 - At least one COMPLETED task returned
 - Every returned task has `status.state === "COMPLETED"`
 
@@ -387,6 +396,7 @@ Cancels a non-terminal (`SUBMITTED` or `PENDING`) task. The handler moves the ta
 ```
 
 **Client assertions:**
+
 - `cancelled.status.state === "CANCELLED"`
 - Verification via `tasks/get` also returns `CANCELLED`
 
@@ -449,6 +459,7 @@ Retrieves a specific config by task id + config id.
 ```
 
 **Client assertions:**
+
 - `pushNotificationConfig.url` matches the set value
 - `pushNotificationConfig.token` matches the set value
 
@@ -468,6 +479,7 @@ Lists all configs registered for a task.
 ```
 
 **Client assertions:**
+
 - `configs` is an array with at least 1 entry
 
 #### 11d. `tasks/pushNotificationConfig/delete`
@@ -491,6 +503,7 @@ Deletes a config by task id + config id. Returns `null` on success.
 **JSON-RPC result:** `null`
 
 **Client assertions:**
+
 - Returns `null`
 - Subsequent `get` for the deleted config throws a "not found" error
 
@@ -534,6 +547,7 @@ data: {"type":"adk.agent.task.status.changed","data":{"taskId":"<uuid>","context
 ```
 
 **Client assertions:**
+
 - HTTP 200 with `Content-Type: text/event-stream`
 - At least one `delta` event received
 - Terminal `task.status.changed` event received with `state: COMPLETED`
@@ -562,6 +576,7 @@ data: {"type":"adk.agent.task.status.changed","data":{"taskId":"<uuid>","context
 ```
 
 **Client assertions:**
+
 - HTTP 200 with `Content-Type: text/event-stream`
 - At least one `task.status.changed` event received
 
@@ -596,6 +611,7 @@ Calling `tasks/get` with a task id that doesn't exist returns a JSON-RPC error r
 ```
 
 **Client assertions:**
+
 - Throws an error (either `A2AClientError` or an error with "not found" message)
 
 ## Expected output
