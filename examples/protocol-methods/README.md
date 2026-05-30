@@ -60,14 +60,15 @@ pnpm --filter @inference-gateway/adk-example-protocol-methods start:client
 
 Server (`server.ts`):
 
-| Env var                 | Default                   | Description                              |
-| ----------------------- | ------------------------- | ---------------------------------------- |
-| `A2A_AGENT_NAME`        | `protocol-methods-agent`  | Agent card `name`.                       |
-| `A2A_AGENT_DESCRIPTION` | `A full-featured A2A ...` | Agent card `description`.                |
-| `A2A_AGENT_VERSION`     | `0.0.0`                   | Agent card `version`.                    |
-| `A2A_SERVER_HOST`       | `127.0.0.1`               | Listen host.                             |
-| `A2A_SERVER_PORT`       | `8080`                    | Listen port.                             |
-| `DELTA_DELAY_MS`        | `100`                     | Sleep between delta frames (0 disables). |
+| Env var                 | Default                   | Description                                                                                                                           |
+| ----------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `A2A_AGENT_NAME`        | `protocol-methods-agent`  | Agent card `name`.                                                                                                                    |
+| `A2A_AGENT_DESCRIPTION` | `A full-featured A2A ...` | Agent card `description`.                                                                                                             |
+| `A2A_AGENT_VERSION`     | `0.0.0`                   | Agent card `version`.                                                                                                                 |
+| `A2A_SERVER_HOST`       | `127.0.0.1`               | Listen host.                                                                                                                          |
+| `A2A_SERVER_PORT`       | `8080`                    | Listen port.                                                                                                                          |
+| `DELTA_DELAY_MS`        | `100`                     | Sleep between delta frames (0 disables).                                                                                              |
+| `WORKER_DELAY_MS`       | `500`                     | Background worker sleep before completing a PENDING task. Keeps the task non-terminal long enough for `tasks/cancel` to intercept it. |
 
 Client (`client.ts`):
 
@@ -178,7 +179,7 @@ The server exposes an extended agent card via the `agent/getAuthenticatedExtende
 
 ### 4. `message/send` (create a task)
 
-Creates a new task from a user message. The server enqueues it as `PENDING` and returns immediately with a `SUBMITTED` / `PENDING` task object. A background worker picks it up asynchronously.
+Creates a new task from a user message. The server enqueues it as `PENDING` and returns immediately with a task whose `status.state` is `TASK_STATE_SUBMITTED` (the wire form of `PENDING`). A background worker picks it up asynchronously after `WORKER_DELAY_MS`.
 
 **JSON-RPC request:**
 
@@ -204,7 +205,7 @@ Creates a new task from a user message. The server enqueues it as `PENDING` and 
   "id": "<task-uuid>",
   "contextId": "<context-uuid>",
   "status": {
-    "state": "SUBMITTED",
+    "state": "TASK_STATE_SUBMITTED",
     "timestamp": "..."
   },
   "history": [
@@ -220,13 +221,13 @@ Creates a new task from a user message. The server enqueues it as `PENDING` and 
 **Client assertions:**
 
 - `task.id` is a non-empty string
-- `task.status.state === "SUBMITTED"`
+- `task.status.state === TASK_STATE.PENDING` (which is the string `"TASK_STATE_SUBMITTED"` on the wire)
 
 ---
 
 ### 5. `tasks/get` (retrieve immediately after send)
 
-Retrieves the task by id. Called immediately after `message/send`, the task may still be `SUBMITTED` or `PENDING`.
+Retrieves the task by id. Called immediately after `message/send`, the task may still be `PENDING` (`TASK_STATE_SUBMITTED` on the wire).
 
 **JSON-RPC request:**
 
@@ -244,7 +245,7 @@ Retrieves the task by id. Called immediately after `message/send`, the task may 
 ```json
 {
   "id": "<task-uuid>",
-  "status": { "state": "SUBMITTED", "timestamp": "..." },
+  "status": { "state": "TASK_STATE_SUBMITTED", "timestamp": "..." },
   "history": [ ... ]
 }
 ```
@@ -370,7 +371,7 @@ Lists only tasks whose `status.state` equals `COMPLETED`.
 
 ### 10. `tasks/cancel`
 
-Cancels a non-terminal (`SUBMITTED` or `PENDING`) task. The handler moves the task to `CANCELLED` and stores it in the dead-letter store. Terminal tasks cannot be cancelled.
+Cancels a non-terminal (`PENDING` / `IN_PROGRESS`) task. The handler moves the task to `CANCELLED` and stores it in the dead-letter store. Terminal tasks cannot be cancelled. The example server uses `WORKER_DELAY_MS=500` by default so a newly-submitted task stays `PENDING` long enough to be cancelled.
 
 **JSON-RPC request:**
 
@@ -636,7 +637,7 @@ Registered methods:
   - tasks/pushNotificationConfig/list
   - tasks/pushNotificationConfig/set
   - tasks/resubscribe
-background: task <task-id> dequeued, completing...
+background: task <task-id> dequeued
 background: task <task-id> -> COMPLETED
 ```
 
@@ -665,7 +666,7 @@ Client (abbreviated - UUIDs and timestamps will differ):
 ── 4. message/send ───────────────────────────────────────
   ✓ task.id is a string
   ✓ task.id is non-empty
-  ✓ task.status.state === SUBMITTED
+  ✓ task.status.state === PENDING (got TASK_STATE_SUBMITTED)
 
 ── 5. tasks/get (immediately after send) ────────────────
   ✓ returned task id matches
@@ -688,9 +689,9 @@ Client (abbreviated - UUIDs and timestamps will differ):
   ✓ at least one COMPLETED task
 
 ── 10. tasks/cancel ──────────────────────────────────────
-  ✓ cancel-task created (SUBMITTED)
+  ✓ cancel-task created (PENDING; got TASK_STATE_SUBMITTED)
   ✓ returned task id matches
-  ✓ task state is CANCELLED
+  ✓ task state is CANCELLED (got TASK_STATE_CANCELLED)
   ✓ verify cancelled via tasks/get
 
 ── 11. push notification config CRUD ─────────────────────
@@ -722,7 +723,7 @@ Hello from the protocol-methods agent. This is a streaming response with word-by
   ✓ getTask(non-existent) throws expected error
 
 ══════════════════════════════════════════════════════════
-  Walkthrough complete: 30 passed, 0 failed
+  Walkthrough complete: 48 passed, 0 failed
 ══════════════════════════════════════════════════════════
 ```
 
@@ -750,7 +751,7 @@ Key components:
 
 3. **Extended card** - A second `AgentCard` with `(extended)` in its name, served via the `agent/getAuthenticatedExtendedCard` method. In production this would be decorated with OIDC auth schemes; here it demonstrates the mechanism without requiring an identity provider.
 
-4. **Background worker** - A simple loop that dequeues `PENDING` tasks (created by `message/send`), transitions them to `COMPLETED` with an echo response, and stores them in the dead-letter store.
+4. **Background worker** - A simple loop that dequeues `PENDING` tasks (created by `message/send`), waits `WORKER_DELAY_MS`, and then transitions them to `COMPLETED` with an echo response. The worker rechecks the task's state after the sleep and skips anything that is no longer `PENDING` so it doesn't race with `tasks/cancel` or the streaming handler (which shares the same storage).
 
 5. **Mock streaming executor** - An `async function*` that yields word-by-word `delta` events followed by a final `statusChanged` event with `state: COMPLETED`. Simulates an LLM token stream without any external dependency.
 

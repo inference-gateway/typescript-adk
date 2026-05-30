@@ -254,15 +254,16 @@ try {
   assert(typeof createdTask.id === 'string', 'task.id is a string');
   assert(createdTask.id.length > 0, 'task.id is non-empty');
   assert(
-    createdTask.status.state === TASK_STATE.SUBMITTED,
-    'task.status.state === SUBMITTED'
+    createdTask.status.state === TASK_STATE.PENDING,
+    `task.status.state === PENDING (got ${createdTask.status.state})`
   );
   console.log(`  task id:    ${createdTask.id}`);
   console.log(`  state:      ${createdTask.status.state}`);
   console.log(`  contextId:  ${createdTask.contextId ?? '(none)'}`);
 } catch (err) {
   fail('sendMessage', String(err));
-  createdTask = { id: '', status: { state: '', timestamp: '' } };
+  console.log('  (remaining steps skipped – sendMessage failed)');
+  process.exit(1);
 }
 
 // -----------------------------------------------------------------------
@@ -383,12 +384,9 @@ try {
   };
   const cancelTask = await client.sendMessage({ message: cancelMessage });
   assert(
-    cancelTask.status.state === TASK_STATE.SUBMITTED,
-    'cancel-task created (SUBMITTED)'
+    cancelTask.status.state === TASK_STATE.PENDING,
+    `cancel-task created (PENDING; got ${cancelTask.status.state})`
   );
-
-  // Wait briefly so it transitions from SUBMITTED to PENDING
-  await sleep(100);
 
   const cancelled = await jsonRpcCall<Task>('tasks/cancel', {
     taskId: cancelTask.id,
@@ -529,7 +527,16 @@ try {
     contentType.startsWith('text/event-stream'),
     `stream: Content-Type is text/event-stream (got ${contentType})`
   );
-  assert(response.body !== null, 'stream: response has body');
+  if (response.body === null) {
+    throw new Error('stream: response has no body');
+  }
+  pass('stream: response has body');
+
+  const TERMINAL_STATES = new Set<string>([
+    TASK_STATE.COMPLETED,
+    TASK_STATE.FAILED,
+    TASK_STATE.CANCELLED,
+  ]);
 
   let deltaCount = 0;
   let terminalEvent: TaskStatusUpdateEvent | null = null;
@@ -545,25 +552,37 @@ try {
       }
     } else if (event.type === AGENT_EVENT_TYPE.TASK_STATUS_CHANGED) {
       const data = event.data as TaskStatusUpdateEvent;
-      if (data.status.state === TASK_STATE.IN_PROGRESS) {
+      // Capture as terminal on first sight of either signal: the wire `final`
+      // flag, or a terminal state. The server emits both together at end of
+      // stream; treating either as terminal makes the walkthrough robust to
+      // periodic IN_PROGRESS updates that may interleave with deltas.
+      if (data.final === true || TERMINAL_STATES.has(data.status.state)) {
+        if (terminalEvent === null) {
+          terminalEvent = data;
+          streamTaskId = data.taskId;
+          console.log(
+            `\n  [stream] ${data.status.state} (final=${data.final})`
+          );
+        }
+      } else if (data.status.state === TASK_STATE.IN_PROGRESS) {
         console.log('\n  [stream] IN_PROGRESS');
-      } else if (data.final === true) {
-        terminalEvent = data;
-        streamTaskId = data.taskId;
-        console.log(`\n  [stream] ${data.status.state} (final=true)`);
       }
     }
   }
 
   assert(deltaCount > 0, `stream: received ${deltaCount} delta(s)`);
-  assert(terminalEvent !== null, 'stream: received terminal status event');
-  assert(
-    terminalEvent!.status.state === TASK_STATE.COMPLETED,
-    `stream: final state is COMPLETED (got ${terminalEvent!.status.state})`
-  );
-  console.log(
-    `  stream complete: ${deltaCount} delta(s), task ${streamTaskId}`
-  );
+  if (terminalEvent === null) {
+    fail('stream: received terminal status event');
+  } else {
+    pass('stream: received terminal status event');
+    assert(
+      terminalEvent.status.state === TASK_STATE.COMPLETED,
+      `stream: final state is COMPLETED (got ${terminalEvent.status.state})`
+    );
+    console.log(
+      `  stream complete: ${deltaCount} delta(s), task ${streamTaskId}`
+    );
+  }
 } catch (err) {
   fail('message/stream', String(err));
 }
@@ -596,7 +615,10 @@ if (streamTaskId !== null) {
       ct.startsWith('text/event-stream'),
       `resubscribe: Content-Type is text/event-stream`
     );
-    assert(response.body !== null, 'resubscribe: response has body');
+    if (response.body === null) {
+      throw new Error('resubscribe: response has no body');
+    }
+    pass('resubscribe: response has body');
 
     let resubEvents = 0;
     for await (const event of readSSEEvents(response.body)) {

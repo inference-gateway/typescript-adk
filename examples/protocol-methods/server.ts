@@ -47,6 +47,10 @@ const DELTA_DELAY_MS = Number.parseInt(
   process.env['DELTA_DELAY_MS'] ?? '100',
   10
 );
+const WORKER_DELAY_MS = Number.parseInt(
+  process.env['WORKER_DELAY_MS'] ?? '500',
+  10
+);
 
 const MOCK_RESPONSE_WORDS: readonly string[] = [
   'Hello',
@@ -305,12 +309,28 @@ async function runWorker(signal: AbortSignal): Promise<void> {
     } catch {
       return;
     }
-    storage.updateActive(task);
-    console.log(`background: task ${task.id} dequeued, completing...`);
+    console.log(`background: task ${task.id} dequeued`);
+
+    // Sleep before completing so a `tasks/cancel` issued shortly after
+    // `message/send` can intercept the task while it's still PENDING.
+    await sleep(WORKER_DELAY_MS, signal);
+    if (signal.aborted) return;
+
+    // Skip tasks that another handler (the streaming method, or a cancel
+    // request) has already moved out of PENDING. The streaming handler
+    // shares this storage and owns its own task transitions; without this
+    // guard the worker would clobber its state and break the SSE response.
+    const latest = storage.getTask(task.id);
+    if (latest === undefined || latest.state !== TASK_STATE.PENDING) {
+      console.log(
+        `background: task ${task.id} no longer PENDING (state=${latest?.state ?? 'gone'}); skipping`
+      );
+      continue;
+    }
 
     const completed = {
       ...task,
-      state: TASK_STATE.COMPLETED as const,
+      state: TASK_STATE.COMPLETED,
       status: {
         state: TASK_STATE.COMPLETED,
         timestamp: new Date().toISOString(),
