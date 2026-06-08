@@ -27,6 +27,8 @@ on:
     types:
       - submitted
 
+permissions: {}
+
 jobs:
   claude:
     if: |
@@ -41,10 +43,10 @@ jobs:
       issues: write
       id-token: write
       actions: read
-    uses: inference-gateway/.github/.github/workflows/claude.yml@v0.6.1
+    uses: inference-gateway/.github/.github/workflows/claude.yml@v0.7.6
     with:
       language: "typescript"
       markdownlint: true
-      allowed-tools: "Bash(task:*),Bash(node:*),Bash(npm:*),Bash(pnpm:*),Bash(gh pr:*),Bash(gh issue:*),Bash(gh repo:*)"
+      allowed-tools: "Bash(task:*),Bash(node:*),Bash(npm:*),Bash(pnpm:*)"
       prompt: ${{ inputs.prompt }}
     secrets: inherit
