@@ -36,7 +36,7 @@ jobs:
           git config --global commit.gpgsign false
           git config --global commit.signoff true
 
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
