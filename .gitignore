@@ -25,6 +25,7 @@ yarn-error.log*
 # Editor / OS
 .vscode/
 .idea/
+.infer/
 .DS_Store
 *.swp
 *~
