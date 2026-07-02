@@ -74,6 +74,7 @@ Two error classes, both exported: `AgentCardValidationError` (carries an optiona
 `src/agent/build-metadata.ts` is the TS equivalent of `BuildAgentName`/`BuildAgentDescription`/`BuildAgentVersion` in the Go ADK's `server/metadata.go`. Values are read from `process.env` **once at first import** and frozen into `buildMetadata`. An empty string means "not injected" — `applyBuildMetadata(card)` treats empty values as no-ops, so it's safe to call unconditionally.
 
 Injection options for downstream consumers:
+
 - **Bundle-time**: tsup `define`, e.g. `define: { 'process.env.BUILD_AGENT_NAME': JSON.stringify('my-agent') }`
 - **Runtime**: set `BUILD_AGENT_NAME` (etc.) in the environment before the module is first imported
 

@@ -112,18 +112,18 @@ If you'd rather manage your own Node and pnpm versions:
 
 ### Essential Tasks
 
-| Command                       | Description                                                       |
-| ----------------------------- | ----------------------------------------------------------------- |
-| `pnpm install`                | Install dependencies (use `--frozen-lockfile` in CI)              |
-| `pnpm build`                  | Bundle to `dist/` with `tsup` (ESM + `.d.ts`)                     |
-| `pnpm test`                   | Run the Vitest suite (one-shot)                                   |
-| `pnpm test:watch`             | Run Vitest in watch mode                                          |
-| `pnpm test:coverage`          | Generate a v8 coverage report                                     |
-| `pnpm lint` / `pnpm lint:fix` | Run ESLint (with `--fix` for autofixes)                           |
-| `pnpm typecheck`              | Run `tsc --noEmit`                                                |
-| `pnpm format`                 | Format with Prettier                                              |
-| `pnpm format:check`           | Fail if files are not Prettier-formatted                          |
-| `pnpm generate:types`         | Regenerate `src/types/generated/a2a.ts` from the pinned schema    |
+| Command                       | Description                                                        |
+| ----------------------------- | ------------------------------------------------------------------ |
+| `pnpm install`                | Install dependencies (use `--frozen-lockfile` in CI)               |
+| `pnpm build`                  | Bundle to `dist/` with `tsup` (ESM + `.d.ts`)                      |
+| `pnpm test`                   | Run the Vitest suite (one-shot)                                    |
+| `pnpm test:watch`             | Run Vitest in watch mode                                           |
+| `pnpm test:coverage`          | Generate a v8 coverage report                                      |
+| `pnpm lint` / `pnpm lint:fix` | Run ESLint (with `--fix` for autofixes)                            |
+| `pnpm typecheck`              | Run `tsc --noEmit`                                                 |
+| `pnpm format`                 | Format with Prettier                                               |
+| `pnpm format:check`           | Fail if files are not Prettier-formatted                           |
+| `pnpm generate:types`         | Regenerate `src/types/generated/a2a.ts` from the pinned schema     |
 | `pnpm generate:types:check`   | Fail if the committed generated types drift from the pinned schema |
 
 ### Regenerating A2A Protocol Types
@@ -184,7 +184,7 @@ If you changed the pinned schema SHA or the generator, also run `pnpm generate:t
 ### Comments
 
 - Default to writing no comments. Names should carry the meaning.
-- Write a comment only when the *why* is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific upstream bug.
+- Write a comment only when the _why_ is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific upstream bug.
 - Don't add doc-block boilerplate that just restates the signature. JSDoc is welcome for public API surface where it adds genuine clarification (constraints, error behavior, links to related symbols).
 
 ## 🛠️ Making Changes
@@ -210,20 +210,20 @@ git checkout -b feat/your-feature-name
 
 Commits must follow [Conventional Commits](https://www.conventionalcommits.org/) - semantic-release reads them to compute the next version. The release rules live in [`.releaserc.yaml`](./.releaserc.yaml):
 
-| Type       | Release bump | Notes                                                     |
-| ---------- | ------------ | --------------------------------------------------------- |
-| `feat`     | **minor**    | New consumer-visible capability                            |
-| `fix`      | patch        | Bug fix                                                    |
-| `perf`     | patch        | Performance improvement                                    |
-| `refactor` | patch        | Internal refactor with no API change                       |
-| `impr`     | patch        | General improvement                                        |
-| `docs`     | patch        | Documentation only                                         |
-| `test`     | patch        | Tests only                                                 |
-| `build`    | patch        | Build tooling                                              |
-| `ci`       | patch        | CI config                                                  |
-| `style`    | patch        | Formatting / whitespace                                    |
-| `security` | patch        | Security fix                                               |
-| `chore`    | patch        | Misc (scope `release` is excluded from the release bump)   |
+| Type       | Release bump | Notes                                                    |
+| ---------- | ------------ | -------------------------------------------------------- |
+| `feat`     | **minor**    | New consumer-visible capability                          |
+| `fix`      | patch        | Bug fix                                                  |
+| `perf`     | patch        | Performance improvement                                  |
+| `refactor` | patch        | Internal refactor with no API change                     |
+| `impr`     | patch        | General improvement                                      |
+| `docs`     | patch        | Documentation only                                       |
+| `test`     | patch        | Tests only                                               |
+| `build`    | patch        | Build tooling                                            |
+| `ci`       | patch        | CI config                                                |
+| `style`    | patch        | Formatting / whitespace                                  |
+| `security` | patch        | Security fix                                             |
+| `chore`    | patch        | Misc (scope `release` is excluded from the release bump) |
 
 **Format:**
 
@@ -392,7 +392,7 @@ Before submitting your contribution:
 - [ ] Commits follow [Conventional Commits](https://www.conventionalcommits.org/) - semantic-release will use them to compute the version bump
 - [ ] New/changed behavior is covered by a test
 - [ ] Public API changes are reflected in the [README](./README.md) where appropriate
-- [ ] PR description explains the *why*, not just the *what*
+- [ ] PR description explains the _why_, not just the _what_
 
 ---
 

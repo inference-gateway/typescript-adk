@@ -21,9 +21,9 @@ When `enableCreateArtifact` is on, the toolbox advertises one extra tool to the 
   "parameters": {
     "type": "object",
     "properties": {
-      "content":  { "type": "string" },
+      "content": { "type": "string" },
       "filename": { "type": "string" },
-      "name":     { "type": "string" },
+      "name": { "type": "string" },
       "mimeType": { "type": "string" }
     },
     "required": ["content", "filename"]
@@ -71,26 +71,26 @@ pnpm --filter @inference-gateway/adk-example-artifacts-autonomous-tool start:cli
 
 Server (`server.ts`):
 
-| Env var                     | Default                                                                                                                                                                                              | Description                                                                                                                                                          |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `A2A_AGENT_CLIENT_PROVIDER` | **required**                                                                                                                                                                                         | Provider key (`openai`, `anthropic`, `groq`, `ollama`, ...). Used both to talk to the LLM and to look up `<PROVIDER>_API_KEY` when no explicit key is set.            |
-| `A2A_AGENT_CLIENT_MODEL`    | **required**                                                                                                                                                                                         | Model identifier sent on every completion (e.g. `gpt-4o-mini`).                                                                                                      |
-| `A2A_AGENT_CLIENT_BASE_URL` | unset                                                                                                                                                                                                | Override the OpenAI-compatible endpoint. Point at the Inference Gateway, Ollama (`http://localhost:11434/v1`), or your provider's own URL.                            |
-| `A2A_AGENT_CLIENT_API_KEY`  | falls back to `<PROVIDER>_API_KEY`                                                                                                                                                                   | Explicit API key. Required when the provider's default env var is not set.                                                                                            |
-| `A2A_AGENT_SYSTEM_PROMPT`   | (see source)                                                                                                                                                                                         | System prompt prepended to every LLM call. The default nudges the model to prefer `create_artifact` over inlining content into replies.                              |
-| `ARTIFACTS_ROOT`            | `<os.tmpdir>/adk-artifacts-autonomous`                                                                                                                                                               | Root directory on disk under which artifact files and sidecars are written.                                                                                          |
-| `ARTIFACTS_BASE_URL`        | `http://${A2A_SERVER_HOST}:${A2A_SERVER_PORT}/artifacts`                                                                                                                                             | Base URL emitted in `FilePart.fileWithUri` and returned to the LLM in the tool result.                                                                               |
-| `A2A_AGENT_NAME`            | `artifacts-autonomous-tool-agent`                                                                                                                                                                    | Agent card `name`.                                                                                                                                                   |
-| `A2A_AGENT_DESCRIPTION`     | (see source)                                                                                                                                                                                         | Agent card `description`.                                                                                                                                            |
-| `A2A_AGENT_VERSION`         | `0.0.0`                                                                                                                                                                                              | Agent card `version`.                                                                                                                                                |
-| `A2A_SERVER_HOST`           | `127.0.0.1`                                                                                                                                                                                          | Listen host.                                                                                                                                                         |
-| `A2A_SERVER_PORT`           | `8080`                                                                                                                                                                                               | Listen port.                                                                                                                                                         |
+| Env var                     | Default                                                  | Description                                                                                                                                                |
+| --------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `A2A_AGENT_CLIENT_PROVIDER` | **required**                                             | Provider key (`openai`, `anthropic`, `groq`, `ollama`, ...). Used both to talk to the LLM and to look up `<PROVIDER>_API_KEY` when no explicit key is set. |
+| `A2A_AGENT_CLIENT_MODEL`    | **required**                                             | Model identifier sent on every completion (e.g. `gpt-4o-mini`).                                                                                            |
+| `A2A_AGENT_CLIENT_BASE_URL` | unset                                                    | Override the OpenAI-compatible endpoint. Point at the Inference Gateway, Ollama (`http://localhost:11434/v1`), or your provider's own URL.                 |
+| `A2A_AGENT_CLIENT_API_KEY`  | falls back to `<PROVIDER>_API_KEY`                       | Explicit API key. Required when the provider's default env var is not set.                                                                                 |
+| `A2A_AGENT_SYSTEM_PROMPT`   | (see source)                                             | System prompt prepended to every LLM call. The default nudges the model to prefer `create_artifact` over inlining content into replies.                    |
+| `ARTIFACTS_ROOT`            | `<os.tmpdir>/adk-artifacts-autonomous`                   | Root directory on disk under which artifact files and sidecars are written.                                                                                |
+| `ARTIFACTS_BASE_URL`        | `http://${A2A_SERVER_HOST}:${A2A_SERVER_PORT}/artifacts` | Base URL emitted in `FilePart.fileWithUri` and returned to the LLM in the tool result.                                                                     |
+| `A2A_AGENT_NAME`            | `artifacts-autonomous-tool-agent`                        | Agent card `name`.                                                                                                                                         |
+| `A2A_AGENT_DESCRIPTION`     | (see source)                                             | Agent card `description`.                                                                                                                                  |
+| `A2A_AGENT_VERSION`         | `0.0.0`                                                  | Agent card `version`.                                                                                                                                      |
+| `A2A_SERVER_HOST`           | `127.0.0.1`                                              | Listen host.                                                                                                                                               |
+| `A2A_SERVER_PORT`           | `8080`                                                   | Listen port.                                                                                                                                               |
 
 Client (`client.ts`):
 
-| Env var      | Default                       | Description                                                                                                                          |
-| ------------ | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `SERVER_URL` | `http://127.0.0.1:8080`       | Base URL of the A2A server.                                                                                                          |
+| Env var      | Default                        | Description                                                                                                                         |
+| ------------ | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `SERVER_URL` | `http://127.0.0.1:8080`        | Base URL of the A2A server.                                                                                                         |
 | `PROMPTS`    | (two demo prompts, see source) | Pipe (`\|\|`)-separated list of prompts. Each one is sent as its own `message/send` request and the artifacts are downloaded after. |
 
 ## Expected flow

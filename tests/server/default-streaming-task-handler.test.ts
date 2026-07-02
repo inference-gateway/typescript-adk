@@ -639,12 +639,10 @@ describe('DefaultStreamingTaskHandler usage metadata', () => {
     handler.setEnableUsageMetadata(true);
     const events = await drain(handler.handle(buildContext()));
     const inputRequired = events.find((e) => e.type === 'inputRequired') as
-      | Extract<StreamingTaskEvent, { type: 'inputRequired' }>
-      | undefined;
+      Extract<StreamingTaskEvent, { type: 'inputRequired' }> | undefined;
     expect(inputRequired).toBeDefined();
     const metadata = inputRequired?.metadata as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     expect(metadata?.['usage']).toEqual({
       prompt_tokens: 4,
       completion_tokens: 2,
@@ -676,8 +674,7 @@ describe('DefaultStreamingTaskHandler usage metadata', () => {
     handler.setEnableUsageMetadata(true);
     const events = await drain(handler.handle(buildContext()));
     const status = events.find((e) => e.type === 'statusChanged') as
-      | Extract<StreamingTaskEvent, { type: 'statusChanged' }>
-      | undefined;
+      Extract<StreamingTaskEvent, { type: 'statusChanged' }> | undefined;
     expect(status?.state).toBe(TASK_STATE.FAILED);
     const metadata = status?.metadata as Record<string, unknown> | undefined;
     expect(metadata?.['execution_stats']).toEqual({

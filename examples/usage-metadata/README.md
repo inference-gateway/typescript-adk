@@ -8,14 +8,14 @@ Mirrors the Go ADK's [`examples/usage-metadata/`](https://github.com/inference-g
 
 The `UsageTracker` accumulates per-task counters across the agent loop:
 
-| Counter (wire form)              | Meaning                                             |
-| -------------------------------- | --------------------------------------------------- |
-| `usage.prompt_tokens`            | Total prompt tokens across every LLM call.          |
-| `usage.completion_tokens`        | Total completion tokens.                            |
-| `usage.total_tokens`             | Sum (or upstream-reported total, when provided).    |
-| `execution_stats.iterations`     | Number of LLM iterations the loop performed.        |
-| `execution_stats.tool_calls`     | Number of tool calls dispatched.                    |
-| `execution_stats.failed_tools`   | Number of tool calls that errored.                  |
+| Counter (wire form)            | Meaning                                          |
+| ------------------------------ | ------------------------------------------------ |
+| `usage.prompt_tokens`          | Total prompt tokens across every LLM call.       |
+| `usage.completion_tokens`      | Total completion tokens.                         |
+| `usage.total_tokens`           | Sum (or upstream-reported total, when provided). |
+| `execution_stats.iterations`   | Number of LLM iterations the loop performed.     |
+| `execution_stats.tool_calls`   | Number of tool calls dispatched.                 |
+| `execution_stats.failed_tools` | Number of tool calls that errored.               |
 
 When the task reaches a terminal state (`COMPLETED` / `FAILED` / `CANCELLED` / `INPUT_REQUIRED`), the counters are serialized into `task.metadata` like this:
 
@@ -74,16 +74,16 @@ pnpm --filter @inference-gateway/adk-example-usage-metadata start:client
 
 ### Configuration
 
-| Environment variable     | Default                                                   | Description                                                                                                  |
-| ------------------------ | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `A2A_AGENT_NAME`         | `usage-metadata-agent`                                    | Agent name advertised on the card.                                                                           |
-| `A2A_AGENT_DESCRIPTION`  | (canned demo string)                                      | Agent description advertised on the card.                                                                    |
-| `A2A_AGENT_VERSION`      | `0.0.0`                                                   | Agent version advertised on the card.                                                                        |
-| `A2A_SERVER_HOST`        | `127.0.0.1`                                               | Bind host.                                                                                                   |
-| `A2A_SERVER_PORT`        | `8080`                                                    | Bind port.                                                                                                   |
-| `SERVER_URL`             | `http://127.0.0.1:8080`                                   | Client target URL.                                                                                           |
-| `SEND_PROMPTS`           | (canned 2-prompt list)                                    | `||`-separated prompts for the `message/send` portion.                                                       |
-| `STREAM_PROMPT`          | `What's the weather in Tokyo?`                            | Prompt for the `message/stream` portion.                                                                     |
+| Environment variable    | Default                        | Description                               |
+| ----------------------- | ------------------------------ | ----------------------------------------- |
+| `A2A_AGENT_NAME`        | `usage-metadata-agent`         | Agent name advertised on the card.        |
+| `A2A_AGENT_DESCRIPTION` | (canned demo string)           | Agent description advertised on the card. |
+| `A2A_AGENT_VERSION`     | `0.0.0`                        | Agent version advertised on the card.     |
+| `A2A_SERVER_HOST`       | `127.0.0.1`                    | Bind host.                                |
+| `A2A_SERVER_PORT`       | `8080`                         | Bind port.                                |
+| `SERVER_URL`            | `http://127.0.0.1:8080`        | Client target URL.                        |
+| `SEND_PROMPTS`          | (canned 2-prompt list)         | `                                         |     | `-separated prompts for the `message/send` portion. |
+| `STREAM_PROMPT`         | `What's the weather in Tokyo?` | Prompt for the `message/stream` portion.  |
 
 ## Expected output
 
