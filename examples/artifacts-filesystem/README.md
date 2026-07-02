@@ -47,21 +47,21 @@ pnpm --filter @inference-gateway/adk-example-artifacts-filesystem start:client
 
 Server (`server.ts`):
 
-| Env var                 | Default                                                                                                       | Description                                                                                                                                |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `A2A_AGENT_NAME`        | `artifacts-filesystem-agent`                                                                                  | Agent card `name`.                                                                                                                         |
-| `A2A_AGENT_DESCRIPTION` | (see source)                                                                                                  | Agent card `description`.                                                                                                                  |
-| `A2A_AGENT_VERSION`     | `0.0.0`                                                                                                       | Agent card `version`.                                                                                                                      |
-| `A2A_SERVER_HOST`       | `127.0.0.1`                                                                                                   | Listen host.                                                                                                                               |
-| `A2A_SERVER_PORT`       | `8080`                                                                                                        | Listen port.                                                                                                                               |
-| `ARTIFACTS_ROOT`        | `<os.tmpdir>/adk-artifacts-filesystem`                                                                        | Root directory on disk under which artifact files and their sidecars are written. Created lazily on first write with mode `0o700`.         |
-| `ARTIFACTS_BASE_URL`    | `http://${A2A_SERVER_HOST}:${A2A_SERVER_PORT}/artifacts`                                                      | Base URL emitted in `FilePart.fileWithUri`. Defaults to point at this server's built-in `/artifacts` endpoint.                             |
+| Env var                 | Default                                                  | Description                                                                                                                        |
+| ----------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `A2A_AGENT_NAME`        | `artifacts-filesystem-agent`                             | Agent card `name`.                                                                                                                 |
+| `A2A_AGENT_DESCRIPTION` | (see source)                                             | Agent card `description`.                                                                                                          |
+| `A2A_AGENT_VERSION`     | `0.0.0`                                                  | Agent card `version`.                                                                                                              |
+| `A2A_SERVER_HOST`       | `127.0.0.1`                                              | Listen host.                                                                                                                       |
+| `A2A_SERVER_PORT`       | `8080`                                                   | Listen port.                                                                                                                       |
+| `ARTIFACTS_ROOT`        | `<os.tmpdir>/adk-artifacts-filesystem`                   | Root directory on disk under which artifact files and their sidecars are written. Created lazily on first write with mode `0o700`. |
+| `ARTIFACTS_BASE_URL`    | `http://${A2A_SERVER_HOST}:${A2A_SERVER_PORT}/artifacts` | Base URL emitted in `FilePart.fileWithUri`. Defaults to point at this server's built-in `/artifacts` endpoint.                     |
 
 Client (`client.ts`):
 
-| Env var      | Default                                                                          | Description                                |
-| ------------ | -------------------------------------------------------------------------------- | ------------------------------------------ |
-| `SERVER_URL` | `http://127.0.0.1:8080`                                                          | Base URL of the A2A server.                |
+| Env var      | Default                                                                         | Description                               |
+| ------------ | ------------------------------------------------------------------------------- | ----------------------------------------- |
+| `SERVER_URL` | `http://127.0.0.1:8080`                                                         | Base URL of the A2A server.               |
 | `PROMPT`     | `Hello from the filesystem artifacts example - please write this note to disk.` | Text written into the persisted artifact. |
 
 ## Expected flow

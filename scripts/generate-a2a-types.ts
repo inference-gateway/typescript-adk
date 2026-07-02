@@ -28,12 +28,7 @@ const HEADER = `// Code generated from A2A schema. DO NOT EDIT.
 `;
 
 type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 interface RawSchema {
   $schema?: string;
