@@ -166,7 +166,7 @@ export class TelemetryProvider {
 
     sdkConfig.logRecordProcessor =
       this.options.logRecordProcessor ??
-      new SimpleLogRecordProcessor(new OTLPLogExporter());
+      new SimpleLogRecordProcessor({ exporter: new OTLPLogExporter() });
 
     sdkConfig.metricReader =
       this.options.metricReader ??
