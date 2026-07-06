@@ -94,6 +94,7 @@ The server is provider-agnostic. To switch:
 
 - **OpenAI** → `A2A_AGENT_CLIENT_PROVIDER=openai`, `A2A_AGENT_CLIENT_MODEL=gpt-4o-mini`, `OPENAI_API_KEY=...`. Leave `A2A_AGENT_CLIENT_BASE_URL` unset to hit OpenAI directly via the SDK default, or set it to your Inference Gateway URL.
 - **Anthropic** → `A2A_AGENT_CLIENT_PROVIDER=anthropic`, `A2A_AGENT_CLIENT_MODEL=claude-3-5-sonnet-latest`, `ANTHROPIC_API_KEY=...`. Anthropic is reachable through the Inference Gateway (`A2A_AGENT_CLIENT_BASE_URL=http://localhost:8080/v1`).
+- **Nvidia** → `A2A_AGENT_CLIENT_PROVIDER=nvidia`, `A2A_AGENT_CLIENT_MODEL=nvidia/meta/llama-3.1-8b-instruct`, `NVIDIA_API_KEY=...`. Nvidia NIM models (from the [build.nvidia.com](https://build.nvidia.com) API catalog) are reached through the Inference Gateway (`A2A_AGENT_CLIENT_BASE_URL=http://localhost:8080/v1`); the leading `nvidia/` model prefix is stripped automatically.
 - **Groq / DeepSeek / Cohere / Mistral / Google / Cloudflare** → same pattern: set the matching provider id, model, and `<PROVIDER>_API_KEY` (or `A2A_AGENT_CLIENT_API_KEY`).
 - **Local Ollama** → `A2A_AGENT_CLIENT_PROVIDER=ollama`, `A2A_AGENT_CLIENT_MODEL=llama3.2`, `A2A_AGENT_CLIENT_BASE_URL=http://localhost:11434/v1`, no API key.
 
