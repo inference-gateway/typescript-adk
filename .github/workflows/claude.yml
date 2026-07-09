@@ -53,6 +53,8 @@ jobs:
       language: "typescript"
       markdownlint: true
       allowed-tools: "Bash(task:*),Bash(node:*),Bash(npm:*),Bash(pnpm:*)"
+      plugins: |
+        DietrichGebert/ponytail
       browser: ${{ inputs.browser || false }}
       prompt: ${{ inputs.prompt }}
     secrets: inherit
