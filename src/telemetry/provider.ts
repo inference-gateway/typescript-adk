@@ -9,6 +9,7 @@ import {
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
+import { PrometheusExporter } from '@opentelemetry/exporter-prometheus';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { SimpleLogRecordProcessor } from '@opentelemetry/sdk-logs';
@@ -67,8 +68,10 @@ export interface CreateTelemetryProviderOptions {
    */
   readonly logRecordProcessor?: NodeSDKConfig['logRecordProcessor'];
   /**
-   * Replace the default OTLP HTTP metric reader. Pass a no-op reader to
-   * disable metric export in tests.
+   * Replace the metric reader selected by
+   * {@link TelemetryConfig.metricsExporter}. Pass a no-op reader to disable
+   * metric export in tests, or a Prometheus/OTLP reader to force a specific
+   * pipeline regardless of env.
    */
   readonly metricReader?: NodeSDKConfig['metricReader'];
   /**
@@ -94,9 +97,11 @@ export interface CreateTelemetryProviderOptions {
  *   global no-op tracer. Zero runtime cost beyond the provider object itself.
  *
  * - **Enabled**: {@link start} initialises the {@link NodeSDK} with OTLP HTTP
- *   exporters (overridable via constructor options), the standard Node
- *   auto-instrumentation bundle, and a resource with
- *   `service.name`/`service.version` populated from the resolved config.
+ *   trace/log exporters, a metric reader selected by
+ *   {@link TelemetryConfig.metricsExporter} (OTLP push by default, a Prometheus
+ *   pull endpoint, or none), the standard Node auto-instrumentation bundle, and
+ *   a resource with `service.name`/`service.version` populated from the
+ *   resolved config. All exporters are overridable via constructor options.
  *
  * The provider does not register itself globally on construction - call
  * {@link start} to start exporting and {@link shutdown} to flush and stop. It
@@ -119,6 +124,9 @@ export class TelemetryProvider {
       serviceName: serviceName.length > 0 ? serviceName : DEFAULT_SERVICE_NAME,
       serviceVersion:
         serviceVersion.length > 0 ? serviceVersion : DEFAULT_SERVICE_VERSION,
+      metricsExporter: base.metricsExporter,
+      prometheusHost: base.prometheusHost,
+      prometheusPort: base.prometheusPort,
     };
   }
 
@@ -168,15 +176,42 @@ export class TelemetryProvider {
       this.options.logRecordProcessor ??
       new SimpleLogRecordProcessor({ exporter: new OTLPLogExporter() });
 
-    sdkConfig.metricReader =
-      this.options.metricReader ??
-      new PeriodicExportingMetricReader({
-        exporter: new OTLPMetricExporter(),
-      });
+    const metricReader = this.options.metricReader ?? this.createMetricReader();
+    if (metricReader !== undefined) {
+      sdkConfig.metricReader = metricReader;
+    }
 
     this.sdk = new NodeSDK(sdkConfig);
     this.sdk.start();
     this.started = true;
+  }
+
+  /**
+   * Build the metric reader for the resolved {@link TelemetryConfig.metricsExporter}:
+   *
+   * - `'otlp'` (default) - {@link PeriodicExportingMetricReader} pushing over
+   *   OTLP HTTP.
+   * - `'prometheus'` - {@link PrometheusExporter}, which starts its own HTTP
+   *   scrape endpoint on `prometheusHost:prometheusPort` (default `/metrics`)
+   *   and is stopped again by {@link shutdown}.
+   * - `'none'` - `undefined`, so no metric reader is registered and the metrics
+   *   signal stays off while traces/logs keep flowing.
+   */
+  private createMetricReader(): NodeSDKConfig['metricReader'] {
+    switch (this.config.metricsExporter) {
+      case 'none':
+        return undefined;
+      case 'prometheus':
+        return new PrometheusExporter({
+          host: this.config.prometheusHost,
+          port: this.config.prometheusPort,
+        });
+      case 'otlp':
+      default:
+        return new PeriodicExportingMetricReader({
+          exporter: new OTLPMetricExporter(),
+        });
+    }
   }
 
   /**
