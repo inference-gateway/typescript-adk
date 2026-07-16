@@ -55,8 +55,6 @@ describe('TelemetryProvider Prometheus pull exporter', () => {
       },
       serviceName: 'prom-agent',
       serviceVersion: '1.0.0',
-      // No auto-instrumentation and no span export keep the test self-contained;
-      // the default log exporter stays idle since nothing emits log records.
       instrumentations: [],
       spanProcessors: [],
     });
