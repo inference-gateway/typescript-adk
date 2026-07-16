@@ -22,6 +22,8 @@ import {
 import {
   DEFAULT_SERVICE_NAME,
   DEFAULT_SERVICE_VERSION,
+  OTEL_SERVICE_NAME_ENV,
+  OTEL_SERVICE_VERSION_ENV,
   loadTelemetryConfigFromEnv,
   type TelemetryConfig,
 } from './config.js';
@@ -154,6 +156,14 @@ export class TelemetryProvider {
     if (!this.config.enable || this.started) {
       return;
     }
+
+    // Override env vars so the NodeSDK's default resource detection picks up
+    // the configured values instead of whatever the outer environment has set.
+    // The SDK merges the explicit resource with the detected one, and the
+    // detected resource wins for conflicting attributes, so we must set the
+    // env vars to ensure our config takes precedence.
+    process.env[OTEL_SERVICE_NAME_ENV] = this.config.serviceName;
+    process.env[OTEL_SERVICE_VERSION_ENV] = this.config.serviceVersion;
 
     const resource = resourceFromAttributes({
       [ATTR_SERVICE_NAME]: this.config.serviceName,
