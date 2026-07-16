@@ -208,7 +208,7 @@ Each example ships its own README with setup instructions.
 
 ### Status & Roadmap
 
-The TypeScript ADK currently focuses on the core A2A protocol surface: `message/send`, `tasks/get`, `tasks/list`, AgentCard discovery, the task lifecycle state machine, in-memory and Redis-backed storage, the retrying client, CloudEvents, and SSE. Capabilities that exist in the [Go ADK](https://github.com/inference-gateway/adk) but are **not yet implemented** here include: LLM client / multi-provider chat completion, streaming task handlers, additional JSON-RPC methods (`tasks/cancel`, `tasks/resubscribe`, `tasks/pushNotificationConfig/*`, `agent/getAuthenticatedExtendedCard`), file artifacts (filesystem & MinIO), OIDC/OAuth authentication, push notifications, and OpenTelemetry-based observability. The TS ADK tracks the Go ADK as the long-term feature target - contributions toward parity are welcome.
+The TypeScript ADK currently focuses on the core A2A protocol surface: `message/send`, `tasks/get`, `tasks/list`, AgentCard discovery, the task lifecycle state machine, in-memory and Redis-backed storage, the retrying client, CloudEvents, and SSE. Capabilities that exist in the [Go ADK](https://github.com/inference-gateway/adk) but are **not yet implemented** here include: LLM client / multi-provider chat completion, streaming task handlers, additional JSON-RPC methods (`tasks/cancel`, `tasks/resubscribe`, `tasks/pushNotificationConfig/*`, `agent/getAuthenticatedExtendedCard`), file artifacts (filesystem & MinIO), OIDC/OAuth authentication, and push notifications. OpenTelemetry-based observability (traces, logs, and OTLP-push or Prometheus-pull metrics) is available via `createTelemetryProvider` - see [Telemetry & metrics exporters](#telemetry--metrics-exporters). The TS ADK tracks the Go ADK as the long-term feature target - contributions toward parity are welcome.
 
 ## 📖 API Reference
 
@@ -574,6 +574,36 @@ For everything else - port, host, JSON-RPC path, agent-card cache-control, handl
 - **Bundle-time metadata injection** - use `tsup`'s `define` option to bake `BUILD_AGENT_NAME` / `_DESCRIPTION` / `_VERSION` into the bundled output instead of relying on the runtime environment. See [Build-Time Agent Metadata](#build-time-agent-metadata) above.
 - **CloudEvents forwarding** - wrap your task-state transitions in `createCloudEvent` and POST them to a webhook or message bus for downstream subscribers, using the spec-compliant `CLOUDEVENTS_CONTENT_TYPE`.
 - **TLS termination** - boot the server over HTTPS by passing `tls: { certPath, keyPath }` into `createA2AServer` (or `loadServerTLSConfigFromEnv()` to read the same paths from `TLS_ENABLE` / `TLS_CERT_PATH` / `TLS_KEY_PATH`). For mTLS, add `caPath` and `requestCert: true`. See [TLS](#tls) below.
+- **Telemetry** - construct `createTelemetryProvider()` and call `start()` to wire OpenTelemetry traces, logs, and metrics. Metrics push over OTLP by default or expose a Prometheus pull endpoint - see [Telemetry & metrics exporters](#telemetry--metrics-exporters) below.
+
+### Telemetry & metrics exporters
+
+`createTelemetryProvider()` wires an OpenTelemetry `NodeSDK`. It is off until `TELEMETRY_ENABLE=true`; traces and logs always push over OTLP (`OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS` / `OTEL_EXPORTER_OTLP_PROTOCOL`). Only the **metrics** signal is selectable, via the standard `OTEL_METRICS_EXPORTER` env var:
+
+| `OTEL_METRICS_EXPORTER` | Metrics behavior |
+| --- | --- |
+| _(unset)_ or `otlp` | **Default.** Push over OTLP to `OTEL_EXPORTER_OTLP_ENDPOINT` (unchanged from before). |
+| `prometheus` | **Pull.** Start a Prometheus scrape endpoint at `/metrics` on `OTEL_EXPORTER_PROMETHEUS_HOST:OTEL_EXPORTER_PROMETHEUS_PORT` (default `0.0.0.0:9464`). |
+| `none` | Disable the metrics signal entirely; traces and logs still export. |
+
+Prometheus-pull env vars (only consulted when `OTEL_METRICS_EXPORTER=prometheus`):
+
+| Env var | Default | Purpose |
+| --- | --- | --- |
+| `OTEL_EXPORTER_PROMETHEUS_HOST` | `0.0.0.0` | Bind host for the scrape endpoint. |
+| `OTEL_EXPORTER_PROMETHEUS_PORT` | `9464` | Bind port for the scrape endpoint (`0` picks an ephemeral port). |
+
+```ts
+import { createTelemetryProvider } from '@inference-gateway/adk';
+
+// With: TELEMETRY_ENABLE=true OTEL_METRICS_EXPORTER=prometheus
+const telemetry = createTelemetryProvider();
+telemetry.start(); // scrape endpoint live at http://0.0.0.0:9464/metrics
+// ... wire into createA2AServer({ card, telemetry }), then on shutdown:
+await telemetry.shutdown(); // stops the Prometheus HTTP server
+```
+
+This OpenTelemetry Prometheus endpoint (default port `9464`) is independent of the standalone `createMetricsServer` / `MetricsServer` (a `prom-client` server on default port `9090`) - the two serve different registries and can run side by side.
 
 ### TLS
 
