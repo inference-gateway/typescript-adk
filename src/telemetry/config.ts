@@ -116,14 +116,16 @@ export const OTEL_METRICS_EXPORTER_ENV = 'OTEL_METRICS_EXPORTER';
  * binds to. Only consulted when {@link OTEL_METRICS_EXPORTER_ENV} is
  * `prometheus`. Defaults to {@link DEFAULT_PROMETHEUS_HOST}.
  */
-export const OTEL_EXPORTER_PROMETHEUS_HOST_ENV = 'OTEL_EXPORTER_PROMETHEUS_HOST';
+export const OTEL_EXPORTER_PROMETHEUS_HOST_ENV =
+  'OTEL_EXPORTER_PROMETHEUS_HOST';
 
 /**
  * Standard OpenTelemetry env var for the port the Prometheus pull endpoint
  * listens on. Only consulted when {@link OTEL_METRICS_EXPORTER_ENV} is
  * `prometheus`. Defaults to {@link DEFAULT_PROMETHEUS_PORT}.
  */
-export const OTEL_EXPORTER_PROMETHEUS_PORT_ENV = 'OTEL_EXPORTER_PROMETHEUS_PORT';
+export const OTEL_EXPORTER_PROMETHEUS_PORT_ENV =
+  'OTEL_EXPORTER_PROMETHEUS_PORT';
 
 const TRUTHY = new Set(['1', 'true', 'yes', 'on']);
 const FALSY = new Set(['', '0', 'false', 'no', 'off']);
