@@ -48,9 +48,9 @@ function makeResponse(overrides: Partial<LLMResponse> = {}): LLMResponse {
     choices: [
       {
         index: 0,
-        finish_reason: FinishReason.stop,
+        finish_reason: FinishReason.Stop,
         message: {
-          role: MessageRole.assistant,
+          role: MessageRole.Assistant,
           content: 'hello',
         },
       },
@@ -75,8 +75,8 @@ function makeStreamChunk(
     choices: [
       {
         index: 0,
-        delta: { content: 'hi', role: MessageRole.assistant },
-        finish_reason: FinishReason.stop,
+        delta: { content: 'hi', role: MessageRole.Assistant },
+        finish_reason: FinishReason.Stop,
       },
     ],
     ...overrides,
@@ -121,7 +121,7 @@ function fakeTransport(
 }
 
 const userMessage: LLMMessage = {
-  role: MessageRole.user,
+  role: MessageRole.User,
   content: 'hello',
 };
 
@@ -178,6 +178,15 @@ describe('OpenAICompatibleLLMClient construction', () => {
       client: fakeTransport(),
     });
     expect(client.getProvider()).toBe(Provider.openai);
+  });
+
+  it('accepts Provider.llamacpp as a typed provider', () => {
+    const client = new OpenAICompatibleLLMClient({
+      provider: Provider.llamacpp,
+      model: 'qwen2.5',
+      client: fakeTransport(),
+    });
+    expect(client.getProvider()).toBe(Provider.llamacpp);
   });
 
   it('exposes createOpenAICompatibleLLMClient as a factory', () => {
