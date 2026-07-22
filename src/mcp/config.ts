@@ -75,20 +75,39 @@ export function parseDurationMs(
   if (raw === undefined) {
     return fallback;
   }
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) {
+  const s = raw.trim();
+  const n = s.length;
+  if (n === 0) {
     return fallback;
   }
+  // Hand-rolled contiguous number+unit scan - no regex, so CodeQL's
+  // polynomial-redos query has nothing to flag (same reasoning as
+  // joinEndpoint in client.ts). Mirrors Go's time.ParseDuration: one or
+  // more `<number><unit>` pairs, e.g. "1m30s"; any gap makes it unparseable.
   let total = 0;
   let matched = false;
-  // Sticky (`y`) anchors each match at lastIndex, so a long digit run with no
-  // unit can't trigger the O(n^2) multi-start rescan CodeQL flags on the global
-  // form - and it mirrors Go's contiguous number+unit parsing.
-  const re = /(\d+(?:\.\d+)?)(ms|s|m|h)/y;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(trimmed)) !== null) {
+  let i = 0;
+  while (i < n) {
+    const numStart = i;
+    while (i < n && s.charCodeAt(i) >= 48 && s.charCodeAt(i) <= 57) i++; // 0-9
+    if (i < n && s.charCodeAt(i) === 46) {
+      // '.'
+      i++;
+      while (i < n && s.charCodeAt(i) >= 48 && s.charCodeAt(i) <= 57) i++;
+    }
+    if (i === numStart) {
+      return fallback;
+    }
+    const value = Number(s.slice(numStart, i));
+    let unit: string;
+    if (s.startsWith('ms', i)) unit = 'ms';
+    else if (s.startsWith('s', i)) unit = 's';
+    else if (s.startsWith('m', i)) unit = 'm';
+    else if (s.startsWith('h', i)) unit = 'h';
+    else return fallback;
+    i += unit.length;
+    total += value * DURATION_UNIT_MS[unit]!;
     matched = true;
-    total += Number(m[1]) * DURATION_UNIT_MS[m[2] as string]!;
   }
   return matched ? total : fallback;
 }
