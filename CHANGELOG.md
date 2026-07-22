@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.0](https://github.com/inference-gateway/typescript-adk/compare/v0.13.0...v0.14.0) (2026-07-22)
+
+### ✨ Features
+
+* **mcp:** MCP client parity with the Go ADK ([#183](https://github.com/inference-gateway/typescript-adk/issues/183)) ([b50be66](https://github.com/inference-gateway/typescript-adk/commit/b50be664ff33f2481cf9de7d69148b1318f96397)), references [#251](https://github.com/inference-gateway/typescript-adk/issues/251)
+
+### 🔧 Miscellaneous
+
+* **deps:** bump actions/setup-node in the github-actions group ([#180](https://github.com/inference-gateway/typescript-adk/issues/180)) ([efe58ef](https://github.com/inference-gateway/typescript-adk/commit/efe58ef34f35d893375411f68652994017b6a027))
+* **deps:** bump the npm group with 6 updates (revert typescript 7.0.2) ([#181](https://github.com/inference-gateway/typescript-adk/issues/181)) ([148b86d](https://github.com/inference-gateway/typescript-adk/commit/148b86d46abd5e2c07590d80e4c1e31e2e0cb6d7))
+
 ## [0.13.0](https://github.com/inference-gateway/typescript-adk/compare/v0.12.0...v0.13.0) (2026-07-19)
 
 ### ✨ Features
