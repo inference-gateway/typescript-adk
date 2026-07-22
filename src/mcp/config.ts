@@ -4,43 +4,43 @@
  * whether it is implemented in Go or TypeScript.
  *
  * Everything is disabled by default: {@link MCPConfig.enable} is `false` unless
- * `MCP_ENABLE` is truthy, and {@link loadMCPConfigFromEnv} returns a config with
- * an empty {@link MCPConfig.servers} list when `MCP_SERVERS` is unset. Callers
- * should treat "enabled with no servers" as a no-op.
+ * `A2A_MCP_ENABLE` is truthy, and {@link loadMCPConfigFromEnv} returns a config
+ * with an empty {@link MCPConfig.servers} list when `A2A_MCP_SERVERS` is unset.
+ * Callers should treat "enabled with no servers" as a no-op.
  */
 export interface MCPConfig {
-  /** Master switch. Defaults to `false` (`MCP_ENABLE`). */
+  /** Master switch. Defaults to `false` (`A2A_MCP_ENABLE`). */
   readonly enable: boolean;
-  /** MCP server base URLs (`MCP_SERVERS`, comma-separated). */
+  /** MCP server base URLs (`A2A_MCP_SERVERS`, comma-separated). */
   readonly servers: readonly string[];
-  /** Path appended to each server URL (`MCP_ENDPOINT`). Default `/mcp`. */
+  /** Path appended to each server URL (`A2A_MCP_ENDPOINT`). Default `/mcp`. */
   readonly endpoint: string;
-  /** Tool-catalog refresh interval in ms (`MCP_REFRESH_INTERVAL`). Default 5m. */
+  /** Tool-catalog refresh interval in ms (`A2A_MCP_REFRESH_INTERVAL`). Default 5m. */
   readonly refreshIntervalMs: number;
-  /** Init/list-tools timeout in ms (`MCP_DIAL_TIMEOUT`). Default 30s. */
+  /** Init/list-tools timeout in ms (`A2A_MCP_DIAL_TIMEOUT`). Default 30s. */
   readonly dialTimeoutMs: number;
-  /** Single tool-invocation timeout in ms (`MCP_CALL_TIMEOUT`). Default 30s. */
+  /** Single tool-invocation timeout in ms (`A2A_MCP_CALL_TIMEOUT`). Default 30s. */
   readonly callTimeoutMs: number;
   /**
-   * Max initial connection attempts per server (`MCP_MAX_RETRIES`). `0` means
+   * Max initial connection attempts per server (`A2A_MCP_MAX_RETRIES`). `0` means
    * retry forever. Default `0`.
    */
   readonly maxRetries: number;
-  /** Initial connection backoff in ms (`MCP_RETRY_INTERVAL`). Doubles. Default 2s. */
+  /** Initial connection backoff in ms (`A2A_MCP_RETRY_INTERVAL`). Doubles. Default 2s. */
   readonly retryIntervalMs: number;
-  /** Upper bound on connection backoff in ms (`MCP_RETRY_MAX_INTERVAL`). Default 30s. */
+  /** Upper bound on connection backoff in ms (`A2A_MCP_RETRY_MAX_INTERVAL`). Default 30s. */
   readonly retryMaxIntervalMs: number;
 }
 
-export const MCP_ENABLE_ENV = 'MCP_ENABLE';
-export const MCP_SERVERS_ENV = 'MCP_SERVERS';
-export const MCP_ENDPOINT_ENV = 'MCP_ENDPOINT';
-export const MCP_REFRESH_INTERVAL_ENV = 'MCP_REFRESH_INTERVAL';
-export const MCP_DIAL_TIMEOUT_ENV = 'MCP_DIAL_TIMEOUT';
-export const MCP_CALL_TIMEOUT_ENV = 'MCP_CALL_TIMEOUT';
-export const MCP_MAX_RETRIES_ENV = 'MCP_MAX_RETRIES';
-export const MCP_RETRY_INTERVAL_ENV = 'MCP_RETRY_INTERVAL';
-export const MCP_RETRY_MAX_INTERVAL_ENV = 'MCP_RETRY_MAX_INTERVAL';
+export const MCP_ENABLE_ENV = 'A2A_MCP_ENABLE';
+export const MCP_SERVERS_ENV = 'A2A_MCP_SERVERS';
+export const MCP_ENDPOINT_ENV = 'A2A_MCP_ENDPOINT';
+export const MCP_REFRESH_INTERVAL_ENV = 'A2A_MCP_REFRESH_INTERVAL';
+export const MCP_DIAL_TIMEOUT_ENV = 'A2A_MCP_DIAL_TIMEOUT';
+export const MCP_CALL_TIMEOUT_ENV = 'A2A_MCP_CALL_TIMEOUT';
+export const MCP_MAX_RETRIES_ENV = 'A2A_MCP_MAX_RETRIES';
+export const MCP_RETRY_INTERVAL_ENV = 'A2A_MCP_RETRY_INTERVAL';
+export const MCP_RETRY_MAX_INTERVAL_ENV = 'A2A_MCP_RETRY_MAX_INTERVAL';
 
 export const DEFAULT_MCP_ENDPOINT = '/mcp';
 export const DEFAULT_MCP_REFRESH_INTERVAL_MS = 5 * 60_000;

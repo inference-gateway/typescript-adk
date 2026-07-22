@@ -26,19 +26,19 @@ describe('joinEndpoint', () => {
 describe('createMCPClientFromEnv', () => {
   it('returns undefined when MCP is disabled', () => {
     expect(
-      createMCPClientFromEnv({ env: { MCP_SERVERS: 'http://a' } })
+      createMCPClientFromEnv({ env: { A2A_MCP_SERVERS: 'http://a' } })
     ).toBeUndefined();
   });
 
   it('returns undefined when enabled but no servers are configured', () => {
     expect(
-      createMCPClientFromEnv({ env: { MCP_ENABLE: 'true' } })
+      createMCPClientFromEnv({ env: { A2A_MCP_ENABLE: 'true' } })
     ).toBeUndefined();
   });
 
   it('returns a client when enabled with servers', () => {
     const client = createMCPClientFromEnv({
-      env: { MCP_ENABLE: 'true', MCP_SERVERS: 'http://a:8080' },
+      env: { A2A_MCP_ENABLE: 'true', A2A_MCP_SERVERS: 'http://a:8080' },
     });
     expect(client).toBeInstanceOf(MCPClient);
   });
@@ -46,7 +46,9 @@ describe('createMCPClientFromEnv', () => {
 
 describe('MCPClient', () => {
   it('starts with no servers without throwing and lists nothing', () => {
-    const client = new MCPClient(loadMCPConfigFromEnv({ MCP_ENABLE: 'true' }));
+    const client = new MCPClient(
+      loadMCPConfigFromEnv({ A2A_MCP_ENABLE: 'true' })
+    );
     expect(() => client.start()).not.toThrow();
     expect(client.listTools()).toEqual([]);
   });
@@ -63,9 +65,9 @@ describe('MCPClient', () => {
     await server.connect(serverTransport);
 
     const config = loadMCPConfigFromEnv({
-      MCP_ENABLE: 'true',
-      MCP_SERVERS: 'http://in-memory',
-      MCP_REFRESH_INTERVAL: '1h',
+      A2A_MCP_ENABLE: 'true',
+      A2A_MCP_SERVERS: 'http://in-memory',
+      A2A_MCP_REFRESH_INTERVAL: '1h',
     });
 
     class TestMCPClient extends MCPClient {

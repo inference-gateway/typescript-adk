@@ -31,7 +31,7 @@ describe('loadMCPConfigFromEnv', () => {
     });
   });
 
-  it('parses truthy MCP_ENABLE values', () => {
+  it('parses truthy A2A_MCP_ENABLE values', () => {
     for (const value of ['1', 'true', 'TRUE', 'yes', 'on']) {
       expect(loadMCPConfigFromEnv({ [MCP_ENABLE_ENV]: value }).enable).toBe(
         true
@@ -39,14 +39,14 @@ describe('loadMCPConfigFromEnv', () => {
     }
   });
 
-  it('splits and trims comma-separated MCP_SERVERS, dropping blanks', () => {
+  it('splits and trims comma-separated A2A_MCP_SERVERS, dropping blanks', () => {
     const config = loadMCPConfigFromEnv({
       [MCP_SERVERS_ENV]: ' http://a:8080 , ,http://b:9090 ',
     });
     expect(config.servers).toEqual(['http://a:8080', 'http://b:9090']);
   });
 
-  it('honours MCP_ENDPOINT and falls back to the default on empty', () => {
+  it('honours A2A_MCP_ENDPOINT and falls back to the default on empty', () => {
     expect(
       loadMCPConfigFromEnv({ [MCP_ENDPOINT_ENV]: '/tools' }).endpoint
     ).toBe('/tools');
@@ -62,7 +62,7 @@ describe('loadMCPConfigFromEnv', () => {
     ).toBe(600_000);
   });
 
-  it('keeps MCP_MAX_RETRIES=0 (retry forever) and rejects negatives', () => {
+  it('keeps A2A_MCP_MAX_RETRIES=0 (retry forever) and rejects negatives', () => {
     expect(
       loadMCPConfigFromEnv({ [MCP_MAX_RETRIES_ENV]: '0' }).maxRetries
     ).toBe(0);
