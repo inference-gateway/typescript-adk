@@ -81,7 +81,10 @@ export function parseDurationMs(
   }
   let total = 0;
   let matched = false;
-  const re = /(\d+(?:\.\d+)?)(ms|s|m|h)/g;
+  // Sticky (`y`) anchors each match at lastIndex, so a long digit run with no
+  // unit can't trigger the O(n^2) multi-start rescan CodeQL flags on the global
+  // form - and it mirrors Go's contiguous number+unit parsing.
+  const re = /(\d+(?:\.\d+)?)(ms|s|m|h)/y;
   let m: RegExpExecArray | null;
   while ((m = re.exec(trimmed)) !== null) {
     matched = true;

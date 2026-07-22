@@ -333,7 +333,13 @@ export class MCPClient implements MCPToolProvider {
  * `new URL(endpoint, base)`, which would discard any base path.
  */
 export function joinEndpoint(baseUrl: string, endpoint: string): string {
-  const base = baseUrl.replace(/\/+$/, '');
+  // Trim trailing slashes with an O(n) walk rather than /\/+$/, which CodeQL
+  // flags as polynomial-backtracking on adversarial input.
+  let end = baseUrl.length;
+  while (end > 0 && baseUrl[end - 1] === '/') {
+    end--;
+  }
+  const base = baseUrl.slice(0, end);
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return `${base}${path}`;
 }
