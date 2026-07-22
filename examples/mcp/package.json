@@ -1,0 +1,21 @@
+{
+  "name": "@inference-gateway/adk-example-mcp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MCP client example for @inference-gateway/adk - an LLM-backed A2A agent that discovers and invokes tools from MCP servers via the mcp_list_tools / mcp_call_tool selector tools.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx server.ts",
+    "start:server": "tsx server.ts",
+    "start:client": "tsx client.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@inference-gateway/adk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^7.0.2"
+  }
+}

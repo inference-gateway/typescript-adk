@@ -95,6 +95,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1055.0",
     "@hono/node-server": "^2.0.4",
     "@inference-gateway/sdk": "^0.12.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/auto-instrumentations-node": "0.78.0",
     "@opentelemetry/exporter-logs-otlp-http": "0.220.0",
