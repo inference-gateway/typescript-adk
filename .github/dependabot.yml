@@ -8,6 +8,12 @@ updates:
       npm:
         patterns:
           - '*'
+    # typescript-eslint (peer <6.1.0) and tsup's dts plugin don't support TS 7 yet;
+    # the 7.x bump has been reverted 3x. Stay on 6.x until they catch up.
+    ignore:
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
