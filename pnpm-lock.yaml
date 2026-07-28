@@ -18,8 +18,8 @@ importers:
         specifier: ^2.0.4
         version: 2.0.12(hono@4.12.32)
       '@inference-gateway/sdk':
-        specifier: ^0.15.0
-        version: 0.15.0
+        specifier: ^0.17.0
+        version: 0.17.0
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@4.4.3)
@@ -931,8 +931,8 @@ packages:
     resolution: {integrity: sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==}
     engines: {node: '>=18.18'}
 
-  '@inference-gateway/sdk@0.15.0':
-    resolution: {integrity: sha512-k4XWN+T/zyjMS0AZWTEO0b4sCi0Id5iHBDRfYDeWE/ppOfu5vb5gE77RUn0hQA/YfniEGMgyh/noh14HAwii0g==}
+  '@inference-gateway/sdk@0.17.0':
+    resolution: {integrity: sha512-v8i7PunTL5PbhvNkfXidf1T0v94DyntgR4uCjd65st7eTrGhzarB3bRub/S/1qjkPaYLAtnqyh5wIVyS4TRlLQ==}
     engines: {node: '>=24.15.0'}
     peerDependencies:
       node-fetch: ^2.7.0
@@ -3935,7 +3935,7 @@ snapshots:
 
   '@humanwhocodes/retry@0.4.3': {}
 
-  '@inference-gateway/sdk@0.15.0': {}
+  '@inference-gateway/sdk@0.17.0': {}
 
   '@ioredis/as-callback@3.0.0': {}
 
