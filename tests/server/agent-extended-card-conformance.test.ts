@@ -310,8 +310,7 @@ describe('agent/getAuthenticatedExtendedCard conformance', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { error: { code: number } };
     expect(body.error.code).toBe(
-      JSONRPC_ERROR_CODES
-        .AUTHENTICATED_EXTENDED_CARD_NOT_CONFIGURED_ERROR
+      JSONRPC_ERROR_CODES.AUTHENTICATED_EXTENDED_CARD_NOT_CONFIGURED_ERROR
     );
   });
 });

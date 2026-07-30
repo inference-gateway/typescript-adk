@@ -135,8 +135,7 @@ describe('createGetAuthenticatedExtendedCardHandler', () => {
       handler(undefined, ctx);
     } catch (err) {
       expect((err as JSONRPCError).code).toBe(
-        JSONRPC_ERROR_CODES
-          .AUTHENTICATED_EXTENDED_CARD_NOT_CONFIGURED_ERROR
+        JSONRPC_ERROR_CODES.AUTHENTICATED_EXTENDED_CARD_NOT_CONFIGURED_ERROR
       );
     }
   });

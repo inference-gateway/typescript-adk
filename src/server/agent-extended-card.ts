@@ -76,8 +76,7 @@ export function createGetAuthenticatedExtendedCardHandler(
     }
     if (card === undefined) {
       throw new JSONRPCError(
-        JSONRPC_ERROR_CODES
-          .AUTHENTICATED_EXTENDED_CARD_NOT_CONFIGURED_ERROR,
+        JSONRPC_ERROR_CODES.AUTHENTICATED_EXTENDED_CARD_NOT_CONFIGURED_ERROR,
         'authenticated extended card is not configured'
       );
     }
