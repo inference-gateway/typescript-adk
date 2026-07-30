@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.15.0](https://github.com/inference-gateway/typescript-adk/compare/v0.14.0...v0.15.0) (2026-07-30)
+
+### ✨ Features
+
+* **jsonrpc:** add A2A spec error codes -32004 and -32007 ([#195](https://github.com/inference-gateway/typescript-adk/issues/195)) ([0ecc3bf](https://github.com/inference-gateway/typescript-adk/commit/0ecc3bfcf59a4121364c94c729d58f99b9f144da))
+
+### 👷 CI
+
+* **claude:** centralize claude.yml via reusable workflow ([#185](https://github.com/inference-gateway/typescript-adk/issues/185)) ([214db98](https://github.com/inference-gateway/typescript-adk/commit/214db989ed82feaa66a50a76682715075d86cf4d))
+* **claude:** centralize claude.yml via reusable workflow ([#186](https://github.com/inference-gateway/typescript-adk/issues/186)) ([6da005b](https://github.com/inference-gateway/typescript-adk/commit/6da005ba599939b791fb79e83d3bb4c4e5860d1f))
+* **claude:** centralize claude.yml via reusable workflow ([#191](https://github.com/inference-gateway/typescript-adk/issues/191)) ([ecfa7af](https://github.com/inference-gateway/typescript-adk/commit/ecfa7afc74c0448064b35e9efd0bca0cdde990e9))
+* **claude:** centralize claude.yml via reusable workflow ([#193](https://github.com/inference-gateway/typescript-adk/issues/193)) ([942290a](https://github.com/inference-gateway/typescript-adk/commit/942290a2670e8175fd5c5b1cfb6aa64c37e7bb6a))
+
+### 🔧 Miscellaneous
+
+* **deps:** bump @hono/node-server from 1.19.14 to 2.0.11 ([#184](https://github.com/inference-gateway/typescript-adk/issues/184)) ([edbf021](https://github.com/inference-gateway/typescript-adk/commit/edbf021518ad1f2a270817f87f814b9cb9d7760f))
+* **deps:** bump @inference-gateway/sdk from ^0.15.0 to ^0.17.0 ([#192](https://github.com/inference-gateway/typescript-adk/issues/192)) ([cec64c4](https://github.com/inference-gateway/typescript-adk/commit/cec64c48a2602dec3759afa6fc127a9e33882b63))
+* **deps:** bump actions/checkout in the github-actions group ([#187](https://github.com/inference-gateway/typescript-adk/issues/187)) ([e0b4d89](https://github.com/inference-gateway/typescript-adk/commit/e0b4d890b87a2a2b16ac4053ca703c1ecdf8275a))
+* **deps:** bump infer CLI v0.147.1 -> v0.153.1 ([#189](https://github.com/inference-gateway/typescript-adk/issues/189)) ([16deeb7](https://github.com/inference-gateway/typescript-adk/commit/16deeb70d688fadea9ec96e698f763adac482d44))
+* **deps:** bump the npm group with 22 updates ([#188](https://github.com/inference-gateway/typescript-adk/issues/188)) ([5c68864](https://github.com/inference-gateway/typescript-adk/commit/5c688645bb8b01497b4fbfeabebb958ec98ffd00))
+* **deps:** ignore typescript major bumps, keep root on 6.x ([#190](https://github.com/inference-gateway/typescript-adk/issues/190)) ([30d5001](https://github.com/inference-gateway/typescript-adk/commit/30d50016f20352e989ebc6cd7458364876a80517)), references [#181](https://github.com/inference-gateway/typescript-adk/issues/181) [#188](https://github.com/inference-gateway/typescript-adk/issues/188)
+* **release:** update GitHub App client ID to use RELEASER_APP_CLIENT_ID ([fd1ab90](https://github.com/inference-gateway/typescript-adk/commit/fd1ab90da291c2370b3e155cfcbb45d69f4c90c9))
+
 ## [0.14.0](https://github.com/inference-gateway/typescript-adk/compare/v0.13.0...v0.14.0) (2026-07-22)
 
 ### ✨ Features
