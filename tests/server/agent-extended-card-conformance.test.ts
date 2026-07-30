@@ -254,7 +254,7 @@ describe('agent/getAuthenticatedExtendedCard conformance', () => {
     expect(body.supportsExtendedAgentCard).toBe(true);
   });
 
-  it('returns method-not-found when no extended card is configured', async () => {
+  it('returns unsupported-operation-error when supportsExtendedAgentCard is false', async () => {
     const server = createA2AServer({
       card: publicCard({ supportsExtendedAgentCard: false }),
       authenticator: new OIDCAuthenticator(buildVerifier()),
@@ -279,6 +279,38 @@ describe('agent/getAuthenticatedExtendedCard conformance', () => {
 
     expect(res.status).toBe(200);
     const body = (await res.json()) as { error: { code: number } };
-    expect(body.error.code).toBe(JSONRPC_ERROR_CODES.METHOD_NOT_FOUND);
+    expect(body.error.code).toBe(
+      JSONRPC_ERROR_CODES.UNSUPPORTED_OPERATION_ERROR
+    );
+  });
+
+  it('returns not-configured-error when supportsExtendedAgentCard is true but no extended card', async () => {
+    const server = createA2AServer({
+      card: publicCard({ supportsExtendedAgentCard: true }),
+      authenticator: new OIDCAuthenticator(buildVerifier()),
+    });
+    const { baseUrl, close: stop } = await startServer(server);
+    close = stop;
+
+    const token = await signTestToken(key, {
+      issuer: ISSUER,
+      audience: CLIENT_ID,
+      subject: 'user-1',
+    });
+    const res = await postJSON(
+      baseUrl,
+      {
+        jsonrpc: JSONRPC_VERSION,
+        method: GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
+        id: 6,
+      },
+      token
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { error: { code: number } };
+    expect(body.error.code).toBe(
+      JSONRPC_ERROR_CODES.AUTHENTICATED_EXTENDED_CARD_NOT_CONFIGURED_ERROR
+    );
   });
 });

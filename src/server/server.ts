@@ -77,9 +77,12 @@ export interface A2AServerConfig {
   readonly card: AgentCard;
   /**
    * Optional extended agent card returned to authenticated callers via the
-   * `agent/getAuthenticatedExtendedCard` JSON-RPC method. When provided, the
-   * server auto-registers that method; when omitted, the method is not
-   * registered and calls receive `-32601 method not found`.
+   * `agent/getAuthenticatedExtendedCard` JSON-RPC method. The handler is
+   * always registered regardless of this field; when omitted, the method
+   * returns `-32004` (UnsupportedOperationError) if
+   * {@link AgentCard.supportsExtendedAgentCard} is false/absent, or `-32007`
+   * (AuthenticatedExtendedCardNotConfiguredError) if the card advertises
+   * support but no extended card was provided.
    *
    * The extended card typically wraps {@link card} and adds auth schemes plus
    * any capabilities the agent only exposes after authentication. Pair this
@@ -211,14 +214,16 @@ export class A2AServer {
     this.telemetry = config.telemetry;
     this.tlsEnabled = config.tls !== undefined;
 
-    if (config.extendedCard !== undefined) {
-      this.registry.register(
-        GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
-        createGetAuthenticatedExtendedCardHandler({
-          card: config.extendedCard,
-        })
-      );
-    }
+    this.registry.register(
+      GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
+      createGetAuthenticatedExtendedCardHandler({
+        ...(config.extendedCard !== undefined
+          ? { card: config.extendedCard }
+          : {}),
+        supportsExtendedAgentCard:
+          config.card.supportsExtendedAgentCard ?? false,
+      })
+    );
 
     this.app = this.buildApp();
     if (config.tls !== undefined) {

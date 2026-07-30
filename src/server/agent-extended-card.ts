@@ -33,8 +33,17 @@ export interface GetAuthenticatedExtendedCardHandlerOptions {
    *
    * The handler returns this object verbatim - callers are responsible for
    * ensuring it doesn't leak data the caller shouldn't see.
+   *
+   * When omitted and `supportsExtendedAgentCard` is true, the handler returns
+   * `-32007` (AuthenticatedExtendedCardNotConfiguredError).
    */
-  readonly card: AgentCard;
+  readonly card?: AgentCard;
+  /**
+   * Whether the public agent card advertises `supportsExtendedAgentCard`.
+   * When absent or false, the handler returns `-32004`
+   * (UnsupportedOperationError) per A2A spec 3.3.4.
+   */
+  readonly supportsExtendedAgentCard?: boolean;
 }
 
 /**
@@ -55,10 +64,22 @@ export interface GetAuthenticatedExtendedCardHandlerOptions {
 export function createGetAuthenticatedExtendedCardHandler(
   options: GetAuthenticatedExtendedCardHandlerOptions
 ): MethodHandler<unknown, AgentCard> {
-  const { card } = options;
+  const { card, supportsExtendedAgentCard } = options;
 
   return (params: unknown): AgentCard => {
     validateParams(params);
+    if (!supportsExtendedAgentCard) {
+      throw new JSONRPCError(
+        JSONRPC_ERROR_CODES.UNSUPPORTED_OPERATION_ERROR,
+        'agent does not support extended agent card'
+      );
+    }
+    if (card === undefined) {
+      throw new JSONRPCError(
+        JSONRPC_ERROR_CODES.AUTHENTICATED_EXTENDED_CARD_NOT_CONFIGURED_ERROR,
+        'authenticated extended card is not configured'
+      );
+    }
     return card;
   };
 }
