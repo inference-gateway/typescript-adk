@@ -43,7 +43,10 @@ describe('createGetAuthenticatedExtendedCardHandler', () => {
 
   it('returns the configured extended card verbatim when params is absent', () => {
     const card = makeExtendedCard();
-    const handler = createGetAuthenticatedExtendedCardHandler({ card });
+    const handler = createGetAuthenticatedExtendedCardHandler({
+      card,
+      supportsExtendedAgentCard: true,
+    });
 
     const result = handler(undefined, ctx);
 
@@ -52,7 +55,10 @@ describe('createGetAuthenticatedExtendedCardHandler', () => {
 
   it('returns the card when params is an empty object', () => {
     const card = makeExtendedCard();
-    const handler = createGetAuthenticatedExtendedCardHandler({ card });
+    const handler = createGetAuthenticatedExtendedCardHandler({
+      card,
+      supportsExtendedAgentCard: true,
+    });
 
     const result = handler({}, ctx);
 
@@ -61,7 +67,10 @@ describe('createGetAuthenticatedExtendedCardHandler', () => {
 
   it('returns the card when params has a string tenant', () => {
     const card = makeExtendedCard();
-    const handler = createGetAuthenticatedExtendedCardHandler({ card });
+    const handler = createGetAuthenticatedExtendedCardHandler({
+      card,
+      supportsExtendedAgentCard: true,
+    });
 
     const result = handler({ tenant: 'acme' }, ctx);
 
@@ -71,6 +80,7 @@ describe('createGetAuthenticatedExtendedCardHandler', () => {
   it('rejects array params with -32602', () => {
     const handler = createGetAuthenticatedExtendedCardHandler({
       card: makeExtendedCard(),
+      supportsExtendedAgentCard: true,
     });
 
     expect(() => handler([], ctx)).toThrow(JSONRPCError);
@@ -86,6 +96,7 @@ describe('createGetAuthenticatedExtendedCardHandler', () => {
   it('rejects non-string tenant with -32602', () => {
     const handler = createGetAuthenticatedExtendedCardHandler({
       card: makeExtendedCard(),
+      supportsExtendedAgentCard: true,
     });
 
     expect(() => handler({ tenant: 42 }, ctx)).toThrow(JSONRPCError);
@@ -94,6 +105,38 @@ describe('createGetAuthenticatedExtendedCardHandler', () => {
     } catch (err) {
       expect((err as JSONRPCError).code).toBe(
         JSONRPC_ERROR_CODES.INVALID_PARAMS
+      );
+    }
+  });
+
+  it('throws -32004 when supportsExtendedAgentCard is false', () => {
+    const handler = createGetAuthenticatedExtendedCardHandler({
+      card: makeExtendedCard(),
+      supportsExtendedAgentCard: false,
+    });
+
+    expect(() => handler(undefined, ctx)).toThrow(JSONRPCError);
+    try {
+      handler(undefined, ctx);
+    } catch (err) {
+      expect((err as JSONRPCError).code).toBe(
+        JSONRPC_ERROR_CODES.UNSUPPORTED_OPERATION_ERROR
+      );
+    }
+  });
+
+  it('throws -32007 when supportsExtendedAgentCard is true but no card', () => {
+    const handler = createGetAuthenticatedExtendedCardHandler({
+      supportsExtendedAgentCard: true,
+    });
+
+    expect(() => handler(undefined, ctx)).toThrow(JSONRPCError);
+    try {
+      handler(undefined, ctx);
+    } catch (err) {
+      expect((err as JSONRPCError).code).toBe(
+        JSONRPC_ERROR_CODES
+          .AUTHENTICATED_EXTENDED_CARD_NOT_CONFIGURED_ERROR
       );
     }
   });

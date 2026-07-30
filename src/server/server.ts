@@ -211,14 +211,16 @@ export class A2AServer {
     this.telemetry = config.telemetry;
     this.tlsEnabled = config.tls !== undefined;
 
-    if (config.extendedCard !== undefined) {
-      this.registry.register(
-        GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
-        createGetAuthenticatedExtendedCardHandler({
-          card: config.extendedCard,
-        })
-      );
-    }
+    this.registry.register(
+      GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
+      createGetAuthenticatedExtendedCardHandler({
+        ...(config.extendedCard !== undefined
+          ? { card: config.extendedCard }
+          : {}),
+        supportsExtendedAgentCard:
+          config.card.supportsExtendedAgentCard ?? false,
+      })
+    );
 
     this.app = this.buildApp();
     if (config.tls !== undefined) {
