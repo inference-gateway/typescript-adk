@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.15.1](https://github.com/inference-gateway/typescript-adk/compare/v0.15.0...v0.15.1) (2026-08-26)
+
+### 🐛 Bug Fixes
+
+* **auth:** fail closed on broken config and align enable env vars to *_ENABLED ([#206](https://github.com/inference-gateway/typescript-adk/issues/206)) ([4e20d86](https://github.com/inference-gateway/typescript-adk/commit/4e20d86a08a5d4fdd29e645f0b2531d1580cc3e0)), references [#282](https://github.com/inference-gateway/typescript-adk/issues/282)
+
+### 👷 CI
+
+* **claude:** centralize claude.yml via reusable workflow ([#197](https://github.com/inference-gateway/typescript-adk/issues/197)) ([44e7965](https://github.com/inference-gateway/typescript-adk/commit/44e7965139c7c19c673689dc91938709521d6bd0))
+* **claude:** centralize claude.yml via reusable workflow ([#198](https://github.com/inference-gateway/typescript-adk/issues/198)) ([ebddf56](https://github.com/inference-gateway/typescript-adk/commit/ebddf56823374089e027216e2d1f5ccfdc76ee86))
+
+### 🔧 Miscellaneous
+
+* **deps:** bump hono from 4.12.32 to 4.12.34 ([#200](https://github.com/inference-gateway/typescript-adk/issues/200)) ([7d4cfbc](https://github.com/inference-gateway/typescript-adk/commit/7d4cfbcea8960c89dfa75fbd2cb0fb38e0863eb0))
+* **deps:** bump infer CLI v0.153.1 -> v0.155.0 ([#196](https://github.com/inference-gateway/typescript-adk/issues/196)) ([f64f72a](https://github.com/inference-gateway/typescript-adk/commit/f64f72a07958db038e56fec7c4004934f94856ef))
+* **deps:** bump infer CLI v0.155.0 -> v0.164.0 ([#201](https://github.com/inference-gateway/typescript-adk/issues/201)) ([b4e28eb](https://github.com/inference-gateway/typescript-adk/commit/b4e28ebac3f95c61501c53d654e018f9f4777d12))
+* **deps:** bump pnpm/action-setup in the github-actions group ([#202](https://github.com/inference-gateway/typescript-adk/issues/202)) ([074f771](https://github.com/inference-gateway/typescript-adk/commit/074f771cd3d5a8e88e88905d60c2792101bcc75b))
+* **deps:** bump the npm group with 10 updates ([#204](https://github.com/inference-gateway/typescript-adk/issues/204)) ([2fa2e66](https://github.com/inference-gateway/typescript-adk/commit/2fa2e66a6db69c6c0acf94e4f401a61e59babd3f))
+* **deps:** bump the npm group with 11 updates ([#203](https://github.com/inference-gateway/typescript-adk/issues/203)) ([41971d6](https://github.com/inference-gateway/typescript-adk/commit/41971d62685273e842f0ab4e3e5c7600e7b2e2dd))
+* **deps:** bump the npm group with 5 updates ([#199](https://github.com/inference-gateway/typescript-adk/issues/199)) ([377a302](https://github.com/inference-gateway/typescript-adk/commit/377a302503655f1aa59498e7cd6ea455d30b040a))
+* **deps:** bump the npm group with 6 updates ([#205](https://github.com/inference-gateway/typescript-adk/issues/205)) ([0b05085](https://github.com/inference-gateway/typescript-adk/commit/0b05085c9d40bf5461b60429243f44b01fee94ba))
+
 ## [0.15.0](https://github.com/inference-gateway/typescript-adk/compare/v0.14.0...v0.15.0) (2026-07-30)
 
 ### ✨ Features
