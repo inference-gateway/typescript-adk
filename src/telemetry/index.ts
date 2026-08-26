@@ -12,7 +12,7 @@ export {
   OTEL_METRICS_EXPORTER_ENV,
   OTEL_SERVICE_NAME_ENV,
   OTEL_SERVICE_VERSION_ENV,
-  TELEMETRY_ENABLE_ENV,
+  TELEMETRY_ENABLED_ENV,
   loadTelemetryConfigFromEnv,
 } from './config.js';
 export type { MetricsExporter, TelemetryConfig } from './config.js';

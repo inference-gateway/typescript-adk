@@ -9,7 +9,7 @@ import { TLSConfigError } from './errors.js';
  * `'true'`, `'1'`, `'yes'`, or `'on'`. Any other value - including an empty
  * string or unset - returns `undefined` from the loader.
  */
-export const TLS_ENABLE_ENV = 'TLS_ENABLE';
+export const TLS_ENABLED_ENV = 'TLS_ENABLED';
 /** Env var holding the path to the server's TLS certificate (PEM). */
 export const TLS_CERT_PATH_ENV = 'TLS_CERT_PATH';
 /** Env var holding the path to the server's TLS private key (PEM). */
@@ -27,7 +27,7 @@ export const TLS_PASSPHRASE_ENV = 'TLS_PASSPHRASE';
  * client certificate (`requestCert: true`) and rejects connections that do
  * not present one signed by the configured {@link TLS_CA_PATH_ENV} bundle
  * (`rejectUnauthorized: true`). Truthy values match the same set as
- * {@link TLS_ENABLE_ENV}.
+ * {@link TLS_ENABLED_ENV}.
  */
 export const TLS_CLIENT_AUTH_ENV = 'TLS_CLIENT_AUTH';
 
@@ -115,7 +115,7 @@ export function buildServerTLSOptions(
 
 /**
  * Read a TLS config from environment variables. Returns `undefined` when
- * {@link TLS_ENABLE_ENV} is not set to a truthy value, so callers can use
+ * {@link TLS_ENABLED_ENV} is not set to a truthy value, so callers can use
  * the result in an optional config slot without an `if` ladder.
  *
  * Throws {@link TLSConfigError} when TLS is enabled but
@@ -128,7 +128,7 @@ export function buildServerTLSOptions(
 export function loadServerTLSConfigFromEnv(
   env: NodeJS.ProcessEnv = process.env
 ): ServerTLSConfig | undefined {
-  if (!isTruthyEnv(env[TLS_ENABLE_ENV])) {
+  if (!isTruthyEnv(env[TLS_ENABLED_ENV])) {
     return undefined;
   }
 
@@ -137,12 +137,12 @@ export function loadServerTLSConfigFromEnv(
 
   if (typeof certPath !== 'string' || certPath.length === 0) {
     throw new TLSConfigError(
-      `${TLS_ENABLE_ENV}=true but ${TLS_CERT_PATH_ENV} is unset`
+      `${TLS_ENABLED_ENV}=true but ${TLS_CERT_PATH_ENV} is unset`
     );
   }
   if (typeof keyPath !== 'string' || keyPath.length === 0) {
     throw new TLSConfigError(
-      `${TLS_ENABLE_ENV}=true but ${TLS_KEY_PATH_ENV} is unset`
+      `${TLS_ENABLED_ENV}=true but ${TLS_KEY_PATH_ENV} is unset`
     );
   }
 

@@ -16,7 +16,7 @@ import {
   ATTR_JSONRPC_METHOD,
   ATTR_JSONRPC_REQUEST_ID,
   SPAN_NAME_JSONRPC_REQUEST,
-  TELEMETRY_ENABLE_ENV,
+  TELEMETRY_ENABLED_ENV,
   TelemetryProvider,
 } from '../../src/telemetry/index.js';
 import type { AgentCard } from '../../src/types/generated/a2a.js';
@@ -61,7 +61,7 @@ describe('A2AServer emits JSON-RPC spans when a TelemetryProvider is supplied', 
   beforeAll(() => {
     exporter = new InMemorySpanExporter();
     provider = new TelemetryProvider({
-      env: { [TELEMETRY_ENABLE_ENV]: 'true' },
+      env: { [TELEMETRY_ENABLED_ENV]: 'true' },
       serviceName: 'telemetry-agent',
       serviceVersion: '1.0.0',
       spanProcessors: [new SimpleSpanProcessor(exporter)],

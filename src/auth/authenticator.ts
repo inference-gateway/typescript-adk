@@ -167,9 +167,10 @@ export interface CreateAuthenticatorOptions {
 /**
  * Build the appropriate {@link Authenticator} for `options.config`:
  *
- *  - If auth is disabled or required fields are missing, returns a
- *    {@link NoopAuthenticator}. Missing fields with `enable=true` are logged
- *    as a warning.
+ *  - If auth is disabled, returns a {@link NoopAuthenticator}.
+ *  - If auth is enabled but required fields are missing, throws - the server
+ *    fails closed on explicit-but-broken config instead of silently booting
+ *    unauthenticated (matching the Go ADK since v0.26.4).
  *  - Otherwise fetches the OIDC discovery document and returns a fully
  *    configured {@link OIDCAuthenticator}.
  *
@@ -179,17 +180,15 @@ export interface CreateAuthenticatorOptions {
 export async function createAuthenticator(
   options: CreateAuthenticatorOptions
 ): Promise<Authenticator> {
-  const logger = options.logger ?? NOOP_LOGGER;
   const config = options.config;
 
   if (!config.enable) {
     return new NoopAuthenticator();
   }
   if (!isAuthConfigComplete(config)) {
-    logger.warn(
-      'auth: AUTH_ENABLE=true but required fields are missing (AUTH_ISSUER_URL, AUTH_CLIENT_ID, AUTH_CLIENT_SECRET); authentication disabled'
+    throw new Error(
+      'auth: AUTH_ENABLED=true but required fields are missing (AUTH_ISSUER_URL, AUTH_CLIENT_ID, AUTH_CLIENT_SECRET)'
     );
-    return new NoopAuthenticator();
   }
 
   const fetchMetadata =
@@ -216,7 +215,7 @@ export async function createAuthenticator(
     ).clockToleranceSeconds = options.clockToleranceSeconds;
   }
   const verifier = createOIDCVerifier(verifierOptions);
-  return new OIDCAuthenticator(verifier, logger);
+  return new OIDCAuthenticator(verifier, options.logger ?? NOOP_LOGGER);
 }
 
 function jsonRpcUnauthorized(

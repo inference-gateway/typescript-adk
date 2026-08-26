@@ -9,7 +9,7 @@
  * The OTLP exporter honours the standard OpenTelemetry environment variables
  * (`OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS`,
  * `OTEL_EXPORTER_OTLP_PROTOCOL`) - this config layer only adds the
- * inference-gateway-org-specific `TELEMETRY_ENABLE` toggle and the
+ * inference-gateway-org-specific `TELEMETRY_ENABLED` toggle and the
  * `OTEL_SERVICE_NAME`/`OTEL_SERVICE_VERSION` defaults pulled from the agent
  * card when the server constructs the provider.
  */
@@ -68,7 +68,7 @@ export type MetricsExporter = 'otlp' | 'prometheus' | 'none';
  * without flipping the global OTel kill-switch (which would also disable any
  * SDK initialised by a parent process or sidecar).
  */
-export const TELEMETRY_ENABLE_ENV = 'TELEMETRY_ENABLE';
+export const TELEMETRY_ENABLED_ENV = 'TELEMETRY_ENABLED';
 
 /**
  * Standard OpenTelemetry env var for the `service.name` resource attribute.
@@ -209,7 +209,7 @@ function parsePort(raw: string | undefined, fallback: number): number {
  * Read telemetry configuration from an environment-shaped map (defaults to
  * `process.env`). Recognised keys:
  *
- * - {@link TELEMETRY_ENABLE_ENV} - bool, default `false`
+ * - {@link TELEMETRY_ENABLED_ENV} - bool, default `false`
  * - {@link OTEL_SERVICE_NAME_ENV} - service name, default {@link DEFAULT_SERVICE_NAME}
  * - {@link OTEL_SERVICE_VERSION_ENV} - service version, default {@link DEFAULT_SERVICE_VERSION}
  * - {@link OTEL_METRICS_EXPORTER_ENV} - `otlp`/`prometheus`/`none`, default {@link DEFAULT_METRICS_EXPORTER}
@@ -225,7 +225,7 @@ export function loadTelemetryConfigFromEnv(
   env: Readonly<Record<string, string | undefined>> = process.env
 ): TelemetryConfig {
   return {
-    enable: parseBool(env[TELEMETRY_ENABLE_ENV]),
+    enable: parseBool(env[TELEMETRY_ENABLED_ENV]),
     serviceName: env[OTEL_SERVICE_NAME_ENV] ?? DEFAULT_SERVICE_NAME,
     serviceVersion: env[OTEL_SERVICE_VERSION_ENV] ?? DEFAULT_SERVICE_VERSION,
     metricsExporter: parseMetricsExporter(env[OTEL_METRICS_EXPORTER_ENV]),

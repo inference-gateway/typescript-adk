@@ -4,7 +4,7 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
-  TELEMETRY_ENABLE_ENV,
+  TELEMETRY_ENABLED_ENV,
   TelemetryProvider,
   createTelemetryProvider,
 } from '../../src/telemetry/index.js';
@@ -48,7 +48,7 @@ describe('TelemetryProvider span emission', () => {
   beforeAll(() => {
     exporter = new InMemorySpanExporter();
     provider = new TelemetryProvider({
-      env: { [TELEMETRY_ENABLE_ENV]: 'true' },
+      env: { [TELEMETRY_ENABLED_ENV]: 'true' },
       serviceName: 'test-svc',
       serviceVersion: '1.0.0',
       spanProcessors: [new SimpleSpanProcessor(exporter)],

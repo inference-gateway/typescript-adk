@@ -26,9 +26,9 @@ const HOST = process.env['A2A_SERVER_HOST'] ?? '127.0.0.1';
 const tls: ServerTLSConfig | undefined = loadServerTLSConfigFromEnv();
 if (tls === undefined) {
   console.error(
-    'TLS_ENABLE must be true and TLS_CERT_PATH / TLS_KEY_PATH must be set.\n' +
+    'TLS_ENABLED must be true and TLS_CERT_PATH / TLS_KEY_PATH must be set.\n' +
       "Hint: run './generate-certs.sh' then\n" +
-      '  TLS_ENABLE=true \\\n' +
+      '  TLS_ENABLED=true \\\n' +
       '  TLS_CERT_PATH=./certs/cert.pem \\\n' +
       '  TLS_KEY_PATH=./certs/key.pem \\\n' +
       '  pnpm --filter @inference-gateway/adk-example-tls-server start:server'

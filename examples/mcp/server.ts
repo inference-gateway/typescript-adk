@@ -87,7 +87,7 @@ const agent = new AgentBuilder()
 
 const toolBox = new DefaultToolBox();
 
-// Wire the MCP client behind A2A_MCP_ENABLE. Returns undefined when MCP is
+// Wire the MCP client behind A2A_MCP_ENABLED. Returns undefined when MCP is
 // disabled or no servers are configured, so the agent simply runs without MCP
 // tools.
 const mcpClient = createMCPClientFromEnv({ logger });
@@ -99,7 +99,7 @@ if (mcpClient !== undefined) {
   });
 } else {
   logger.warn(
-    'mcp client disabled (set A2A_MCP_ENABLE=true and A2A_MCP_SERVERS=<urls> to enable)'
+    'mcp client disabled (set A2A_MCP_ENABLED=true and A2A_MCP_SERVERS=<urls> to enable)'
   );
 }
 

@@ -6,7 +6,7 @@ import {
   DEFAULT_METRICS_PORT,
   DEFAULT_METRICS_READ_TIMEOUT_MS,
   DEFAULT_METRICS_WRITE_TIMEOUT_MS,
-  METRICS_ENABLE_ENV,
+  METRICS_ENABLED_ENV,
   METRICS_HOST_ENV,
   METRICS_IDLE_TIMEOUT_MS_ENV,
   METRICS_PATH_ENV,
@@ -15,7 +15,7 @@ import {
   METRICS_WRITE_TIMEOUT_MS_ENV,
   loadMetricsConfigFromEnv,
 } from '../../src/metrics/index.js';
-import { TELEMETRY_ENABLE_ENV } from '../../src/telemetry/index.js';
+import { TELEMETRY_ENABLED_ENV } from '../../src/telemetry/index.js';
 
 describe('loadMetricsConfigFromEnv', () => {
   it('defaults to disabled with the standard port/host/path when env is empty', () => {
@@ -31,33 +31,33 @@ describe('loadMetricsConfigFromEnv', () => {
     });
   });
 
-  it('METRICS_ENABLE truthy values turn the server on', () => {
+  it('METRICS_ENABLED truthy values turn the server on', () => {
     for (const value of ['1', 'true', 'TRUE', 'yes', 'on']) {
-      const cfg = loadMetricsConfigFromEnv({ [METRICS_ENABLE_ENV]: value });
+      const cfg = loadMetricsConfigFromEnv({ [METRICS_ENABLED_ENV]: value });
       expect(cfg.enable, `value=${value}`).toBe(true);
     }
   });
 
-  it('METRICS_ENABLE falsy values keep the server off', () => {
+  it('METRICS_ENABLED falsy values keep the server off', () => {
     for (const value of ['0', 'false', 'no', 'off', '', 'nonsense']) {
-      const cfg = loadMetricsConfigFromEnv({ [METRICS_ENABLE_ENV]: value });
+      const cfg = loadMetricsConfigFromEnv({ [METRICS_ENABLED_ENV]: value });
       expect(cfg.enable, `value=${value}`).toBe(false);
     }
   });
 
-  it('falls back to TELEMETRY_ENABLE when METRICS_ENABLE is unset', () => {
+  it('falls back to TELEMETRY_ENABLED when METRICS_ENABLED is unset', () => {
     expect(
-      loadMetricsConfigFromEnv({ [TELEMETRY_ENABLE_ENV]: 'true' }).enable
+      loadMetricsConfigFromEnv({ [TELEMETRY_ENABLED_ENV]: 'true' }).enable
     ).toBe(true);
     expect(
-      loadMetricsConfigFromEnv({ [TELEMETRY_ENABLE_ENV]: 'false' }).enable
+      loadMetricsConfigFromEnv({ [TELEMETRY_ENABLED_ENV]: 'false' }).enable
     ).toBe(false);
   });
 
-  it('METRICS_ENABLE takes precedence over TELEMETRY_ENABLE', () => {
+  it('METRICS_ENABLED takes precedence over TELEMETRY_ENABLED', () => {
     const cfg = loadMetricsConfigFromEnv({
-      [METRICS_ENABLE_ENV]: 'false',
-      [TELEMETRY_ENABLE_ENV]: 'true',
+      [METRICS_ENABLED_ENV]: 'false',
+      [TELEMETRY_ENABLED_ENV]: 'true',
     });
     expect(cfg.enable).toBe(false);
   });

@@ -162,7 +162,7 @@ describe('OIDCAuthenticator', () => {
 });
 
 describe('createAuthenticator', () => {
-  it('returns a noop when AUTH_ENABLE is false', async () => {
+  it('returns a noop when AUTH_ENABLED is false', async () => {
     const auth = await createAuthenticator({
       config: {
         enable: false,
@@ -175,21 +175,17 @@ describe('createAuthenticator', () => {
     expect(auth).toBeInstanceOf(NoopAuthenticator);
   });
 
-  it('returns a noop and warns when AUTH_ENABLE=true but required fields are missing', async () => {
-    const warn = vi.fn();
-    const auth = await createAuthenticator({
-      config: {
-        enable: true,
-        issuerUrl: '',
-        clientId: '',
-        clientSecret: '',
-      },
-      logger: { debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() },
-    });
-    expect(auth.enabled).toBe(false);
-    expect(warn).toHaveBeenCalledOnce();
-    const firstCall = warn.mock.calls[0];
-    expect(firstCall?.[0]).toMatch(/required fields are missing/);
+  it('throws when AUTH_ENABLED=true but required fields are missing', async () => {
+    await expect(
+      createAuthenticator({
+        config: {
+          enable: true,
+          issuerUrl: '',
+          clientId: '',
+          clientSecret: '',
+        },
+      })
+    ).rejects.toThrow(/required fields are missing/);
   });
 
   it('does not call the discovery fetch when disabled', async () => {

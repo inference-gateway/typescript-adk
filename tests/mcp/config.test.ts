@@ -7,7 +7,7 @@ import {
   DEFAULT_MCP_REFRESH_INTERVAL_MS,
   DEFAULT_MCP_RETRY_INTERVAL_MS,
   DEFAULT_MCP_RETRY_MAX_INTERVAL_MS,
-  MCP_ENABLE_ENV,
+  MCP_ENABLED_ENV,
   MCP_ENDPOINT_ENV,
   MCP_MAX_RETRIES_ENV,
   MCP_REFRESH_INTERVAL_ENV,
@@ -31,9 +31,9 @@ describe('loadMCPConfigFromEnv', () => {
     });
   });
 
-  it('parses truthy A2A_MCP_ENABLE values', () => {
+  it('parses truthy A2A_MCP_ENABLED values', () => {
     for (const value of ['1', 'true', 'TRUE', 'yes', 'on']) {
-      expect(loadMCPConfigFromEnv({ [MCP_ENABLE_ENV]: value }).enable).toBe(
+      expect(loadMCPConfigFromEnv({ [MCP_ENABLED_ENV]: value }).enable).toBe(
         true
       );
     }
