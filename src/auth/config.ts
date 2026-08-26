@@ -4,8 +4,8 @@
  *
  * `enable` defaults to false - disabled mode is a no-op middleware with zero
  * verification overhead. When `enable` is true but a required field is
- * missing, {@link loadAuthConfigFromEnv} returns a disabled config and the
- * builder logs a warning, matching the Go ADK's permissive boot behaviour.
+ * missing, the authenticator factory throws so the server fails closed on
+ * explicit-but-broken config, matching the Go ADK since v0.26.4.
  */
 export interface AuthConfig {
   readonly enable: boolean;
@@ -35,7 +35,7 @@ function parseBool(raw: string | undefined): boolean {
  * Read auth configuration from an environment-shaped map (defaults to
  * `process.env`). Recognised keys:
  *
- * - `AUTH_ENABLE` - bool, default `false`
+ * - `AUTH_ENABLED` - bool, default `false`
  * - `AUTH_ISSUER_URL` - OIDC issuer URL
  * - `AUTH_CLIENT_ID` - OAuth2 client id (used as the expected JWT `aud`)
  * - `AUTH_CLIENT_SECRET` - OAuth2 client secret
@@ -44,7 +44,7 @@ export function loadAuthConfigFromEnv(
   env: Readonly<Record<string, string | undefined>> = process.env
 ): AuthConfig {
   return {
-    enable: parseBool(env['AUTH_ENABLE']),
+    enable: parseBool(env['AUTH_ENABLED']),
     issuerUrl: env['AUTH_ISSUER_URL'] ?? '',
     clientId: env['AUTH_CLIENT_ID'] ?? '',
     clientSecret: env['AUTH_CLIENT_SECRET'] ?? '',
@@ -54,7 +54,7 @@ export function loadAuthConfigFromEnv(
 /**
  * Whether `config` has the minimum fields needed for real OIDC verification.
  * When this returns `false` and `config.enable` is `true`, the authenticator
- * factory degrades to a noop and emits a warning.
+ * factory throws instead of silently degrading to a noop.
  */
 export function isAuthConfigComplete(config: AuthConfig): boolean {
   return (

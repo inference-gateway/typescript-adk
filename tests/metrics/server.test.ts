@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_METRICS_HOST,
   DEFAULT_METRICS_PORT,
-  METRICS_ENABLE_ENV,
+  METRICS_ENABLED_ENV,
   METRICS_HEALTH_PATH,
   MetricsRegistry,
   MetricsServer,
@@ -54,7 +54,7 @@ describe('MetricsServer HTTP behaviour (enabled mode)', () => {
     registry.incrementTasksCompleted(3);
 
     server = new MetricsServer({
-      env: { [METRICS_ENABLE_ENV]: 'true' },
+      env: { [METRICS_ENABLED_ENV]: 'true' },
       config: {
         enable: true,
         port: 0,
@@ -78,7 +78,7 @@ describe('MetricsServer HTTP behaviour (enabled mode)', () => {
 
   it('serves /health independently of /metrics', async () => {
     server = new MetricsServer({
-      env: { [METRICS_ENABLE_ENV]: 'true' },
+      env: { [METRICS_ENABLED_ENV]: 'true' },
       config: {
         enable: true,
         port: 0,

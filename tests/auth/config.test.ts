@@ -13,18 +13,18 @@ describe('loadAuthConfigFromEnv', () => {
     expect(config.clientSecret).toBe('');
   });
 
-  it('parses AUTH_ENABLE as a boolean', () => {
-    expect(loadAuthConfigFromEnv({ AUTH_ENABLE: 'true' }).enable).toBe(true);
-    expect(loadAuthConfigFromEnv({ AUTH_ENABLE: '1' }).enable).toBe(true);
-    expect(loadAuthConfigFromEnv({ AUTH_ENABLE: 'YES' }).enable).toBe(true);
-    expect(loadAuthConfigFromEnv({ AUTH_ENABLE: 'false' }).enable).toBe(false);
-    expect(loadAuthConfigFromEnv({ AUTH_ENABLE: '0' }).enable).toBe(false);
-    expect(loadAuthConfigFromEnv({ AUTH_ENABLE: 'bogus' }).enable).toBe(false);
+  it('parses AUTH_ENABLED as a boolean', () => {
+    expect(loadAuthConfigFromEnv({ AUTH_ENABLED: 'true' }).enable).toBe(true);
+    expect(loadAuthConfigFromEnv({ AUTH_ENABLED: '1' }).enable).toBe(true);
+    expect(loadAuthConfigFromEnv({ AUTH_ENABLED: 'YES' }).enable).toBe(true);
+    expect(loadAuthConfigFromEnv({ AUTH_ENABLED: 'false' }).enable).toBe(false);
+    expect(loadAuthConfigFromEnv({ AUTH_ENABLED: '0' }).enable).toBe(false);
+    expect(loadAuthConfigFromEnv({ AUTH_ENABLED: 'bogus' }).enable).toBe(false);
   });
 
   it('reads issuer URL, client ID, and client secret verbatim', () => {
     const config = loadAuthConfigFromEnv({
-      AUTH_ENABLE: 'true',
+      AUTH_ENABLED: 'true',
       AUTH_ISSUER_URL: 'https://issuer.example.com',
       AUTH_CLIENT_ID: 'my-client',
       AUTH_CLIENT_SECRET: 's3cret',

@@ -4,12 +4,12 @@
  * whether it is implemented in Go or TypeScript.
  *
  * Everything is disabled by default: {@link MCPConfig.enable} is `false` unless
- * `A2A_MCP_ENABLE` is truthy, and {@link loadMCPConfigFromEnv} returns a config
+ * `A2A_MCP_ENABLED` is truthy, and {@link loadMCPConfigFromEnv} returns a config
  * with an empty {@link MCPConfig.servers} list when `A2A_MCP_SERVERS` is unset.
  * Callers should treat "enabled with no servers" as a no-op.
  */
 export interface MCPConfig {
-  /** Master switch. Defaults to `false` (`A2A_MCP_ENABLE`). */
+  /** Master switch. Defaults to `false` (`A2A_MCP_ENABLED`). */
   readonly enable: boolean;
   /** MCP server base URLs (`A2A_MCP_SERVERS`, comma-separated). */
   readonly servers: readonly string[];
@@ -32,7 +32,7 @@ export interface MCPConfig {
   readonly retryMaxIntervalMs: number;
 }
 
-export const MCP_ENABLE_ENV = 'A2A_MCP_ENABLE';
+export const MCP_ENABLED_ENV = 'A2A_MCP_ENABLED';
 export const MCP_SERVERS_ENV = 'A2A_MCP_SERVERS';
 export const MCP_ENDPOINT_ENV = 'A2A_MCP_ENDPOINT';
 export const MCP_REFRESH_INTERVAL_ENV = 'A2A_MCP_REFRESH_INTERVAL';
@@ -140,7 +140,7 @@ export function loadMCPConfigFromEnv(
 ): MCPConfig {
   const endpointRaw = env[MCP_ENDPOINT_ENV];
   return {
-    enable: parseBool(env[MCP_ENABLE_ENV]),
+    enable: parseBool(env[MCP_ENABLED_ENV]),
     servers: parseServers(env[MCP_SERVERS_ENV]),
     endpoint:
       endpointRaw !== undefined && endpointRaw.length > 0

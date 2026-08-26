@@ -166,7 +166,7 @@ export interface A2AServerConfig {
    * called.
    *
    * Pair with {@link import('../tls/index.js').loadServerTLSConfigFromEnv}
-   * to drive TLS from `TLS_ENABLE` / `TLS_CERT_PATH` / `TLS_KEY_PATH`
+   * to drive TLS from `TLS_ENABLED` / `TLS_CERT_PATH` / `TLS_KEY_PATH`
    * environment variables.
    */
   readonly tls?: ServerTLSConfig;

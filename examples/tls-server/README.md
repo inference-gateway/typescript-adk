@@ -46,7 +46,7 @@ This writes a 10-year self-signed cert to `./certs/cert.pem` and an unencrypted 
 ### 2. Start the server
 
 ```sh
-TLS_ENABLE=true \
+TLS_ENABLED=true \
 TLS_CERT_PATH=./certs/cert.pem \
 TLS_KEY_PATH=./certs/key.pem \
 pnpm --filter @inference-gateway/adk-example-tls-server start:server
@@ -76,7 +76,7 @@ pnpm --filter @inference-gateway/adk-example-tls-server start:client
 
 | Env var           | Required when TLS is enabled | Description                                                                              |
 | ----------------- | :--------------------------: | ---------------------------------------------------------------------------------------- |
-| `TLS_ENABLE`      |              ✓               | Master toggle. Truthy values: `true`, `1`, `yes`, `on`.                                  |
+| `TLS_ENABLED`     |              ✓               | Master toggle. Truthy values: `true`, `1`, `yes`, `on`.                                  |
 | `TLS_CERT_PATH`   |              ✓               | Path to the server's TLS certificate (PEM).                                              |
 | `TLS_KEY_PATH`    |              ✓               | Path to the server's TLS private key (PEM).                                              |
 | `TLS_CA_PATH`     |                              | CA bundle for verifying client certificates (mTLS only).                                 |
@@ -105,7 +105,7 @@ docker run --rm \
   -p 8443:8443 \
   -v /etc/tls/cert.pem:/run/secrets/tls/cert.pem:ro \
   -v /etc/tls/key.pem:/run/secrets/tls/key.pem:ro \
-  -e TLS_ENABLE=true \
+  -e TLS_ENABLED=true \
   -e TLS_CERT_PATH=/run/secrets/tls/cert.pem \
   -e TLS_KEY_PATH=/run/secrets/tls/key.pem \
   -e A2A_SERVER_HOST=0.0.0.0 \
@@ -134,7 +134,7 @@ spec:
         - name: agent
           image: my-agent:latest
           env:
-            - { name: TLS_ENABLE, value: 'true' }
+            - { name: TLS_ENABLED, value: 'true' }
             - { name: TLS_CERT_PATH, value: '/etc/tls/tls.crt' }
             - { name: TLS_KEY_PATH, value: '/etc/tls/tls.key' }
           volumeMounts:

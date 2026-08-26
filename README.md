@@ -196,7 +196,7 @@ Each example ships its own README with setup instructions.
 - 🏷️ **Build-Time Metadata** - Inject `name` / `description` / `version` at bundle or runtime (mirrors the Go ADK's `BuildAgent*` LD flags)
 - ☁️ **CloudEvents v1.0** - `createCloudEvent` helper for wrapping agent events in a spec-compliant envelope
 - 📡 **SSE Streaming** - `SSEStreamWriter` for emitting Server-Sent Events with a configurable heartbeat
-- 🔒 **TLS** - Server-side HTTPS termination via `tls: { certPath, keyPath }` (driven by `TLS_ENABLE` / `TLS_CERT_PATH` / `TLS_KEY_PATH` env vars); outbound `ClientTLSConfig` on both `A2AClient` and `OpenAICompatibleLLMClient` for self-signed or mTLS peers. Built on `node:https` / `node:tls` - no third-party TLS dependency.
+- 🔒 **TLS** - Server-side HTTPS termination via `tls: { certPath, keyPath }` (driven by `TLS_ENABLED` / `TLS_CERT_PATH` / `TLS_KEY_PATH` env vars); outbound `ClientTLSConfig` on both `A2AClient` and `OpenAICompatibleLLMClient` for self-signed or mTLS peers. Built on `node:https` / `node:tls` - no third-party TLS dependency.
 
 ### Developer Experience
 
@@ -573,30 +573,30 @@ For everything else - port, host, JSON-RPC path, agent-card cache-control, handl
 - **Tuning client behavior** - `A2AClientConfig` exposes `timeoutMs`, `retry` (a partial `RetryConfig` or `false`), `headers`, `fetch`, `userAgent`, and overrides for `jsonRpcPath` / `agentCardPath` / `healthPath`. Call `withRetry` directly when you want to apply the same retry policy outside the client.
 - **Bundle-time metadata injection** - use `tsup`'s `define` option to bake `BUILD_AGENT_NAME` / `_DESCRIPTION` / `_VERSION` into the bundled output instead of relying on the runtime environment. See [Build-Time Agent Metadata](#build-time-agent-metadata) above.
 - **CloudEvents forwarding** - wrap your task-state transitions in `createCloudEvent` and POST them to a webhook or message bus for downstream subscribers, using the spec-compliant `CLOUDEVENTS_CONTENT_TYPE`.
-- **TLS termination** - boot the server over HTTPS by passing `tls: { certPath, keyPath }` into `createA2AServer` (or `loadServerTLSConfigFromEnv()` to read the same paths from `TLS_ENABLE` / `TLS_CERT_PATH` / `TLS_KEY_PATH`). For mTLS, add `caPath` and `requestCert: true`. See [TLS](#tls) below.
+- **TLS termination** - boot the server over HTTPS by passing `tls: { certPath, keyPath }` into `createA2AServer` (or `loadServerTLSConfigFromEnv()` to read the same paths from `TLS_ENABLED` / `TLS_CERT_PATH` / `TLS_KEY_PATH`). For mTLS, add `caPath` and `requestCert: true`. See [TLS](#tls) below.
 - **Telemetry** - construct `createTelemetryProvider()` and call `start()` to wire OpenTelemetry traces, logs, and metrics. Metrics push over OTLP by default or expose a Prometheus pull endpoint - see [Telemetry & metrics exporters](#telemetry--metrics-exporters) below.
 
 ### Telemetry & metrics exporters
 
-`createTelemetryProvider()` wires an OpenTelemetry `NodeSDK`. It is off until `TELEMETRY_ENABLE=true`; traces and logs always push over OTLP (`OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS` / `OTEL_EXPORTER_OTLP_PROTOCOL`). Only the **metrics** signal is selectable, via the standard `OTEL_METRICS_EXPORTER` env var:
+`createTelemetryProvider()` wires an OpenTelemetry `NodeSDK`. It is off until `TELEMETRY_ENABLED=true`; traces and logs always push over OTLP (`OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS` / `OTEL_EXPORTER_OTLP_PROTOCOL`). Only the **metrics** signal is selectable, via the standard `OTEL_METRICS_EXPORTER` env var:
 
-| `OTEL_METRICS_EXPORTER` | Metrics behavior |
-| --- | --- |
-| _(unset)_ or `otlp` | **Default.** Push over OTLP to `OTEL_EXPORTER_OTLP_ENDPOINT` (unchanged from before). |
-| `prometheus` | **Pull.** Start a Prometheus scrape endpoint at `/metrics` on `OTEL_EXPORTER_PROMETHEUS_HOST:OTEL_EXPORTER_PROMETHEUS_PORT` (default `0.0.0.0:9464`). |
-| `none` | Disable the metrics signal entirely; traces and logs still export. |
+| `OTEL_METRICS_EXPORTER` | Metrics behavior                                                                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _(unset)_ or `otlp`     | **Default.** Push over OTLP to `OTEL_EXPORTER_OTLP_ENDPOINT` (unchanged from before).                                                                 |
+| `prometheus`            | **Pull.** Start a Prometheus scrape endpoint at `/metrics` on `OTEL_EXPORTER_PROMETHEUS_HOST:OTEL_EXPORTER_PROMETHEUS_PORT` (default `0.0.0.0:9464`). |
+| `none`                  | Disable the metrics signal entirely; traces and logs still export.                                                                                    |
 
 Prometheus-pull env vars (only consulted when `OTEL_METRICS_EXPORTER=prometheus`):
 
-| Env var | Default | Purpose |
-| --- | --- | --- |
-| `OTEL_EXPORTER_PROMETHEUS_HOST` | `0.0.0.0` | Bind host for the scrape endpoint. |
-| `OTEL_EXPORTER_PROMETHEUS_PORT` | `9464` | Bind port for the scrape endpoint (`0` picks an ephemeral port). |
+| Env var                         | Default   | Purpose                                                          |
+| ------------------------------- | --------- | ---------------------------------------------------------------- |
+| `OTEL_EXPORTER_PROMETHEUS_HOST` | `0.0.0.0` | Bind host for the scrape endpoint.                               |
+| `OTEL_EXPORTER_PROMETHEUS_PORT` | `9464`    | Bind port for the scrape endpoint (`0` picks an ephemeral port). |
 
 ```ts
 import { createTelemetryProvider } from '@inference-gateway/adk';
 
-// With: TELEMETRY_ENABLE=true OTEL_METRICS_EXPORTER=prometheus
+// With: TELEMETRY_ENABLED=true OTEL_METRICS_EXPORTER=prometheus
 const telemetry = createTelemetryProvider();
 telemetry.start(); // scrape endpoint live at http://0.0.0.0:9464/metrics
 // ... wire into createA2AServer({ card, telemetry }), then on shutdown:
@@ -622,17 +622,17 @@ const card: AgentCard = /* ... */;
 
 const server = createA2AServer({
   card,
-  tls: loadServerTLSConfigFromEnv(), // reads TLS_ENABLE / TLS_CERT_PATH / TLS_KEY_PATH
+  tls: loadServerTLSConfigFromEnv(), // reads TLS_ENABLED / TLS_CERT_PATH / TLS_KEY_PATH
 });
 
 await server.listen(8443, '0.0.0.0');
 ```
 
-`loadServerTLSConfigFromEnv()` returns `undefined` when `TLS_ENABLE` is falsy, so the same code drops back to plaintext for local dev without a branch in the caller. The recognized env vars are:
+`loadServerTLSConfigFromEnv()` returns `undefined` when `TLS_ENABLED` is falsy, so the same code drops back to plaintext for local dev without a branch in the caller. The recognized env vars are:
 
 | Env var           |    Required     | Purpose                                                                |
 | ----------------- | :-------------: | ---------------------------------------------------------------------- |
-| `TLS_ENABLE`      | (master toggle) | Truthy: `true`, `1`, `yes`, `on`. Anything else returns `undefined`.   |
+| `TLS_ENABLED`     | (master toggle) | Truthy: `true`, `1`, `yes`, `on`. Anything else returns `undefined`.   |
 | `TLS_CERT_PATH`   |   ✓ (when on)   | Server certificate (PEM).                                              |
 | `TLS_KEY_PATH`    |   ✓ (when on)   | Server private key (PEM).                                              |
 | `TLS_CA_PATH`     |                 | CA bundle used to verify client certs (mTLS only).                     |
@@ -645,7 +645,7 @@ For container deployments, mount cert / key files from a secrets backend rather 
 docker run --rm -p 8443:8443 \
   -v /etc/tls/cert.pem:/run/secrets/tls/cert.pem:ro \
   -v /etc/tls/key.pem:/run/secrets/tls/key.pem:ro \
-  -e TLS_ENABLE=true \
+  -e TLS_ENABLED=true \
   -e TLS_CERT_PATH=/run/secrets/tls/cert.pem \
   -e TLS_KEY_PATH=/run/secrets/tls/key.pem \
   my-agent:latest

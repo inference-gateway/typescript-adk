@@ -32,7 +32,7 @@ export A2A_AGENT_CLIENT_MODEL=gpt-4o-mini
 export OPENAI_API_KEY=sk-...
 
 # MCP client
-export A2A_MCP_ENABLE=true
+export A2A_MCP_ENABLED=true
 export A2A_MCP_SERVERS=http://localhost:3000
 
 pnpm --filter @inference-gateway/adk-example-mcp start:server
@@ -44,22 +44,22 @@ In another terminal, send a couple of prompts:
 pnpm --filter @inference-gateway/adk-example-mcp start:client
 ```
 
-With `A2A_MCP_ENABLE` unset (the default) the agent still runs - it just has no
+With `A2A_MCP_ENABLED` unset (the default) the agent still runs - it just has no
 MCP tools registered.
 
 ## Configuration (`A2A_MCP_*`)
 
-| Var | Default | Purpose |
-| --- | --- | --- |
-| `A2A_MCP_ENABLE` | `false` | Enable the MCP client |
-| `A2A_MCP_SERVERS` | - | Comma-separated MCP server base URLs |
-| `A2A_MCP_ENDPOINT` | `/mcp` | Path appended to each server URL |
-| `A2A_MCP_REFRESH_INTERVAL` | `5m` | Tool-catalog refresh interval |
-| `A2A_MCP_DIAL_TIMEOUT` | `30s` | Init/list-tools timeout |
-| `A2A_MCP_CALL_TIMEOUT` | `30s` | Single tool-invocation timeout |
-| `A2A_MCP_MAX_RETRIES` | `0` | Max initial connection attempts (0 = retry forever) |
-| `A2A_MCP_RETRY_INTERVAL` | `2s` | Initial backoff (doubles) |
-| `A2A_MCP_RETRY_MAX_INTERVAL` | `30s` | Max backoff |
+| Var                          | Default | Purpose                                             |
+| ---------------------------- | ------- | --------------------------------------------------- |
+| `A2A_MCP_ENABLED`            | `false` | Enable the MCP client                               |
+| `A2A_MCP_SERVERS`            | -       | Comma-separated MCP server base URLs                |
+| `A2A_MCP_ENDPOINT`           | `/mcp`  | Path appended to each server URL                    |
+| `A2A_MCP_REFRESH_INTERVAL`   | `5m`    | Tool-catalog refresh interval                       |
+| `A2A_MCP_DIAL_TIMEOUT`       | `30s`   | Init/list-tools timeout                             |
+| `A2A_MCP_CALL_TIMEOUT`       | `30s`   | Single tool-invocation timeout                      |
+| `A2A_MCP_MAX_RETRIES`        | `0`     | Max initial connection attempts (0 = retry forever) |
+| `A2A_MCP_RETRY_INTERVAL`     | `2s`    | Initial backoff (doubles)                           |
+| `A2A_MCP_RETRY_MAX_INTERVAL` | `30s`   | Max backoff                                         |
 
 Durations accept Go-style strings (`5m`, `30s`, `1m30s`).
 
@@ -77,7 +77,7 @@ import {
 } from '@inference-gateway/adk';
 
 const toolBox = new DefaultToolBox();
-const mcp = createMCPClientFromEnv(); // undefined when A2A_MCP_ENABLE is falsy
+const mcp = createMCPClientFromEnv(); // undefined when A2A_MCP_ENABLED is falsy
 if (mcp !== undefined) {
   mcp.start(); // non-blocking background discovery + refresh
   registerMCPTools(toolBox, mcp);

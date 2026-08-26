@@ -10,7 +10,7 @@ import {
   OTEL_METRICS_EXPORTER_ENV,
   OTEL_SERVICE_NAME_ENV,
   OTEL_SERVICE_VERSION_ENV,
-  TELEMETRY_ENABLE_ENV,
+  TELEMETRY_ENABLED_ENV,
   loadTelemetryConfigFromEnv,
 } from '../../src/telemetry/index.js';
 
@@ -27,19 +27,19 @@ describe('loadTelemetryConfigFromEnv', () => {
     });
   });
 
-  it('parses truthy TELEMETRY_ENABLE values', () => {
+  it('parses truthy TELEMETRY_ENABLED values', () => {
     for (const value of ['1', 'true', 'TRUE', 'yes', 'on']) {
       const config = loadTelemetryConfigFromEnv({
-        [TELEMETRY_ENABLE_ENV]: value,
+        [TELEMETRY_ENABLED_ENV]: value,
       });
       expect(config.enable, `value=${value}`).toBe(true);
     }
   });
 
-  it('parses falsy TELEMETRY_ENABLE values', () => {
+  it('parses falsy TELEMETRY_ENABLED values', () => {
     for (const value of ['0', 'false', 'no', 'off', '', 'nonsense']) {
       const config = loadTelemetryConfigFromEnv({
-        [TELEMETRY_ENABLE_ENV]: value,
+        [TELEMETRY_ENABLED_ENV]: value,
       });
       expect(config.enable, `value=${value}`).toBe(false);
     }
@@ -47,7 +47,7 @@ describe('loadTelemetryConfigFromEnv', () => {
 
   it('reads OTEL_SERVICE_NAME and OTEL_SERVICE_VERSION', () => {
     const config = loadTelemetryConfigFromEnv({
-      [TELEMETRY_ENABLE_ENV]: 'true',
+      [TELEMETRY_ENABLED_ENV]: 'true',
       [OTEL_SERVICE_NAME_ENV]: 'echo-agent',
       [OTEL_SERVICE_VERSION_ENV]: '2.4.0',
     });

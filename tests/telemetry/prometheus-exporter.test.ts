@@ -5,7 +5,7 @@ import {
   OTEL_EXPORTER_PROMETHEUS_HOST_ENV,
   OTEL_EXPORTER_PROMETHEUS_PORT_ENV,
   OTEL_METRICS_EXPORTER_ENV,
-  TELEMETRY_ENABLE_ENV,
+  TELEMETRY_ENABLED_ENV,
   TelemetryProvider,
 } from '../../src/telemetry/index.js';
 
@@ -48,7 +48,7 @@ describe('TelemetryProvider Prometheus pull exporter', () => {
     port = await freePort();
     provider = new TelemetryProvider({
       env: {
-        [TELEMETRY_ENABLE_ENV]: 'true',
+        [TELEMETRY_ENABLED_ENV]: 'true',
         [OTEL_METRICS_EXPORTER_ENV]: 'prometheus',
         [OTEL_EXPORTER_PROMETHEUS_HOST_ENV]: '127.0.0.1',
         [OTEL_EXPORTER_PROMETHEUS_PORT_ENV]: String(port),

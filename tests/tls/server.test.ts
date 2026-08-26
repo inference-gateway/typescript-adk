@@ -6,7 +6,7 @@ import {
   TLS_CA_PATH_ENV,
   TLS_CERT_PATH_ENV,
   TLS_CLIENT_AUTH_ENV,
-  TLS_ENABLE_ENV,
+  TLS_ENABLED_ENV,
   TLS_KEY_PATH_ENV,
   TLS_PASSPHRASE_ENV,
   buildServerTLSOptions,
@@ -23,25 +23,25 @@ import {
 const openssl = hasOpenssl();
 
 describe('loadServerTLSConfigFromEnv', () => {
-  it('returns undefined when TLS_ENABLE is unset', () => {
+  it('returns undefined when TLS_ENABLED is unset', () => {
     expect(loadServerTLSConfigFromEnv({})).toBeUndefined();
   });
 
-  it('returns undefined when TLS_ENABLE is false-ish', () => {
+  it('returns undefined when TLS_ENABLED is false-ish', () => {
     expect(
-      loadServerTLSConfigFromEnv({ [TLS_ENABLE_ENV]: 'false' })
+      loadServerTLSConfigFromEnv({ [TLS_ENABLED_ENV]: 'false' })
     ).toBeUndefined();
     expect(
-      loadServerTLSConfigFromEnv({ [TLS_ENABLE_ENV]: '0' })
+      loadServerTLSConfigFromEnv({ [TLS_ENABLED_ENV]: '0' })
     ).toBeUndefined();
     expect(
-      loadServerTLSConfigFromEnv({ [TLS_ENABLE_ENV]: '' })
+      loadServerTLSConfigFromEnv({ [TLS_ENABLED_ENV]: '' })
     ).toBeUndefined();
   });
 
   it('parses certPath / keyPath when TLS is enabled', () => {
     const env = {
-      [TLS_ENABLE_ENV]: 'true',
+      [TLS_ENABLED_ENV]: 'true',
       [TLS_CERT_PATH_ENV]: '/etc/tls/cert.pem',
       [TLS_KEY_PATH_ENV]: '/etc/tls/key.pem',
     };
@@ -54,7 +54,7 @@ describe('loadServerTLSConfigFromEnv', () => {
 
   it('parses optional caPath / passphrase / client auth', () => {
     const env = {
-      [TLS_ENABLE_ENV]: '1',
+      [TLS_ENABLED_ENV]: '1',
       [TLS_CERT_PATH_ENV]: '/c.pem',
       [TLS_KEY_PATH_ENV]: '/k.pem',
       [TLS_CA_PATH_ENV]: '/ca.pem',
@@ -74,11 +74,11 @@ describe('loadServerTLSConfigFromEnv', () => {
 
   it('throws when TLS is enabled but certPath / keyPath are missing', () => {
     expect(() =>
-      loadServerTLSConfigFromEnv({ [TLS_ENABLE_ENV]: 'true' })
+      loadServerTLSConfigFromEnv({ [TLS_ENABLED_ENV]: 'true' })
     ).toThrow(TLSConfigError);
     expect(() =>
       loadServerTLSConfigFromEnv({
-        [TLS_ENABLE_ENV]: 'true',
+        [TLS_ENABLED_ENV]: 'true',
         [TLS_CERT_PATH_ENV]: '/c.pem',
       })
     ).toThrow(/TLS_KEY_PATH/);

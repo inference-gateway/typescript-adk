@@ -364,7 +364,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 
 /**
  * Construct an {@link MCPClient} from environment configuration, or return
- * `undefined` when MCP is disabled (`A2A_MCP_ENABLE` falsy) or no servers are
+ * `undefined` when MCP is disabled (`A2A_MCP_ENABLED` falsy) or no servers are
  * configured. Does NOT call {@link MCPClient.start} - the caller decides when to
  * begin background discovery.
  */

@@ -4,8 +4,8 @@
  * (default port `9090`) that exposes `/metrics` in the Prometheus text format.
  *
  * The endpoint is opt-in. {@link MetricsConfig.enable} is `false` by default
- * and is also gated by either {@link METRICS_ENABLE_ENV} or
- * {@link TELEMETRY_ENABLE_ENV} - whichever is set first wins, in the order
+ * and is also gated by either {@link METRICS_ENABLED_ENV} or
+ * {@link TELEMETRY_ENABLED_ENV} - whichever is set first wins, in the order
  * declared on {@link loadMetricsConfigFromEnv}.
  */
 export interface MetricsConfig {
@@ -53,17 +53,17 @@ export interface MetricsConfig {
 
 /**
  * Environment variable that, when truthy, enables the metrics HTTP server.
- * Takes precedence over {@link TELEMETRY_ENABLE_ENV} when both are set.
+ * Takes precedence over {@link TELEMETRY_ENABLED_ENV} when both are set.
  */
-export const METRICS_ENABLE_ENV = 'METRICS_ENABLE';
+export const METRICS_ENABLED_ENV = 'METRICS_ENABLED';
 
 /**
  * Shared kill-switch with the telemetry SDK - when truthy and
- * {@link METRICS_ENABLE_ENV} is unset, the metrics server also starts. This
+ * {@link METRICS_ENABLED_ENV} is unset, the metrics server also starts. This
  * mirrors the Go ADK's combined `TelemetryConfig.Enable` flag where one toggle
  * lights up both tracing and Prometheus.
  */
-export const TELEMETRY_ENABLE_ENV = 'TELEMETRY_ENABLE';
+export const TELEMETRY_ENABLED_ENV = 'TELEMETRY_ENABLED';
 
 /** Env var that overrides {@link MetricsConfig.port}. */
 export const METRICS_PORT_ENV = 'METRICS_PORT';
@@ -133,15 +133,15 @@ function parsePositiveInt(
 
 /**
  * Read metrics configuration from an environment-shaped map (defaults to
- * `process.env`). The `enable` flag falls back from {@link METRICS_ENABLE_ENV}
- * to {@link TELEMETRY_ENABLE_ENV}; everything else uses its own var with a
+ * `process.env`). The `enable` flag falls back from {@link METRICS_ENABLED_ENV}
+ * to {@link TELEMETRY_ENABLED_ENV}; everything else uses its own var with a
  * sensible default.
  */
 export function loadMetricsConfigFromEnv(
   env: Readonly<Record<string, string | undefined>> = process.env
 ): MetricsConfig {
-  const metricsEnable = parseBool(env[METRICS_ENABLE_ENV]);
-  const telemetryEnable = parseBool(env[TELEMETRY_ENABLE_ENV]);
+  const metricsEnable = parseBool(env[METRICS_ENABLED_ENV]);
+  const telemetryEnable = parseBool(env[TELEMETRY_ENABLED_ENV]);
   const enable = metricsEnable ?? telemetryEnable ?? false;
 
   return {
