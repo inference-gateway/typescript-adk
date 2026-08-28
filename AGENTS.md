@@ -1,5 +1,7 @@
 # Repository Guidelines
 
+The TypeScript Agent Development Kit (`@inference-gateway/adk`) — a Node.js library for building A2A-protocol agents. ESM-only; requires Node 24+ and pnpm 10+ (pinned via `package.json#packageManager`).
+
 ## Project Structure & Module Organization
 
 This package is a TypeScript ESM Agent Development Kit published as `@inference-gateway/adk`. Source lives in `src/`: public exports start at `src/index.ts`, agent card logic is in `src/agent/`, and shared types are in `src/types/`. Generated A2A protocol types are committed under `src/types/generated/`; do not edit them by hand. Tests live in `tests/`, with fixtures in `tests/agent/fixtures/`. Build and generation scripts live in `scripts/`.
