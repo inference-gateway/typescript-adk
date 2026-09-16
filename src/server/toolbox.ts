@@ -566,10 +566,6 @@ export class DefaultToolBox implements ToolBox {
       }
     }
 
-    // Span the tool call (not the lookup/validation above). The parent is
-    // whatever span is active - the task span in a server run - and the
-    // global tracer stays a no-op until a telemetry provider registers, so
-    // this is free when telemetry is disabled.
     const span = trace
       .getTracer(TELEMETRY_INSTRUMENTATION_NAME)
       .startSpan(`tool.${name}`);
