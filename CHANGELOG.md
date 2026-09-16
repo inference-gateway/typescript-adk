@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.16.0](https://github.com/inference-gateway/typescript-adk/compare/v0.15.1...v0.16.0) (2026-09-16)
+
+### ✨ Features
+
+* **server:** span every tool execution in DefaultToolBox.executeTool (tool.<name>) ([#219](https://github.com/inference-gateway/typescript-adk/issues/219)) ([dcc6323](https://github.com/inference-gateway/typescript-adk/commit/dcc63236a36100d21034836d16ad454551d73786)), references [adk#305](https://github.com/adk/issues/305)
+
+### 👷 CI
+
+* **claude:** centralize claude.yml via reusable workflow ([#208](https://github.com/inference-gateway/typescript-adk/issues/208)) ([3589fa8](https://github.com/inference-gateway/typescript-adk/commit/3589fa8cad6fa2fa1f6e650bf0eb56c74f255d48))
+
+### 📚 Documentation
+
+* add AGENTS.md for coding agents ([#210](https://github.com/inference-gateway/typescript-adk/issues/210)) ([e5e3c3d](https://github.com/inference-gateway/typescript-adk/commit/e5e3c3d9de071a4ea60576896d14883d19b35d14))
+
+### 🔧 Miscellaneous
+
+* **deps:** bump claude-code 2.1.201 -> 2.1.238 ([#207](https://github.com/inference-gateway/typescript-adk/issues/207)) ([7f866a1](https://github.com/inference-gateway/typescript-adk/commit/7f866a16cab5d492dc256845f3d4edd1f1cc68d5))
+* **deps:** bump claude-code 2.1.238 -> 2.1.245 ([#212](https://github.com/inference-gateway/typescript-adk/issues/212)) ([44d4138](https://github.com/inference-gateway/typescript-adk/commit/44d41382423021cd143027d915e3263f097c4930))
+* **deps:** bump claude-code 2.1.245 -> 2.1.266 ([#216](https://github.com/inference-gateway/typescript-adk/issues/216)) ([39d39b3](https://github.com/inference-gateway/typescript-adk/commit/39d39b365c5260663126e25e39cfe2be906e8be6))
+* **deps:** bump infer CLI v0.164.0 -> v0.183.0 ([#209](https://github.com/inference-gateway/typescript-adk/issues/209)) ([bf6dfc8](https://github.com/inference-gateway/typescript-adk/commit/bf6dfc816b6d60aea5e77d55a93573416d4d4a07))
+* **deps:** bump infer CLI v0.183.0 -> v0.192.0 ([#217](https://github.com/inference-gateway/typescript-adk/issues/217)) ([3037b59](https://github.com/inference-gateway/typescript-adk/commit/3037b599179d527105153f6309824b71c160fb76))
+* **deps:** bump pnpm/action-setup in the github-actions group ([#214](https://github.com/inference-gateway/typescript-adk/issues/214)) ([55cd1d0](https://github.com/inference-gateway/typescript-adk/commit/55cd1d051653278336aff0289f551d5cc77d8800))
+* **deps:** bump the npm group with 21 updates ([#213](https://github.com/inference-gateway/typescript-adk/issues/213)) ([72109ae](https://github.com/inference-gateway/typescript-adk/commit/72109ae397b391a2e18ca985743355c22843ce31))
+* **deps:** bump the npm group with 7 updates ([#211](https://github.com/inference-gateway/typescript-adk/issues/211)) ([cc9780d](https://github.com/inference-gateway/typescript-adk/commit/cc9780d91247789b26f486be9f589edb81979cc6))
+* **deps:** bump the npm group with 7 updates ([#215](https://github.com/inference-gateway/typescript-adk/issues/215)) ([30e315e](https://github.com/inference-gateway/typescript-adk/commit/30e315e37647be97d1b98727c096e1134ca12dfe))
+
 ## [0.15.1](https://github.com/inference-gateway/typescript-adk/compare/v0.15.0...v0.15.1) (2026-08-26)
 
 ### 🐛 Bug Fixes
