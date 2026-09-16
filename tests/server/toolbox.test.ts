@@ -1,4 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { context as otelContext, propagation, trace } from '@opentelemetry/api';
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+} from '@opentelemetry/sdk-trace-base';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { InMemoryArtifactStorage } from '../../src/artifacts/in-memory-storage.js';
 import { DefaultArtifactService } from '../../src/artifacts/default-artifact-service.js';
 import { createTask } from '../../src/agent/task.js';
@@ -19,6 +32,10 @@ import {
   drainPendingArtifacts,
 } from '../../src/server/toolbox.js';
 import type { Tool } from '../../src/server/toolbox.js';
+import {
+  TELEMETRY_ENABLED_ENV,
+  TelemetryProvider,
+} from '../../src/telemetry/index.js';
 
 function ctx(taskId = 't', contextId = 'c') {
   return createToolContext({
@@ -452,5 +469,118 @@ describe('createToolContext', () => {
     expect(context.taskId).toBe('t');
     expect(context.contextId).toBe('c');
     expect(context.invocationId).toBe('inv');
+  });
+});
+
+describe('DefaultToolBox telemetry (disabled by default)', () => {
+  it('still executes tools when no tracer provider is registered', async () => {
+    const toolbox = new DefaultToolBox({ env: {} });
+    toolbox.addTool(
+      createTool({
+        name: 'plain',
+        description: 'plain',
+        parameters: { type: 'object' },
+        execute: async () => 'ok',
+      })
+    );
+    await expect(toolbox.executeTool('plain', '{}', ctx())).resolves.toBe('ok');
+  });
+});
+
+// The global OTel TracerProvider registers once per process, so every span
+// test shares one provider + exporter set up in `beforeAll` and the exporter
+// is reset between tests.
+describe('DefaultToolBox tool execution spans', () => {
+  let exporter: InMemorySpanExporter;
+  let provider: TelemetryProvider;
+
+  beforeAll(() => {
+    exporter = new InMemorySpanExporter();
+    provider = new TelemetryProvider({
+      env: { [TELEMETRY_ENABLED_ENV]: 'true' },
+      spanProcessors: [new SimpleSpanProcessor(exporter)],
+      instrumentations: [],
+    });
+    provider.start();
+  });
+
+  afterAll(async () => {
+    await provider.shutdown();
+  });
+
+  beforeEach(() => {
+    exporter.reset();
+  });
+
+  function toolboxWithTool(name: string, execute: Tool['execute']) {
+    const toolbox = new DefaultToolBox({ env: {} });
+    toolbox.addTool(
+      createTool({
+        name,
+        description: name,
+        parameters: { type: 'object' },
+        execute,
+      })
+    );
+    return toolbox;
+  }
+
+  function findSpan(name: string) {
+    return exporter
+      .getFinishedSpans()
+      .find((span) => span.name === `tool.${name}`);
+  }
+
+  it('opens a tool.<name> span as a child of the active task span', async () => {
+    const toolbox = toolboxWithTool('greet', async () => 'hi');
+    const taskSpan = provider.getTracer().startSpan('task.process');
+    await otelContext.with(trace.setSpan(otelContext.active(), taskSpan), () =>
+      toolbox.executeTool('greet', '{}', ctx())
+    );
+    taskSpan.end();
+
+    await provider.forceFlush();
+    const toolSpan = findSpan('greet');
+    expect(toolSpan).toBeDefined();
+    expect(toolSpan?.attributes['gen_ai.tool.name']).toBe('greet');
+    expect(toolSpan?.parentSpanContext?.spanId).toBe(
+      taskSpan.spanContext().spanId
+    );
+  });
+
+  it('copies session.id and gen_ai.tool.call.id baggage members onto the span', async () => {
+    const toolbox = toolboxWithTool('lookup', async () => 'ok');
+    const baggageContext = propagation.setBaggage(
+      otelContext.active(),
+      propagation.createBaggage({
+        'session.id': { value: 'session-1' },
+        'gen_ai.tool.call.id': { value: 'call-1' },
+      })
+    );
+    await otelContext.with(baggageContext, () =>
+      toolbox.executeTool('lookup', '{}', ctx())
+    );
+
+    await provider.forceFlush();
+    const toolSpan = findSpan('lookup');
+    expect(toolSpan?.attributes['session.id']).toBe('session-1');
+    expect(toolSpan?.attributes['gen_ai.tool.call.id']).toBe('call-1');
+  });
+
+  it('records the exception and sets ERROR status when a tool throws', async () => {
+    const toolbox = toolboxWithTool('failing', async () => {
+      throw new Error('tool exploded');
+    });
+    await expect(toolbox.executeTool('failing', '{}', ctx())).rejects.toThrow(
+      'tool exploded'
+    );
+
+    await provider.forceFlush();
+    const toolSpan = findSpan('failing');
+    expect(toolSpan?.status.code).toBe(2);
+    expect(toolSpan?.status.message).toBe('tool exploded');
+    expect(toolSpan?.events.some((event) => event.name === 'exception')).toBe(
+      true
+    );
   });
 });

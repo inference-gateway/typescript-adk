@@ -1,7 +1,12 @@
 import { Ajv, type ErrorObject, type ValidateFunction } from 'ajv';
+import { context as otelContext, propagation, trace } from '@opentelemetry/api';
 import type { ArtifactService } from '../artifacts/artifact-service.js';
 import type { ManagedTask } from '../agent/task.js';
 import type { Artifact, Struct } from '../types/generated/a2a.js';
+import {
+  TELEMETRY_INSTRUMENTATION_NAME,
+  recordSpanError,
+} from '../telemetry/index.js';
 import { NOOP_LOGGER, type Logger } from './server-builder.js';
 
 /**
@@ -32,6 +37,19 @@ export const RESERVED_TOOL_NAMES: ReadonlySet<string> = new Set([
   INPUT_REQUIRED_TOOL,
   CREATE_ARTIFACT_TOOL,
 ]);
+
+/**
+ * Span attribute carrying the executed tool's name. Mirrors the Go ADK's
+ * `gen_ai.tool.name` (see `server/agent_toolbox.go`).
+ */
+const ATTR_TOOL_NAME = 'gen_ai.tool.name';
+
+/**
+ * Baggage members copied onto the {@link DefaultToolBox.executeTool} span as
+ * attributes when present - the session id and the LLM tool-call id the task
+ * handler propagated. Mirrors the Go ADK's `ExecuteTool` span.
+ */
+const TOOL_SPAN_BAGGAGE_KEYS = ['session.id', 'gen_ai.tool.call.id'] as const;
 
 /**
  * Description advertised to the LLM for the reserved {@link INPUT_REQUIRED_TOOL}.
@@ -548,7 +566,28 @@ export class DefaultToolBox implements ToolBox {
       }
     }
 
-    return tool.execute(args, context);
+    const span = trace
+      .getTracer(TELEMETRY_INSTRUMENTATION_NAME)
+      .startSpan(`tool.${name}`);
+    span.setAttribute(ATTR_TOOL_NAME, name);
+    const activeBaggage = propagation.getActiveBaggage();
+    for (const key of TOOL_SPAN_BAGGAGE_KEYS) {
+      const entry = activeBaggage?.getEntry(key);
+      if (entry !== undefined) {
+        span.setAttribute(key, entry.value);
+      }
+    }
+    try {
+      return await otelContext.with(
+        trace.setSpan(otelContext.active(), span),
+        () => tool.execute(args, context)
+      );
+    } catch (err) {
+      recordSpanError(span, err);
+      throw err;
+    } finally {
+      span.end();
+    }
   }
 }
 
