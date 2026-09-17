@@ -18,7 +18,7 @@ Run one test: `pnpm vitest run tests/agent/card.test.ts`, or by name with `-t`. 
 
 ## Architecture
 
-Public exports start at `src/index.ts` (barrel). Domain code lives in `src/agent/` (agent card, build metadata, task state machine), `src/server/`, `src/client/`, `src/llm/`, `src/auth/`, `src/storage/`, `src/artifacts/`, `src/mcp/`, `src/testing/`. Tests mirror `src/` under `tests/**/*.test.ts`; fixtures live in `tests/agent/fixtures/`. Each `examples/<name>/` is a standalone package.
+Public exports start at `src/index.ts` (barrel). Domain code lives in `src/agent/` (agent card, build metadata, task state machine), `src/server/`, `src/client/`, `src/llm/`, `src/auth/`, `src/storage/`, `src/artifacts/`, `src/mcp/`, `src/telemetry/`, `src/metrics/`, `src/logging/`, `src/tls/`, `src/testing/`. Tests mirror `src/` under `tests/**/*.test.ts`; fixtures live in `tests/agent/fixtures/`. Each `examples/<name>/` is a standalone package in the pnpm workspace (`pnpm-workspace.yaml`).
 
 ## Generated A2A types
 
