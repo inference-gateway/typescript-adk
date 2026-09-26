@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.16.1](https://github.com/inference-gateway/typescript-adk/compare/v0.16.0...v0.16.1) (2026-09-26)
+
+### 🐛 Bug Fixes
+
+* regenerate A2A types after required-array fix ([#228](https://github.com/inference-gateway/typescript-adk/issues/228)) ([252d974](https://github.com/inference-gateway/typescript-adk/commit/252d974cf42f4b74537c4f481af2a0868bddc2b0))
+
+### 👷 CI
+
+* **claude:** centralize claude.yml via reusable workflow ([#224](https://github.com/inference-gateway/typescript-adk/issues/224)) ([0d8ba5f](https://github.com/inference-gateway/typescript-adk/commit/0d8ba5f364b8ee95ff832b8c5ee3f56e22266f01))
+
+### 📚 Documentation
+
+* refresh AGENTS.md architecture section to match current tree ([#220](https://github.com/inference-gateway/typescript-adk/issues/220)) ([798bcb1](https://github.com/inference-gateway/typescript-adk/commit/798bcb1635b64537a6ab788057f4e5c0809a4bf6))
+
+### 🔧 Miscellaneous
+
+* **deps:** bump claude-code 2.1.266 -> 2.1.278 ([#222](https://github.com/inference-gateway/typescript-adk/issues/222)) ([a13398f](https://github.com/inference-gateway/typescript-adk/commit/a13398fa59e2e7e362c888d683e7f98f3b4b8258))
+* **deps:** bump claude-code 2.1.278 -> 2.1.280 ([#225](https://github.com/inference-gateway/typescript-adk/issues/225)) ([e57cd7a](https://github.com/inference-gateway/typescript-adk/commit/e57cd7ab7364da9225407c8bd85f8bd3c898cb2c))
+* **deps:** bump infer CLI v0.192.0 -> v0.205.3 ([#223](https://github.com/inference-gateway/typescript-adk/issues/223)) ([7828d8b](https://github.com/inference-gateway/typescript-adk/commit/7828d8bc6e52451ef3a3ec6ece7d7b54e7084ee4))
+* **deps:** bump infer CLI v0.205.3 -> v0.208.0 ([#226](https://github.com/inference-gateway/typescript-adk/issues/226)) ([ca99792](https://github.com/inference-gateway/typescript-adk/commit/ca99792eb3ca4687a014fd24269263a7ba2b3b72))
+* **deps:** bump the npm group with 7 updates ([#221](https://github.com/inference-gateway/typescript-adk/issues/221)) ([7864ef7](https://github.com/inference-gateway/typescript-adk/commit/7864ef744a97d9eff2d0a01708c123c7d698a842))
+
 ## [0.16.0](https://github.com/inference-gateway/typescript-adk/compare/v0.15.1...v0.16.0) (2026-09-16)
 
 ### ✨ Features
