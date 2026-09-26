@@ -50,7 +50,7 @@ src/
 
 ### A2A types are generated from an external pinned schema
 
-`src/types/generated/a2a.ts` is produced by `scripts/generate-a2a-types.ts` from the canonical JSON Schema in [inference-gateway/schemas](https://github.com/inference-gateway/schemas), pinned by commit SHA in `SCHEMA_REF` (`scripts/generate-a2a-types.ts:17`). **Never hand-edit `src/types/generated/`** — `pnpm test` runs a drift check (`tests/a2a-types.test.ts`) that fails the build if the committed file disagrees with what regenerating from `SCHEMA_REF` would produce. To consume a newer upstream schema: bump `SCHEMA_REF`, run `pnpm generate:types`, commit the result.
+`src/types/generated/a2a.ts` is produced by `scripts/generate-a2a-types.ts` from the canonical JSON Schema in [inference-gateway/schemas](https://github.com/inference-gateway/schemas), pinned by release tag in `SCHEMA_REF` (`scripts/generate-a2a-types.ts:17`). **Never hand-edit `src/types/generated/`** — `pnpm test` runs a drift check (`tests/a2a-types.test.ts`) that fails the build if the committed file disagrees with what regenerating from `SCHEMA_REF` would produce. To consume a newer upstream schema: bump `SCHEMA_REF`, run `pnpm generate:types`, commit the result.
 
 The generator does two non-obvious normalizations before handing the schema to `json-schema-to-typescript` (`scripts/generate-a2a-types.ts:81`): (1) hoist inline named enums to top-level definitions so they don't get inlined as `TaskState`, `TaskState1`, ...; (2) strip sibling keys from `$ref` usages so structurally identical refs don't get emitted as `Struct1`, `Struct2`. If you change the generator, preserve these — losing them produces a duplicated, numbered type wall.
 

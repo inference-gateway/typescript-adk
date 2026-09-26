@@ -128,13 +128,13 @@ If you'd rather manage your own Node and pnpm versions:
 
 ### Regenerating A2A Protocol Types
 
-The A2A protocol types in `src/types/generated/` are produced by `scripts/generate-a2a-types.ts` from the canonical JSON Schema in [`inference-gateway/schemas`](https://github.com/inference-gateway/schemas), pinned by commit SHA in the `SCHEMA_REF` constant at the top of the generator. **Never hand-edit `src/types/generated/`** - ESLint excludes it, and the drift test (`tests/a2a-types.test.ts`) will fail CI if the committed file disagrees with what regenerating from `SCHEMA_REF` would produce.
+The A2A protocol types in `src/types/generated/` are produced by `scripts/generate-a2a-types.ts` from the canonical JSON Schema in [`inference-gateway/schemas`](https://github.com/inference-gateway/schemas), pinned by release tag in the `SCHEMA_REF` constant at the top of the generator. **Never hand-edit `src/types/generated/`** - ESLint excludes it, and the drift test (`tests/a2a-types.test.ts`) will fail CI if the committed file disagrees with what regenerating from `SCHEMA_REF` would produce.
 
 To consume a newer upstream schema:
 
-1. Bump `SCHEMA_REF` in `scripts/generate-a2a-types.ts` to the new commit SHA.
+1. Bump `SCHEMA_REF` in `scripts/generate-a2a-types.ts` to the new release tag (e.g. `v0.34.3`).
 2. Run `pnpm generate:types`.
-3. Commit both the SHA bump and the regenerated `src/types/generated/a2a.ts` in the same commit.
+3. Commit both the tag bump and the regenerated `src/types/generated/a2a.ts` in the same commit.
 
 The generator does two non-obvious normalizations before handing the schema to `json-schema-to-typescript`: (1) hoist inline named enums to top-level definitions so they aren't inlined as `TaskState1`, `TaskState2`, ...; (2) strip sibling keys from `$ref` usages so structurally identical refs don't get emitted as `Struct1`, `Struct2`. If you change the generator, preserve these - losing them produces a duplicated, numbered type wall.
 

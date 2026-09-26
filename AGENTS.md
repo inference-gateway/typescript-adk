@@ -22,7 +22,7 @@ Public exports start at `src/index.ts` (barrel). Domain code lives in `src/agent
 
 ## Generated A2A types
 
-`src/types/generated/a2a.ts` is generated from the canonical JSON Schema in `inference-gateway/schemas`, pinned by commit SHA in `SCHEMA_REF` (`scripts/generate-a2a-types.ts`). **Never hand-edit `src/types/generated/`.** The drift check in `pnpm test` (`tests/a2a-types.test.ts`) fetches the pinned schema and fails if the committed file disagrees with regeneration — it has a 30s timeout and fails offline by design, not as a flake. Schema bump: change `SCHEMA_REF`, run `pnpm generate:types`, commit both.
+`src/types/generated/a2a.ts` is generated from the canonical JSON Schema in `inference-gateway/schemas`, pinned by release tag in `SCHEMA_REF` (`scripts/generate-a2a-types.ts`). **Never hand-edit `src/types/generated/`.** The drift check in `pnpm test` (`tests/a2a-types.test.ts`) fetches the pinned schema and fails if the committed file disagrees with regeneration — it has a 30s timeout and fails offline by design, not as a flake. Schema bump: change `SCHEMA_REF`, run `pnpm generate:types`, commit both.
 
 ## Code Style
 

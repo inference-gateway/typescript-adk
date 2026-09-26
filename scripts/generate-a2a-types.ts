@@ -10,11 +10,11 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Pin the schema by commit SHA so regeneration is reproducible.
+// Pin the schema by release tag so regeneration is reproducible.
 // Bump this when the upstream schema you want to consume changes.
 export const SCHEMA_REPO = 'inference-gateway/schemas';
 export const SCHEMA_PATH = 'a2a/a2a-schema.json';
-export const SCHEMA_REF = '2b5aea62d53c6dc13990f14a2da6483db1a97902';
+export const SCHEMA_REF = 'v0.34.3';
 
 export const SCHEMA_URL = `https://raw.githubusercontent.com/${SCHEMA_REPO}/${SCHEMA_REF}/${SCHEMA_PATH}`;
 
