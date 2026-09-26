@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 // Bump this when the upstream schema you want to consume changes.
 export const SCHEMA_REPO = 'inference-gateway/schemas';
 export const SCHEMA_PATH = 'a2a/a2a-schema.json';
-export const SCHEMA_REF = '2b5aea62d53c6dc13990f14a2da6483db1a97902';
+export const SCHEMA_REF = 'aabce833c520de67b77e67d319872a5c89f46480';
 
 export const SCHEMA_URL = `https://raw.githubusercontent.com/${SCHEMA_REPO}/${SCHEMA_REF}/${SCHEMA_PATH}`;
 

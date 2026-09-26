@@ -1,6 +1,6 @@
 // Code generated from A2A schema. DO NOT EDIT.
 //
-// Source: https://github.com/inference-gateway/schemas/blob/2b5aea62d53c6dc13990f14a2da6483db1a97902/a2a/a2a-schema.json
+// Source: https://github.com/inference-gateway/schemas/blob/aabce833c520de67b77e67d319872a5c89f46480/a2a/a2a-schema.json
 // Regenerate with: pnpm generate:types
 
 /**
@@ -140,16 +140,16 @@ export interface AgentExtension {
   /**
    * A human-readable description of how this agent uses the extension.
    */
-  description: string;
+  description?: string;
   params?: Struct;
   /**
    * If true, the client must understand and comply with the extension's requirements.
    */
-  required: boolean;
+  required?: boolean;
   /**
    * The unique URI identifying the extension.
    */
-  uri: string;
+  uri?: string;
 }
 
 /**
@@ -321,11 +321,11 @@ export interface CancelTaskRequest {
    * The resource name of the task to cancel.
    *  Format: tasks/{task_id}
    */
-  name: string;
+  name?: string;
   /**
    * Optional tenant, provided as a path parameter.
    */
-  tenant: string;
+  tenant?: string;
 }
 
 /**
@@ -363,11 +363,11 @@ export interface DeleteTaskPushNotificationConfigRequest {
    * The resource name of the config to delete.
    *  Format: tasks/{task_id}/pushNotificationConfigs/{config_id}
    */
-  name: string;
+  name?: string;
   /**
    * Optional tenant, provided as a path parameter.
    */
-  tenant: string;
+  tenant?: string;
 }
 
 /**
@@ -388,18 +388,18 @@ export interface FilePart {
   /**
    * The media type of the file (e.g., "application/pdf").
    */
-  mediaType: string;
+  mediaType?: string;
   /**
    * An optional name for the file (e.g., "document.pdf").
    */
-  name: string;
+  name?: string;
 }
 
 export interface GetExtendedAgentCardRequest {
   /**
    * Optional tenant, provided as a path parameter.
    */
-  tenant: string;
+  tenant?: string;
 }
 
 export interface GetTaskPushNotificationConfigRequest {
@@ -407,11 +407,11 @@ export interface GetTaskPushNotificationConfigRequest {
    * The resource name of the config to retrieve.
    *  Format: tasks/{task_id}/pushNotificationConfigs/{config_id}
    */
-  name: string;
+  name?: string;
   /**
    * Optional tenant, provided as a path parameter.
    */
-  tenant: string;
+  tenant?: string;
 }
 
 /**
@@ -478,20 +478,20 @@ export interface ListTaskPushNotificationConfigRequest {
   /**
    * The maximum number of configurations to return.
    */
-  pageSize: number;
+  pageSize?: number;
   /**
    * A page token received from a previous ListTaskPushNotificationConfigRequest call.
    */
-  pageToken: string;
+  pageToken?: string;
   /**
    * The parent task resource.
    *  Format: tasks/{task_id}
    */
-  parent: string;
+  parent?: string;
   /**
    * Optional tenant, provided as a path parameter.
    */
-  tenant: string;
+  tenant?: string;
 }
 
 /**
@@ -507,7 +507,7 @@ export interface ListTaskPushNotificationConfigResponse {
    * A token, which can be sent as `page_token` to retrieve the next page.
    *  If this field is omitted, there are no subsequent pages.
    */
-  nextPageToken: string;
+  nextPageToken?: string;
 }
 
 /**
@@ -517,7 +517,7 @@ export interface ListTasksRequest {
   /**
    * Filter tasks by context ID to get tasks from a specific conversation or session.
    */
-  contextId: string;
+  contextId?: string;
   /**
    * The maximum number of messages to include in each task's history.
    */
@@ -531,7 +531,7 @@ export interface ListTasksRequest {
    * Filter tasks updated after this timestamp (milliseconds since epoch).
    *  Only tasks with a last updated time greater than or equal to this value will be returned.
    */
-  lastUpdatedAfter: number;
+  lastUpdatedAfter?: number;
   /**
    * Maximum number of tasks to return. Must be between 1 and 100.
    *  Defaults to 50 if not specified.
@@ -540,12 +540,12 @@ export interface ListTasksRequest {
   /**
    * Token for pagination. Use the next_page_token from a previous ListTasksResponse.
    */
-  pageToken: string;
-  status: TaskState;
+  pageToken?: string;
+  status?: TaskState;
   /**
    * Optional tenant, provided as a path parameter.
    */
-  tenant: string;
+  tenant?: string;
 }
 
 /**
@@ -619,7 +619,7 @@ export interface MutualTlsSecurityScheme {
   /**
    * An optional description for the security scheme.
    */
-  description: string;
+  description?: string;
 }
 
 /**
@@ -749,7 +749,7 @@ export interface SendMessageConfiguration {
   /**
    * If true, the operation waits until the task reaches a terminal state before returning. Default is false.
    */
-  blocking: boolean;
+  blocking?: boolean;
   /**
    * The maximum number of messages to include in the history.
    */
@@ -763,12 +763,12 @@ export interface SendMessageConfiguration {
  */
 export interface SendMessageRequest {
   configuration?: SendMessageConfiguration;
-  message?: Message;
+  message: Message;
   metadata?: Struct;
   /**
    * Optional tenant, provided as a path parameter.
    */
-  tenant: string;
+  tenant?: string;
 }
 
 /**
@@ -823,11 +823,11 @@ export interface SubscribeToTaskRequest {
    * The resource name of the task to subscribe to.
    *  Format: tasks/{task_id}
    */
-  name: string;
+  name?: string;
   /**
    * Optional tenant, provided as a path parameter.
    */
-  tenant: string;
+  tenant?: string;
 }
 
 /**
