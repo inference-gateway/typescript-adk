@@ -202,7 +202,7 @@ Each example ships its own README with setup instructions.
 
 - 📦 **ESM-only** - Modern ES2024 bundle via `tsup`, targeted at Node 24 LTS+
 - 🛡️ **Strict TypeScript** - `verbatimModuleSyntax`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `isolatedModules`
-- 📚 **Generated A2A Types** - Types generated from the canonical [`inference-gateway/schemas`](https://github.com/inference-gateway/schemas) at a pinned commit SHA, with a drift check enforced in CI
+- 📚 **Generated A2A Types** - Types generated from the canonical [`inference-gateway/schemas`](https://github.com/inference-gateway/schemas) at a pinned release tag, with a drift check enforced in CI
 - 🧪 **Well Tested** - Vitest suite covering the public surface; a dedicated drift test guards the generated A2A types
 - 🪶 **Minimal Dependencies** - Only `hono` + `@hono/node-server` at runtime
 

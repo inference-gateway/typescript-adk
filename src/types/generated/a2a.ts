@@ -1,6 +1,6 @@
 // Code generated from A2A schema. DO NOT EDIT.
 //
-// Source: https://github.com/inference-gateway/schemas/blob/aabce833c520de67b77e67d319872a5c89f46480/a2a/a2a-schema.json
+// Source: https://github.com/inference-gateway/schemas/blob/v0.34.3/a2a/a2a-schema.json
 // Regenerate with: pnpm generate:types
 
 /**
