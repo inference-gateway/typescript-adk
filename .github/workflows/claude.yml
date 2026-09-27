@@ -83,7 +83,7 @@ jobs:
     uses: inference-gateway/.github/.github/workflows/claude.yml@main
     with:
       language: "typescript"
-      allowed-tools: "Bash(task:*),Bash(node:*),Bash(npm:*),Bash(pnpm:*)"
+      extra-tools: "Bash(pnpm:*)"
       plugins: |
         DietrichGebert/ponytail
       browser: ${{ inputs.browser || false }}
