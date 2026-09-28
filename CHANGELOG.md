@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.16.2](https://github.com/inference-gateway/typescript-adk/compare/v0.16.1...v0.16.2) (2026-09-28)
+
+### 👷 CI
+
+* **claude:** centralize claude.yml via reusable workflow ([#229](https://github.com/inference-gateway/typescript-adk/issues/229)) ([784d966](https://github.com/inference-gateway/typescript-adk/commit/784d96633d4087ffd1541dd098435eac22df3907))
+
+### 🔧 Miscellaneous
+
+* **deps:** bump the npm group with 10 updates ([#230](https://github.com/inference-gateway/typescript-adk/issues/230)) ([7c07db8](https://github.com/inference-gateway/typescript-adk/commit/7c07db86dada7d1bb06c29c860233db8aa2d710e))
+
 ## [0.16.1](https://github.com/inference-gateway/typescript-adk/compare/v0.16.0...v0.16.1) (2026-09-26)
 
 ### 🐛 Bug Fixes
