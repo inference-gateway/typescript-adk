@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.17.0](https://github.com/inference-gateway/typescript-adk/compare/v0.16.2...v0.17.0) (2026-10-01)
+
+### ✨ Features
+
+* pin the a2a schema in a file and add schemas-sync ([#234](https://github.com/inference-gateway/typescript-adk/issues/234)) ([c79b731](https://github.com/inference-gateway/typescript-adk/commit/c79b731148283ca4fbecdbef2fd7f521795cc09e))
+
+### ♻️ Improvements
+
+* migrate to a2a v1.0.1 types ([#236](https://github.com/inference-gateway/typescript-adk/issues/236)) ([0aeb1cf](https://github.com/inference-gateway/typescript-adk/commit/0aeb1cf7359de23bbb7667da8ba00637c2546ab5))
+
+### 🔧 Miscellaneous
+
+* **deps:** bump claude-code 2.1.280 -> 2.1.283 ([#231](https://github.com/inference-gateway/typescript-adk/issues/231)) ([c05a3dd](https://github.com/inference-gateway/typescript-adk/commit/c05a3ddfac5e501158405f2c8854d462a1794515))
+* **deps:** bump infer CLI v0.208.0 -> v0.218.0 ([#232](https://github.com/inference-gateway/typescript-adk/issues/232)) ([661dd58](https://github.com/inference-gateway/typescript-adk/commit/661dd586be37e0dd99b2bef8a234d35f6e49ec7e))
+* **deps:** bump infer CLI v0.218.0 -> v0.221.1 ([#233](https://github.com/inference-gateway/typescript-adk/issues/233)) ([b5020f0](https://github.com/inference-gateway/typescript-adk/commit/b5020f0932fda7edd8a0474ec4a53081f2eb71df))
+
 ## [0.16.2](https://github.com/inference-gateway/typescript-adk/compare/v0.16.1...v0.16.2) (2026-09-28)
 
 ### 👷 CI
