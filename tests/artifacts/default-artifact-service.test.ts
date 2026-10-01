@@ -73,13 +73,11 @@ describe('DefaultArtifactService.createFileArtifact', () => {
 
     expect(artifact.artifactId).toBe('file-1');
     expect(artifact.parts).toHaveLength(1);
-    const file = artifact.parts[0]?.file;
+    const file = artifact.parts[0];
     expect(file).toBeDefined();
-    expect(file?.name).toBe('image.png');
+    expect(file?.filename).toBe('image.png');
     expect(file?.mediaType).toBe('image/png');
-    expect(file?.fileWithUri).toBe(
-      'https://example.test/artifacts/file-1/image.png'
-    );
+    expect(file?.url).toBe('https://example.test/artifacts/file-1/image.png');
 
     // Storage actually received the bytes
     expect(await storage.exists('file-1', 'image.png')).toBe(true);
@@ -97,7 +95,7 @@ describe('DefaultArtifactService.createFileArtifact', () => {
       'mystery.xyz',
       new Uint8Array([1, 2, 3])
     );
-    expect(artifact.parts[0]?.file?.mediaType).toBe('application/octet-stream');
+    expect(artifact.parts[0]?.mediaType).toBe('application/octet-stream');
   });
 
   it('honours an explicit mimeType over extension inference', async () => {
@@ -109,7 +107,7 @@ describe('DefaultArtifactService.createFileArtifact', () => {
       new Uint8Array(),
       { mimeType: 'application/xhtml+xml' }
     );
-    expect(artifact.parts[0]?.file?.mediaType).toBe('application/xhtml+xml');
+    expect(artifact.parts[0]?.mediaType).toBe('application/xhtml+xml');
   });
 
   it('wraps storage failures in ArtifactStorageError with the cause set', async () => {
@@ -143,10 +141,10 @@ describe('DefaultArtifactService.createFileArtifactFromURI', () => {
     );
 
     expect(artifact.artifactId).toBe('uri-1');
-    expect(artifact.parts[0]?.file).toEqual({
-      name: 'report.pdf',
+    expect(artifact.parts[0]).toEqual({
+      filename: 'report.pdf',
       mediaType: 'application/pdf',
-      fileWithUri: 'https://s3.example/bucket/report.pdf',
+      url: 'https://s3.example/bucket/report.pdf',
     });
     expect(storage.list()).toHaveLength(0);
   });
@@ -159,7 +157,7 @@ describe('DefaultArtifactService.createFileArtifactFromURI', () => {
       'report.csv',
       'https://example/report.csv'
     );
-    expect(artifact.parts[0]?.file?.mediaType).toBe('text/csv');
+    expect(artifact.parts[0]?.mediaType).toBe('text/csv');
   });
 
   it('defaults to application/octet-stream for unknown extensions', () => {
@@ -170,7 +168,7 @@ describe('DefaultArtifactService.createFileArtifactFromURI', () => {
       'file.unknown',
       'https://example/file'
     );
-    expect(artifact.parts[0]?.file?.mediaType).toBe('application/octet-stream');
+    expect(artifact.parts[0]?.mediaType).toBe('application/octet-stream');
   });
 });
 
@@ -181,7 +179,7 @@ describe('DefaultArtifactService.createDataArtifact', () => {
       count: 42,
     });
     expect(artifact.artifactId).toBe('data-1');
-    expect(artifact.parts).toEqual([{ data: { data: { count: 42 } } }]);
+    expect(artifact.parts).toEqual([{ data: { count: 42 } }]);
   });
 
   it('shallow-copies the payload so caller mutations do not leak in', () => {
@@ -189,7 +187,7 @@ describe('DefaultArtifactService.createDataArtifact', () => {
     const payload = { count: 1 };
     const artifact = service.createDataArtifact('n', 'd', payload);
     payload.count = 999;
-    expect(artifact.parts[0]?.data?.data).toEqual({ count: 1 });
+    expect(artifact.parts[0]?.data).toEqual({ count: 1 });
   });
 
   it('throws ArtifactValidationError for non-object payloads', () => {
@@ -206,16 +204,14 @@ describe('DefaultArtifactService.createMultiPartArtifact', () => {
     const artifact = service.createMultiPartArtifact('n', 'd', [
       { text: 'hello' },
       {
-        file: {
-          name: 'a.txt',
-          mediaType: 'text/plain',
-          fileWithUri: 'https://example/a.txt',
-        },
+        filename: 'a.txt',
+        mediaType: 'text/plain',
+        url: 'https://example/a.txt',
       },
     ]);
     expect(artifact.parts).toHaveLength(2);
     expect(artifact.parts[0]?.text).toBe('hello');
-    expect(artifact.parts[1]?.file?.name).toBe('a.txt');
+    expect(artifact.parts[1]?.filename).toBe('a.txt');
   });
 
   it('rejects an empty parts array', () => {
@@ -235,9 +231,7 @@ describe('DefaultArtifactService.createMultiPartArtifact', () => {
   it('rejects a part with more than one populated field', () => {
     const { service } = makeService();
     expect(() =>
-      service.createMultiPartArtifact('n', 'd', [
-        { text: 'x', data: { data: { y: 1 } } },
-      ])
+      service.createMultiPartArtifact('n', 'd', [{ text: 'x', data: { y: 1 } }])
     ).toThrow(ArtifactValidationError);
   });
 
@@ -245,7 +239,7 @@ describe('DefaultArtifactService.createMultiPartArtifact', () => {
     const { service } = makeService();
     expect(() =>
       service.createMultiPartArtifact('n', 'd', [
-        { file: { name: 'a', mediaType: 'text/plain' } },
+        { filename: 'a', mediaType: 'text/plain', raw: '' },
       ])
     ).toThrow(ArtifactValidationError);
   });
@@ -309,18 +303,16 @@ describe('DefaultArtifactService.getArtifactsByType', () => {
           artifactId: 'a-file',
           parts: [
             {
-              file: {
-                name: 'a',
-                mediaType: 'text/plain',
-                fileWithUri: 'https://example',
-              },
+              filename: 'a',
+              mediaType: 'text/plain',
+              url: 'https://example',
             },
           ],
         },
-        { artifactId: 'a-data', parts: [{ data: { data: { x: 1 } } }] },
+        { artifactId: 'a-data', parts: [{ data: { x: 1 } }] },
         {
           artifactId: 'a-mixed',
-          parts: [{ text: 'y' }, { data: { data: { x: 2 } } }],
+          parts: [{ text: 'y' }, { data: { x: 2 } }],
         },
       ],
     };

@@ -1,7 +1,7 @@
 import pkg from '../../package.json' with { type: 'json' };
 import type {
   AuthenticationInfo,
-  PushNotificationConfig,
+  TaskPushNotificationConfig,
   Task,
   TaskState,
 } from '../types/generated/a2a.js';
@@ -159,7 +159,7 @@ export interface PushNotificationSender {
    * {@link PushNotificationSendError} on permanent failure.
    */
   sendTaskUpdate(
-    config: PushNotificationConfig,
+    config: TaskPushNotificationConfig,
     task: Task,
     options?: SendTaskUpdateOptions
   ): Promise<void>;
@@ -196,7 +196,7 @@ export class PushNotificationSendError extends Error {
  * HTTP webhook implementation of {@link PushNotificationSender}.
  *
  * Posts JSON-encoded {@link TaskUpdateNotification} payloads to the URL on
- * each {@link PushNotificationConfig}, attaches `Authorization: Bearer <token>`
+ * each {@link TaskPushNotificationConfig}, attaches `Authorization: Bearer <token>`
  * when `config.token` is set (and similar via `config.authentication`), and
  * retries transient HTTP failures with exponential backoff. Failed
  * deliveries surfaced via {@link deliverTaskUpdate} are logged but never
@@ -242,7 +242,7 @@ export class HTTPPushNotificationSender implements PushNotificationSender {
    * outside 5xx/429, or caller abort).
    */
   async sendTaskUpdate(
-    config: PushNotificationConfig,
+    config: TaskPushNotificationConfig,
     task: Task,
     options: SendTaskUpdateOptions = {}
   ): Promise<void> {
@@ -340,7 +340,7 @@ export class HTTPPushNotificationSender implements PushNotificationSender {
    * cannot fail the task that triggered the notification.
    */
   async deliverTaskUpdate(
-    configs: readonly PushNotificationConfig[],
+    configs: readonly TaskPushNotificationConfig[],
     task: Task,
     options: DeliverTaskUpdateOptions = {}
   ): Promise<DeliveryResult[]> {
@@ -431,7 +431,9 @@ export class HTTPPushNotificationSender implements PushNotificationSender {
     return await this.fetchImpl(url, init);
   }
 
-  private buildHeaders(config: PushNotificationConfig): Record<string, string> {
+  private buildHeaders(
+    config: TaskPushNotificationConfig
+  ): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
@@ -446,7 +448,7 @@ export class HTTPPushNotificationSender implements PushNotificationSender {
 }
 
 function resolveAuthorization(
-  config: PushNotificationConfig
+  config: TaskPushNotificationConfig
 ): string | undefined {
   let header: string | undefined;
   if (typeof config.token === 'string' && config.token.length > 0) {
@@ -469,14 +471,12 @@ function authorizationFromSchemes(
   if (typeof credentials !== 'string' || credentials.length === 0) {
     return undefined;
   }
-  for (const scheme of auth.schemes) {
-    const normalised = scheme.toLowerCase();
-    if (normalised === 'bearer') {
-      return `Bearer ${credentials}`;
-    }
-    if (normalised === 'basic') {
-      return `Basic ${credentials}`;
-    }
+  const normalised = auth.scheme.toLowerCase();
+  if (normalised === 'bearer') {
+    return `Bearer ${credentials}`;
+  }
+  if (normalised === 'basic') {
+    return `Basic ${credentials}`;
   }
   return undefined;
 }

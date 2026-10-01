@@ -1,6 +1,6 @@
 import type {
   AgentCard,
-  Security,
+  SecurityRequirement,
   SecurityScheme,
 } from '../types/generated/a2a.js';
 import type { AuthConfig } from './config.js';
@@ -25,7 +25,7 @@ export interface DecorateAgentCardWithAuthOptions {
  *
  *  - `securitySchemes[<schemeName>]` is set to the OpenID Connect security
  *    scheme pointing at the well-known discovery URL for `config.issuerUrl`.
- *  - `security` is extended with a requirement that names `<schemeName>`.
+ *  - `securityRequirements` is extended with a requirement that names `<schemeName>`.
  *
  * Has no effect when `config.enable` is false - returns the input card
  * verbatim so callers can invoke unconditionally.
@@ -58,21 +58,21 @@ export function decorateAgentCardWithAuth(
     [schemeName]: oidcScheme,
   };
 
-  const existingSecurity = card.security ?? [];
+  const existingSecurity = card.securityRequirements ?? [];
   const alreadyRequired = existingSecurity.some(
     (entry) => entry.schemes?.[schemeName] !== undefined
   );
-  const securityRequirement: Security = {
+  const securityRequirement: SecurityRequirement = {
     schemes: { [schemeName]: { list: [] } },
   };
-  const updatedSecurity: Security[] = alreadyRequired
+  const updatedSecurity: SecurityRequirement[] = alreadyRequired
     ? existingSecurity
     : [...existingSecurity, securityRequirement];
 
   return {
     ...card,
     securitySchemes: updatedSchemes,
-    security: updatedSecurity,
+    securityRequirements: updatedSecurity,
   };
 }
 

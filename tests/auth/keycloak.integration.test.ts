@@ -90,7 +90,7 @@ describeMaybe('Keycloak end-to-end (integration)', () => {
       name: 'keycloak-protected-agent',
       description: 'agent protected by keycloak',
       version: '1.0.0',
-      protocolVersion: '1.0',
+      supportedInterfaces: [],
       defaultInputModes: ['text/plain'],
       defaultOutputModes: ['text/plain'],
       capabilities: {},

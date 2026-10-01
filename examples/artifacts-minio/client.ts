@@ -54,8 +54,8 @@ async function downloadAndPrint(uri: string): Promise<void> {
 
 function extractUri(artifact: Artifact): string | undefined {
   for (const part of artifact.parts) {
-    if (typeof part.file?.fileWithUri === 'string') {
-      return part.file.fileWithUri;
+    if (typeof part.url === 'string') {
+      return part.url;
     }
   }
   return undefined;

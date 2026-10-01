@@ -35,18 +35,12 @@ export {
   GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
   createGetAuthenticatedExtendedCardHandler,
 } from './agent-extended-card.js';
-export type {
-  GetAuthenticatedExtendedCardHandlerOptions,
-  GetAuthenticatedExtendedCardParams,
-} from './agent-extended-card.js';
+export type { GetAuthenticatedExtendedCardHandlerOptions } from './agent-extended-card.js';
 export {
   MESSAGE_SEND_METHOD,
   createMessageSendHandler,
 } from './message-send.js';
-export type {
-  MessageSendHandlerOptions,
-  MessageSendParams,
-} from './message-send.js';
+export type { MessageSendHandlerOptions } from './message-send.js';
 export {
   DEFAULT_STREAMING_STATUS_UPDATE_INTERVAL_MS,
   MESSAGE_STREAM_METHOD,
@@ -55,7 +49,6 @@ export {
 } from './message-stream.js';
 export type {
   MessageStreamHandlerOptions,
-  MessageStreamParams,
   StreamingExecutorContext,
   StreamingMethodHandler,
   StreamingMethodResult,
@@ -63,7 +56,7 @@ export type {
   StreamingTaskExecutor,
 } from './message-stream.js';
 export { TASK_GET_METHOD, createTaskGetHandler } from './task-get.js';
-export type { TaskGetHandlerOptions, TaskGetParams } from './task-get.js';
+export type { TaskGetHandlerOptions } from './task-get.js';
 export {
   TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD,
   TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD,
@@ -74,14 +67,7 @@ export {
   createTaskPushNotificationConfigListHandler,
   createTaskPushNotificationConfigSetHandler,
 } from './push-notification-config.js';
-export type {
-  TaskPushNotificationConfigDeleteParams,
-  TaskPushNotificationConfigGetParams,
-  TaskPushNotificationConfigHandlerOptions,
-  TaskPushNotificationConfigListParams,
-  TaskPushNotificationConfigListResult,
-  TaskPushNotificationConfigSetParams,
-} from './push-notification-config.js';
+export type { TaskPushNotificationConfigHandlerOptions } from './push-notification-config.js';
 export {
   DEFAULT_PUSH_NOTIFICATION_CONCURRENCY,
   DEFAULT_PUSH_NOTIFICATION_RETRY_CONFIG,
@@ -100,19 +86,13 @@ export type {
   TaskUpdateNotification,
 } from './push-notification-sender.js';
 export { TASK_CANCEL_METHOD, createTaskCancelHandler } from './task-cancel.js';
-export type {
-  TaskCancelHandlerOptions,
-  TaskCancelParams,
-} from './task-cancel.js';
+export type { TaskCancelHandlerOptions } from './task-cancel.js';
 export { TaskCancellationRegistry } from './task-cancellation.js';
 export {
   TASK_RESUBSCRIBE_METHOD,
   createTaskResubscribeHandler,
 } from './task-resubscribe.js';
-export type {
-  TaskResubscribeHandlerOptions,
-  TaskResubscribeParams,
-} from './task-resubscribe.js';
+export type { TaskResubscribeHandlerOptions } from './task-resubscribe.js';
 export { TaskEventBus, TaskEventBusRegistry } from './task-event-bus.js';
 export type {
   TaskEventCloseListener,
@@ -125,11 +105,7 @@ export {
   TASK_LIST_METHOD,
   createTaskListHandler,
 } from './task-list.js';
-export type {
-  TaskListHandlerOptions,
-  TaskListParams,
-  TaskListResult,
-} from './task-list.js';
+export type { TaskListHandlerOptions } from './task-list.js';
 export {
   AGENT_EVENT_TYPE,
   CLOUDEVENTS_CONTENT_TYPE,

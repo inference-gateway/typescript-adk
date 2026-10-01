@@ -1,6 +1,6 @@
 import { toWireTask } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
-import type { Struct, Task } from '../types/generated/a2a.js';
+import type { GetTaskRequest, Task } from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
 import type { MethodHandler } from './method-registry.js';
 
@@ -11,23 +11,6 @@ import type { MethodHandler } from './method-registry.js';
  * spelling stays in lockstep with conformance tests and other consumers.
  */
 export const TASK_GET_METHOD = 'tasks/get';
-
-/**
- * JSON-RPC params accepted by the A2A `tasks/get` method.
- *
- * Mirrors `types.TaskQueryParams` in the Go ADK (see
- * https://github.com/inference-gateway/adk/blob/main/types/types.go), but uses
- * `taskId` instead of `id` to match the field name used elsewhere in the A2A
- * schema (e.g., `Message.taskId`).
- *
- * `historyLength`, when provided, caps the returned `history` to that many
- * most-recent messages. Omitting it returns the full history.
- */
-export interface TaskGetParams {
-  readonly taskId: string;
-  readonly historyLength?: number;
-  readonly metadata?: Struct;
-}
 
 export interface TaskGetHandlerOptions {
   /** Storage backend to look up tasks in (both active and dead-letter). */
@@ -60,7 +43,7 @@ export function createTaskGetHandler(
 
   return (params: unknown): Task => {
     const validated = validateTaskGetParams(params);
-    const task = storage.getTask(validated.taskId);
+    const task = storage.getTask(validated.id);
     if (task === undefined) {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
@@ -71,20 +54,20 @@ export function createTaskGetHandler(
   };
 }
 
-function validateTaskGetParams(params: unknown): TaskGetParams {
+function validateTaskGetParams(params: unknown): GetTaskRequest {
   if (params === null || typeof params !== 'object' || Array.isArray(params)) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: expected TaskGetParams object'
+      'invalid params: expected GetTaskRequest object'
     );
   }
   const obj = params as Record<string, unknown>;
 
-  const taskId = obj['taskId'];
+  const taskId = obj['id'];
   if (typeof taskId !== 'string' || taskId.length === 0) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: taskId is required and must be a non-empty string'
+      'invalid params: id is required and must be a non-empty string'
     );
   }
 
@@ -104,5 +87,7 @@ function validateTaskGetParams(params: unknown): TaskGetParams {
     historyLength = rawHistoryLength;
   }
 
-  return historyLength === undefined ? { taskId } : { taskId, historyLength };
+  return historyLength === undefined
+    ? { id: taskId }
+    : { id: taskId, historyLength };
 }

@@ -777,7 +777,7 @@ function parseCreateArtifactArgs(args: string): CreateArtifactArgs {
 
 function extractArtifactUri(artifact: Artifact): string | undefined {
   for (const part of artifact.parts ?? []) {
-    const uri = part.file?.fileWithUri;
+    const uri = part.url;
     if (typeof uri === 'string' && uri.length > 0) {
       return uri;
     }

@@ -101,8 +101,7 @@ final status: {
       ]
     },
     "timestamp": "…"
-  },
-  "final": true
+  }
 }
 ```
 

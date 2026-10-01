@@ -21,7 +21,7 @@ function minimalCard(): AgentCard {
     name: 'agent',
     description: 'desc',
     version: '1.0.0',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: {},

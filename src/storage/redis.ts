@@ -1,6 +1,6 @@
 import type { Redis, RedisOptions } from 'ioredis';
 import { isTerminal, type ManagedTask } from '../agent/task.js';
-import type { PushNotificationConfig } from '../types/generated/a2a.js';
+import type { TaskPushNotificationConfig } from '../types/generated/a2a.js';
 import { selectTasksForEviction } from './retention.js';
 import {
   TaskStorageError,
@@ -555,7 +555,7 @@ export class RedisTaskStorage implements TaskStorage {
 
   setPushConfig(
     taskId: string,
-    config: PushNotificationConfig
+    config: TaskPushNotificationConfig
   ): StoredPushNotificationConfig {
     let bucket = this.pushConfigs.get(taskId);
     if (bucket === undefined) {

@@ -23,7 +23,7 @@ function makeCard(): AgentCard {
     name: 'streaming-agent',
     description: 'Agent under test',
     version: '0.0.0',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: { streaming: true },
@@ -198,11 +198,15 @@ describe('message/stream JSON-RPC conformance', () => {
     expect(first.taskId).toBe('id-1');
     expect(first.contextId).toBe('ctx-1');
     expect(first.status.state).toBe(TASK_STATE.IN_PROGRESS);
-    expect(first.final).toBe(false);
+    expect(first.status.state).not.toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
 
     const last = frames[frames.length - 1]?.json.data as TaskStatusUpdateEvent;
     expect(last.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(last.final).toBe(true);
+    expect(last.status.state).toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
 
     const stored = storage.getTask('id-1');
     expect(stored?.state).toBe(TASK_STATE.COMPLETED);

@@ -28,7 +28,7 @@ function makeCard(overrides: Partial<AgentCard> = {}): AgentCard {
     name: 'auth-test-agent',
     description: 'Agent under test',
     version: '1.0.0',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: {},

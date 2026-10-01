@@ -1,5 +1,5 @@
 import { isTerminal, type ManagedTask } from '../agent/task.js';
-import type { PushNotificationConfig } from '../types/generated/a2a.js';
+import type { TaskPushNotificationConfig } from '../types/generated/a2a.js';
 import {
   TaskStorageError,
   type StoredPushNotificationConfig,
@@ -257,7 +257,7 @@ export class InMemoryTaskStorage implements TaskStorage {
 
   setPushConfig(
     taskId: string,
-    config: PushNotificationConfig
+    config: TaskPushNotificationConfig
   ): StoredPushNotificationConfig {
     let bucket = this.pushConfigs.get(taskId);
     if (bucket === undefined) {

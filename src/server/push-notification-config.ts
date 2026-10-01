@@ -1,8 +1,10 @@
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
   AuthenticationInfo,
-  PushNotificationConfig,
-  Struct,
+  DeleteTaskPushNotificationConfigRequest,
+  GetTaskPushNotificationConfigRequest,
+  ListTaskPushNotificationConfigsRequest,
+  ListTaskPushNotificationConfigsResponse,
   TaskPushNotificationConfig,
 } from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
@@ -36,52 +38,6 @@ export const TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD =
 export const TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD =
   'tasks/pushNotificationConfig/delete';
 
-/**
- * Params accepted by the `tasks/pushNotificationConfig/set` method.
- *
- * Mirrors the Go ADK's `TaskPushNotificationConfig` shape (see
- * `adk/server/task_handler.go:HandleTaskPushNotificationConfigSet`), but uses
- * `taskId` rather than the schema's resource-path `name` for consistency with
- * the rest of the `tasks/*` method family in this ADK.
- *
- * If `pushNotificationConfig.id` is omitted or empty, the handler assigns one
- * via `crypto.randomUUID()` and returns the populated config so the caller can
- * use it as the key for subsequent `get`/`delete` calls.
- */
-export interface TaskPushNotificationConfigSetParams {
-  readonly taskId: string;
-  readonly pushNotificationConfig: PushNotificationConfig;
-  readonly metadata?: Struct;
-}
-
-/** Params accepted by the `tasks/pushNotificationConfig/get` method. */
-export interface TaskPushNotificationConfigGetParams {
-  readonly taskId: string;
-  readonly pushNotificationConfigId: string;
-  readonly metadata?: Struct;
-}
-
-/** Params accepted by the `tasks/pushNotificationConfig/list` method. */
-export interface TaskPushNotificationConfigListParams {
-  readonly taskId: string;
-  readonly metadata?: Struct;
-}
-
-/**
- * Result of the `tasks/pushNotificationConfig/list` method. The `configs`
- * array is FIFO-ordered by insertion (matches the storage iteration order).
- */
-export interface TaskPushNotificationConfigListResult {
-  readonly configs: PushNotificationConfig[];
-}
-
-/** Params accepted by the `tasks/pushNotificationConfig/delete` method. */
-export interface TaskPushNotificationConfigDeleteParams {
-  readonly taskId: string;
-  readonly pushNotificationConfigId: string;
-  readonly metadata?: Struct;
-}
-
 export interface TaskPushNotificationConfigHandlerOptions {
   /** Storage backend that persists configs via `setPushConfig` / etc. */
   readonly storage: TaskStorage;
@@ -106,9 +62,9 @@ export interface TaskPushNotificationConfigHandlerOptions {
  *
  * Errors surface as JSON-RPC `-32602` (Invalid Params):
  *  - `params` not an object, missing `taskId`, missing `pushNotificationConfig`
- *  - `pushNotificationConfig.url` missing or empty
- *  - `pushNotificationConfig.id` present but not a non-empty string
- *  - `pushNotificationConfig.token` present but not a string
+ *  - `url` missing or empty
+ *  - `id` present but not a non-empty string
+ *  - `token` present but not a string
  *
  * Storage does *not* verify that `taskId` corresponds to a known task -
  * matches the Go ADK's behaviour and lets clients register configs before the
@@ -120,15 +76,8 @@ export function createTaskPushNotificationConfigSetHandler(
   const { storage } = options;
 
   return (params: unknown): TaskPushNotificationConfig => {
-    const validated = validateSetParams(params);
-    const stored = storage.setPushConfig(
-      validated.taskId,
-      validated.pushNotificationConfig
-    );
-    return {
-      name: encodeResourceName(validated.taskId, stored.id),
-      pushNotificationConfig: stored,
-    };
+    const { taskId, ...config } = validateSetParams(params);
+    return { ...storage.setPushConfig(taskId, config), taskId };
   };
 }
 
@@ -148,23 +97,14 @@ export function createTaskPushNotificationConfigGetHandler(
 
   return (params: unknown): TaskPushNotificationConfig => {
     const validated = validateGetParams(params);
-    const config = storage.getPushConfig(
-      validated.taskId,
-      validated.pushNotificationConfigId
-    );
+    const config = storage.getPushConfig(validated.taskId, validated.id);
     if (config === undefined) {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
         'push notification config not found'
       );
     }
-    return {
-      name: encodeResourceName(
-        validated.taskId,
-        validated.pushNotificationConfigId
-      ),
-      pushNotificationConfig: config,
-    };
+    return { ...config, taskId: validated.taskId };
   };
 }
 
@@ -179,12 +119,16 @@ export function createTaskPushNotificationConfigGetHandler(
  */
 export function createTaskPushNotificationConfigListHandler(
   options: TaskPushNotificationConfigHandlerOptions
-): MethodHandler<unknown, TaskPushNotificationConfigListResult> {
+): MethodHandler<unknown, ListTaskPushNotificationConfigsResponse> {
   const { storage } = options;
 
-  return (params: unknown): TaskPushNotificationConfigListResult => {
+  return (params: unknown): ListTaskPushNotificationConfigsResponse => {
     const validated = validateListParams(params);
-    return { configs: storage.listPushConfigs(validated.taskId) };
+    return {
+      configs: storage
+        .listPushConfigs(validated.taskId)
+        .map((config) => ({ ...config, taskId: validated.taskId })),
+    };
   };
 }
 
@@ -204,10 +148,7 @@ export function createTaskPushNotificationConfigDeleteHandler(
 
   return (params: unknown): null => {
     const validated = validateDeleteParams(params);
-    const removed = storage.deletePushConfig(
-      validated.taskId,
-      validated.pushNotificationConfigId
-    );
+    const removed = storage.deletePushConfig(validated.taskId, validated.id);
     if (!removed) {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
@@ -216,10 +157,6 @@ export function createTaskPushNotificationConfigDeleteHandler(
     }
     return null;
   };
-}
-
-function encodeResourceName(taskId: string, configId: string): string {
-  return `tasks/${taskId}/pushNotificationConfigs/${configId}`;
 }
 
 function requireParamsObject(
@@ -246,63 +183,29 @@ function requireString(obj: Record<string, unknown>, key: string): string {
   return value;
 }
 
-function optionalMetadata(obj: Record<string, unknown>): Struct | undefined {
-  const raw = obj['metadata'];
-  if (raw === undefined) {
-    return undefined;
-  }
-  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new JSONRPCError(
-      JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: metadata must be an object'
-    );
-  }
-  return raw as Struct;
-}
-
 function validateSetParams(
   params: unknown
-): TaskPushNotificationConfigSetParams {
-  const obj = requireParamsObject(
-    params,
-    'TaskPushNotificationConfigSetParams'
-  );
+): TaskPushNotificationConfig & { readonly taskId: string } {
+  const obj = requireParamsObject(params, 'TaskPushNotificationConfig');
   const taskId = requireString(obj, 'taskId');
-
-  const rawConfig = obj['pushNotificationConfig'];
-  if (
-    rawConfig === null ||
-    typeof rawConfig !== 'object' ||
-    Array.isArray(rawConfig)
-  ) {
-    throw new JSONRPCError(
-      JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: pushNotificationConfig is required and must be an object'
-    );
-  }
-  const configObj = rawConfig as Record<string, unknown>;
-  const pushNotificationConfig = validatePushNotificationConfig(configObj);
-
-  const metadata = optionalMetadata(obj);
-  if (metadata === undefined) {
-    return { taskId, pushNotificationConfig };
-  }
-  return { taskId, pushNotificationConfig, metadata };
+  return { ...validatePushNotificationConfig(obj), taskId };
 }
 
 function validatePushNotificationConfig(
   obj: Record<string, unknown>
-): PushNotificationConfig {
+): TaskPushNotificationConfig {
   const url = obj['url'];
   if (typeof url !== 'string' || url.length === 0) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: pushNotificationConfig.url is required and must be a non-empty string'
+      'invalid params: url is required and must be a non-empty string'
     );
   }
 
   const out: {
-    -readonly [K in keyof PushNotificationConfig]: PushNotificationConfig[K];
+    -readonly [
+      K in keyof TaskPushNotificationConfig
+    ]: TaskPushNotificationConfig[K];
   } = { url };
 
   const rawId = obj['id'];
@@ -310,7 +213,7 @@ function validatePushNotificationConfig(
     if (typeof rawId !== 'string' || rawId.length === 0) {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: pushNotificationConfig.id must be a non-empty string when provided'
+        'invalid params: id must be a non-empty string when provided'
       );
     }
     out.id = rawId;
@@ -321,7 +224,7 @@ function validatePushNotificationConfig(
     if (typeof rawToken !== 'string') {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: pushNotificationConfig.token must be a string when provided'
+        'invalid params: token must be a string when provided'
       );
     }
     out.token = rawToken;
@@ -336,7 +239,7 @@ function validatePushNotificationConfig(
     ) {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: pushNotificationConfig.authentication must be an object when provided'
+        'invalid params: authentication must be an object when provided'
       );
     }
     out.authentication = validateAuthenticationInfo(
@@ -350,34 +253,24 @@ function validatePushNotificationConfig(
 function validateAuthenticationInfo(
   obj: Record<string, unknown>
 ): AuthenticationInfo {
-  const rawSchemes = obj['schemes'];
-  if (!Array.isArray(rawSchemes)) {
+  const scheme = obj['scheme'];
+  if (typeof scheme !== 'string' || scheme.length === 0) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: pushNotificationConfig.authentication.schemes must be an array of strings'
+      'invalid params: authentication.scheme must be a non-empty string'
     );
-  }
-  const schemes: string[] = [];
-  for (const scheme of rawSchemes) {
-    if (typeof scheme !== 'string' || scheme.length === 0) {
-      throw new JSONRPCError(
-        JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: pushNotificationConfig.authentication.schemes must contain non-empty strings'
-      );
-    }
-    schemes.push(scheme);
   }
 
   const out: {
     -readonly [K in keyof AuthenticationInfo]: AuthenticationInfo[K];
-  } = { schemes };
+  } = { scheme };
 
   const rawCredentials = obj['credentials'];
   if (rawCredentials !== undefined) {
     if (typeof rawCredentials !== 'string') {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: pushNotificationConfig.authentication.credentials must be a string when provided'
+        'invalid params: authentication.credentials must be a string when provided'
       );
     }
     out.credentials = rawCredentials;
@@ -388,53 +281,30 @@ function validateAuthenticationInfo(
 
 function validateGetParams(
   params: unknown
-): TaskPushNotificationConfigGetParams {
+): GetTaskPushNotificationConfigRequest {
   const obj = requireParamsObject(
     params,
-    'TaskPushNotificationConfigGetParams'
+    'GetTaskPushNotificationConfigRequest'
   );
-  const taskId = requireString(obj, 'taskId');
-  const pushNotificationConfigId = requireString(
-    obj,
-    'pushNotificationConfigId'
-  );
-  const metadata = optionalMetadata(obj);
-  if (metadata === undefined) {
-    return { taskId, pushNotificationConfigId };
-  }
-  return { taskId, pushNotificationConfigId, metadata };
+  return { taskId: requireString(obj, 'taskId'), id: requireString(obj, 'id') };
 }
 
 function validateListParams(
   params: unknown
-): TaskPushNotificationConfigListParams {
+): ListTaskPushNotificationConfigsRequest {
   const obj = requireParamsObject(
     params,
-    'TaskPushNotificationConfigListParams'
+    'ListTaskPushNotificationConfigsRequest'
   );
-  const taskId = requireString(obj, 'taskId');
-  const metadata = optionalMetadata(obj);
-  if (metadata === undefined) {
-    return { taskId };
-  }
-  return { taskId, metadata };
+  return { taskId: requireString(obj, 'taskId') };
 }
 
 function validateDeleteParams(
   params: unknown
-): TaskPushNotificationConfigDeleteParams {
+): DeleteTaskPushNotificationConfigRequest {
   const obj = requireParamsObject(
     params,
-    'TaskPushNotificationConfigDeleteParams'
+    'DeleteTaskPushNotificationConfigRequest'
   );
-  const taskId = requireString(obj, 'taskId');
-  const pushNotificationConfigId = requireString(
-    obj,
-    'pushNotificationConfigId'
-  );
-  const metadata = optionalMetadata(obj);
-  if (metadata === undefined) {
-    return { taskId, pushNotificationConfigId };
-  }
-  return { taskId, pushNotificationConfigId, metadata };
+  return { taskId: requireString(obj, 'taskId'), id: requireString(obj, 'id') };
 }

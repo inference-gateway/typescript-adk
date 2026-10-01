@@ -12,7 +12,7 @@ function makeExtendedCard(): AgentCard {
     name: 'extended-agent',
     description: 'Agent under test',
     version: '1.2.3',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: { streaming: false },
@@ -28,7 +28,7 @@ function makeExtendedCard(): AgentCard {
         },
       },
     },
-    security: [{ schemes: { oidc: { list: [] } } }],
+    securityRequirements: [{ schemes: { oidc: { list: [] } } }],
   };
 }
 

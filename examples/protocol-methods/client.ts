@@ -11,7 +11,6 @@ import {
   type CloudEvent,
   type ManagedTaskState,
   type Message,
-  type PushNotificationConfig,
   type Task,
   type TaskPushNotificationConfig,
   type TaskStatusUpdateEvent,
@@ -180,13 +179,13 @@ try {
     'card.capabilities.pushNotifications === true'
   );
   assert(
-    agentCard.capabilities.stateTransitionHistory === true,
-    'card.capabilities.stateTransitionHistory === true'
+    agentCard.capabilities.pushNotifications === true,
+    'card.capabilities.pushNotifications === true'
   );
   assert(
-    agentCard.supportsExtendedAgentCard === undefined ||
-      agentCard.supportsExtendedAgentCard === true,
-    'card.supportsExtendedAgentCard is absent or true'
+    agentCard.capabilities.extendedAgentCard === undefined ||
+      agentCard.capabilities.extendedAgentCard === true,
+    'card.capabilities.extendedAgentCard is absent or true'
   );
   console.log(`  name:        ${agentCard.name}`);
   console.log(`  description: ${agentCard.description}`);
@@ -327,9 +326,9 @@ try {
 console.log('\n── 8. tasks/list ─────────────────────────────────────────');
 
 try {
-  const { tasks: allTasks, nextCursor } = await jsonRpcCall<{
+  const { tasks: allTasks, nextPageToken } = await jsonRpcCall<{
     tasks: Task[];
-    nextCursor?: string;
+    nextPageToken: string;
   }>('tasks/list', {});
 
   assert(Array.isArray(allTasks), 'result.tasks is an array');
@@ -338,11 +337,11 @@ try {
   for (const t of allTasks) {
     console.log(`    - ${t.id}  (${t.status.state})`);
   }
-  if (nextCursor !== undefined) {
-    console.log(`  nextCursor:  ${nextCursor}`);
-    pass('nextCursor is present (pagination)');
+  if (nextPageToken !== '') {
+    console.log(`  nextPageToken:  ${nextPageToken}`);
+    pass('nextPageToken is present (pagination)');
   } else {
-    console.log('  nextCursor:  (none, last page)');
+    console.log('  nextPageToken:  (none, last page)');
   }
 } catch (err) {
   fail('tasks/list', String(err));
@@ -389,7 +388,7 @@ try {
   );
 
   const cancelled = await jsonRpcCall<Task>('tasks/cancel', {
-    taskId: cancelTask.id,
+    id: cancelTask.id,
   });
   assert(cancelled.id === cancelTask.id, 'returned task id matches');
   assert(
@@ -422,44 +421,34 @@ try {
     'tasks/pushNotificationConfig/set',
     {
       taskId: createdTask.id,
-      pushNotificationConfig: {
-        url: PUSH_URL,
-        token: PUSH_TOKEN,
-      },
+      url: PUSH_URL,
+      token: PUSH_TOKEN,
     }
   );
-  assert(
-    typeof setResult.name === 'string' && setResult.name.length > 0,
-    'set: returned resource name'
-  );
-  assert(setResult.pushNotificationConfig.url === PUSH_URL, 'set: url matches');
-  const configId = setResult.pushNotificationConfig.id;
+  assert(setResult.url === PUSH_URL, 'set: url matches');
+  const configId = setResult.id;
   assert(
     typeof configId === 'string' && configId.length > 0,
     'set: config id assigned'
   );
-  console.log(`  set: name=${setResult.name} id=${configId}`);
+  console.log(`  set: id=${configId}`);
 
   // 11b. Get
   const getResult = await jsonRpcCall<TaskPushNotificationConfig>(
     'tasks/pushNotificationConfig/get',
     {
       taskId: createdTask.id,
-      pushNotificationConfigId: configId,
+      id: configId,
     }
   );
-  assert(getResult.pushNotificationConfig.url === PUSH_URL, 'get: url matches');
-  assert(
-    getResult.pushNotificationConfig.token === PUSH_TOKEN,
-    'get: token matches'
-  );
-  console.log(`  get: url=${getResult.pushNotificationConfig.url}`);
+  assert(getResult.url === PUSH_URL, 'get: url matches');
+  assert(getResult.token === PUSH_TOKEN, 'get: token matches');
+  console.log(`  get: url=${getResult.url}`);
 
   // 11c. List
-  const listResult = await jsonRpcCall<{ configs: PushNotificationConfig[] }>(
-    'tasks/pushNotificationConfig/list',
-    { taskId: createdTask.id }
-  );
+  const listResult = await jsonRpcCall<{
+    configs: TaskPushNotificationConfig[];
+  }>('tasks/pushNotificationConfig/list', { taskId: createdTask.id });
   assert(Array.isArray(listResult.configs), 'list: configs is array');
   assert(listResult.configs.length >= 1, 'list: at least 1 config');
   console.log(`  list: ${listResult.configs.length} config(s)`);
@@ -469,7 +458,7 @@ try {
     'tasks/pushNotificationConfig/delete',
     {
       taskId: createdTask.id,
-      pushNotificationConfigId: configId,
+      id: configId,
     }
   );
   assert(deleteResult === null, 'delete: returns null');
@@ -481,7 +470,7 @@ try {
       'tasks/pushNotificationConfig/get',
       {
         taskId: createdTask.id,
-        pushNotificationConfigId: configId,
+        id: configId,
       }
     );
     fail('get after delete', 'should have thrown not-found error');
@@ -556,13 +545,11 @@ try {
       // flag, or a terminal state. The server emits both together at end of
       // stream; treating either as terminal makes the walkthrough robust to
       // periodic IN_PROGRESS updates that may interleave with deltas.
-      if (data.final === true || TERMINAL_STATES.has(data.status.state)) {
+      if (TERMINAL_STATES.has(data.status.state)) {
         if (terminalEvent === null) {
           terminalEvent = data;
           streamTaskId = data.taskId;
-          console.log(
-            `\n  [stream] ${data.status.state} (final=${data.final})`
-          );
+          console.log(`\n  [stream] ${data.status.state}`);
         }
       } else if (data.status.state === TASK_STATE.IN_PROGRESS) {
         console.log('\n  [stream] IN_PROGRESS');
@@ -598,7 +585,7 @@ if (streamTaskId !== null) {
       jsonrpc: JSONRPC_VERSION,
       id: crypto.randomUUID(),
       method: TASK_RESUBSCRIBE_METHOD,
-      params: { taskId: streamTaskId },
+      params: { id: streamTaskId },
     };
 
     const response = await fetch(`${SERVER_URL}/`, {
@@ -626,7 +613,7 @@ if (streamTaskId !== null) {
         resubEvents += 1;
         const data = event.data as TaskStatusUpdateEvent;
         console.log(
-          `  [resubscribe] task=${data.taskId} state=${data.status.state} final=${data.final}`
+          `  [resubscribe] task=${data.taskId} state=${data.status.state}`
         );
       }
     }

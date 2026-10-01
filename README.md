@@ -104,14 +104,18 @@ const card: AgentCard = {
   name: 'hello-agent',
   description: 'Echoes every message it receives.',
   version: '0.1.0',
-  protocolVersion: '0.3.0',
-  url: 'http://127.0.0.1:8080',
+  supportedInterfaces: [
+    {
+      url: 'http://127.0.0.1:8080',
+      protocolBinding: 'JSONRPC',
+      protocolVersion: '1.0',
+    },
+  ],
   defaultInputModes: ['text/plain'],
   defaultOutputModes: ['text/plain'],
   capabilities: {
     streaming: false,
     pushNotifications: false,
-    stateTransitionHistory: false,
   },
   skills: [
     { id: 'echo', name: 'Echo', description: 'Echo input.', tags: ['echo'] },
@@ -235,7 +239,7 @@ JSON-RPC methods are registered on a per-server `MethodRegistry`. Call `server.r
 
 - **`createMessageSendHandler({ storage })`** registers as `MESSAGE_SEND_METHOD` (`message/send`). It accepts a JSON-RPC `message/send` request, creates a `SUBMITTED` task, enqueues it on the supplied `TaskStorage`, and returns the wire `Task` immediately. Your worker code dequeues and progresses the task.
 - **`createTaskGetHandler({ storage })`** registers as `TASK_GET_METHOD` (`tasks/get`). It looks up the requested task across active and dead-letter storage and returns whatever it finds.
-- **`createTaskListHandler({ storage })`** registers as `TASK_LIST_METHOD` (`tasks/list`). It returns tasks filtered by optional `state` / `contextId`, paginated with an opaque `cursor` and a `limit` clamped to `maxLimit` (default `100`). The response shape is `{ tasks, nextCursor? }`; `nextCursor` is omitted on the final page. Pagination is stable under concurrent inserts and deletes because the cursor is keyset-encoded on `(createdAt, id)`.
+- **`createTaskListHandler({ storage })`** registers as `TASK_LIST_METHOD` (`tasks/list`). It returns tasks filtered by optional `status` / `contextId`, paginated with an opaque `pageToken` and a `pageSize` clamped to `maxLimit` (default `100`). The response shape is the A2A `ListTasksResponse` (`{ tasks, pageSize, totalSize, nextPageToken }`); `nextPageToken` is empty on the final page. Pagination is stable under concurrent inserts and deletes because the cursor is keyset-encoded on `(createdAt, id)`.
 
 These handlers are pure adapters between the JSON-RPC surface and a `TaskStorage` - no business logic lives in them.
 
@@ -333,7 +337,7 @@ export class MyTaskStorage implements TaskStorage {
     /* read across active + dead-letter */
   }
   listTasks(filter?: TaskListFilter): ManagedTask[] {
-    /* FIFO-ordered by createdAt, offset/limit pagination */
+    /* FIFO-ordered by createdAt, pageToken pagination */
   }
 
   getContexts(): string[] {
@@ -451,7 +455,7 @@ The loader runs a four-step pipeline:
 1. Parse JSON.
 2. Resolve `${VAR}` placeholders against `options.env` (defaults to `process.env`). **A missing env var throws `AgentCardLoadError`** rather than silently substituting an empty string.
 3. Shallow-merge `options.overrides` over the resolved object (overrides win).
-4. Validate the required-field subset (`name`, `description`, `version`, `protocolVersion`, `defaultInputModes`, `defaultOutputModes`, `capabilities`, `skills`) - throws `AgentCardValidationError` (with an optional `field` hint) on failure. Optional fields are deliberately left loose.
+4. Validate the required-field subset (`name`, `description`, `version`, `defaultInputModes`, `defaultOutputModes`, `capabilities`, `skills`) - throws `AgentCardValidationError` (with an optional `field` hint) on failure. Optional fields are deliberately left loose.
 
 `loadAgentCardFromFile` is **synchronous by design** - it uses `readFileSync` and is meant for boot-time configuration. Do not call it on the request path.
 
@@ -523,14 +527,18 @@ const baseCard: AgentCard = {
   name: 'placeholder',
   description: 'placeholder',
   version: '0.0.0',
-  protocolVersion: '0.3.0',
-  url: 'http://127.0.0.1:8080',
+  supportedInterfaces: [
+    {
+      url: 'http://127.0.0.1:8080',
+      protocolBinding: 'JSONRPC',
+      protocolVersion: '1.0',
+    },
+  ],
   defaultInputModes: ['text/plain'],
   defaultOutputModes: ['text/plain'],
   capabilities: {
     streaming: false,
     pushNotifications: false,
-    stateTransitionHistory: false,
   },
   skills: [],
 };
@@ -550,14 +558,19 @@ Inside an agent-card JSON file passed to `loadAgentCardFromFile` / `loadAgentCar
   "name": "${A2A_AGENT_NAME}",
   "description": "Production agent in ${ENVIRONMENT}",
   "version": "0.1.0",
-  "protocolVersion": "0.3.0",
+  "supportedInterfaces": [
+    {
+      "url": "http://127.0.0.1:8080",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+    }
+  ],
   "url": "${A2A_AGENT_URL}",
   "defaultInputModes": ["text/plain"],
   "defaultOutputModes": ["text/plain"],
   "capabilities": {
     "streaming": false,
-    "pushNotifications": false,
-    "stateTransitionHistory": false
+    "pushNotifications": false
   },
   "skills": []
 }

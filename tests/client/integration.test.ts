@@ -20,7 +20,7 @@ function makeCard(): AgentCard {
     name: 'integration-agent',
     description: 'real server for client integration tests',
     version: '0.0.1',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: { streaming: false },

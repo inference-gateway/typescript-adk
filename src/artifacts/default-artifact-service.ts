@@ -1,7 +1,5 @@
 import type {
   Artifact,
-  DataPart,
-  FilePart,
   Part,
   Struct,
   Task,
@@ -114,13 +112,8 @@ export class DefaultArtifactService implements ArtifactService {
       );
     }
 
-    const filePart: FilePart = {
-      name: filename,
-      mediaType,
-      fileWithUri: uri,
-    };
     return this.buildArtifactWithId(artifactId, name, description, [
-      { file: filePart },
+      { filename, mediaType, url: uri },
     ]);
   }
 
@@ -132,12 +125,9 @@ export class DefaultArtifactService implements ArtifactService {
     options: CreateFileArtifactFromURIOptions = {}
   ): Artifact {
     const mediaType = this.resolveMimeType(filename, options.mimeType);
-    const filePart: FilePart = {
-      name: filename,
-      mediaType,
-      fileWithUri: uri,
-    };
-    return this.buildArtifact(name, description, [{ file: filePart }]);
+    return this.buildArtifact(name, description, [
+      { filename, mediaType, url: uri },
+    ]);
   }
 
   createDataArtifact(
@@ -151,8 +141,7 @@ export class DefaultArtifactService implements ArtifactService {
         { field: 'data' }
       );
     }
-    const dataPart: DataPart = { data: { ...data } };
-    return this.buildArtifact(name, description, [{ data: dataPart }]);
+    return this.buildArtifact(name, description, [{ data: { ...data } }]);
   }
 
   createMultiPartArtifact(
@@ -321,18 +310,18 @@ export class DefaultArtifactService implements ArtifactService {
   }
 
   private validatePart(part: Part, index: number): void {
-    const populated = [part.text, part.file, part.data].filter(
+    const populated = [part.text, part.raw ?? part.url, part.data].filter(
       (value) => value !== undefined
     );
     if (populated.length === 0) {
       throw new ArtifactValidationError(
-        `invalid part at index ${index}: must have one of text, file, or data`,
+        `invalid part at index ${index}: must have one of text, raw, url, or data`,
         { field: `parts[${index}]` }
       );
     }
     if (populated.length > 1) {
       throw new ArtifactValidationError(
-        `invalid part at index ${index}: only one of text, file, or data may be set`,
+        `invalid part at index ${index}: only one of text, raw/url, or data may be set`,
         { field: `parts[${index}]` }
       );
     }
@@ -344,24 +333,18 @@ export class DefaultArtifactService implements ArtifactService {
     }
     if (
       part.data !== undefined &&
-      (part.data.data === null || typeof part.data.data !== 'object')
+      (part.data === null || typeof part.data !== 'object')
     ) {
       throw new ArtifactValidationError(
         `invalid part at index ${index}: data content must be a non-null object`,
         { field: `parts[${index}].data` }
       );
     }
-    if (part.file !== undefined) {
-      const file = part.file;
-      if (
-        (file.fileWithBytes === undefined || file.fileWithBytes === '') &&
-        (file.fileWithUri === undefined || file.fileWithUri === '')
-      ) {
-        throw new ArtifactValidationError(
-          `invalid part at index ${index}: file part must set fileWithBytes or fileWithUri`,
-          { field: `parts[${index}].file` }
-        );
-      }
+    if (part.raw === '' && (part.url === undefined || part.url === '')) {
+      throw new ArtifactValidationError(
+        `invalid part at index ${index}: file part must set raw or url`,
+        { field: `parts[${index}]` }
+      );
     }
   }
 }
@@ -372,7 +355,8 @@ function artifactHasPartKind(
 ): boolean {
   for (const part of artifact.parts ?? []) {
     if (partKind === 'text' && part.text !== undefined) return true;
-    if (partKind === 'file' && part.file !== undefined) return true;
+    if (partKind === 'file' && (part.raw ?? part.url) !== undefined)
+      return true;
     if (partKind === 'data' && part.data !== undefined) return true;
   }
   return false;
@@ -381,8 +365,11 @@ function artifactHasPartKind(
 function clonePart(part: Part): Part {
   const next: Part = {};
   if (part.text !== undefined) next.text = part.text;
-  if (part.file !== undefined) next.file = { ...part.file };
-  if (part.data !== undefined) next.data = { data: { ...part.data.data } };
+  if (part.raw !== undefined) next.raw = part.raw;
+  if (part.url !== undefined) next.url = part.url;
+  if (part.filename !== undefined) next.filename = part.filename;
+  if (part.mediaType !== undefined) next.mediaType = part.mediaType;
+  if (part.data !== undefined) next.data = { ...part.data };
   if (part.metadata !== undefined) next.metadata = { ...part.metadata };
   return next;
 }

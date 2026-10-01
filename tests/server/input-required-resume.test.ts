@@ -43,7 +43,7 @@ function makeCard(): AgentCard {
     name: 'input-required-agent',
     description: 'Agent under test',
     version: '0.0.0',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: { streaming: true },
@@ -544,7 +544,9 @@ describe('message/stream JSON-RPC pause + resume', () => {
     expect(lastFirst?.json.type).toBe(AGENT_EVENT_TYPE.TASK_STATUS_CHANGED);
     const lastFirstData = lastFirst?.json.data as TaskStatusUpdateEvent;
     expect(lastFirstData.status.state).toBe(TASK_STATE.INPUT_REQUIRED);
-    expect(lastFirstData.final).toBe(false);
+    expect(lastFirstData.status.state).not.toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
 
     // Paused task must still be discoverable in the active store for resume.
     const paused = storage.getActive('id-1');
@@ -589,7 +591,9 @@ describe('message/stream JSON-RPC pause + resume', () => {
     expect(lastSecond?.json.type).toBe(AGENT_EVENT_TYPE.TASK_STATUS_CHANGED);
     const lastSecondData = lastSecond?.json.data as TaskStatusUpdateEvent;
     expect(lastSecondData.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(lastSecondData.final).toBe(true);
+    expect(lastSecondData.status.state).toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
 
     // Final delta should carry the agent's resumed response.
     const deltaTypes = secondTypes.filter((t) => t === AGENT_EVENT_TYPE.DELTA);

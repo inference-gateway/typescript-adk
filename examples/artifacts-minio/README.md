@@ -93,9 +93,9 @@ Client (`client.ts`):
 1. Client sends a `message/send` JSON-RPC request.
 2. Server creates a `PENDING` task, enqueues it, replies with the wire-format task.
 3. Worker dequeues, calls `artifactService.createFileArtifact(...)`, which `PUT`s the object into `s3://${MINIO_BUCKET}/${artifactId}/${filename}` with `x-amz-meta-uploaded-at` set.
-4. In `direct` mode, the artifact's `FilePart.fileWithUri` is a presigned `GET` URL (default lifetime: 5 minutes). In `proxy` mode, it is `${ARTIFACTS_BASE_URL}/${artifactId}/${filename}`, served by the ADK server's `/artifacts` route.
+4. In `direct` mode, the artifact's the part's `url` is a presigned `GET` URL (default lifetime: 5 minutes). In `proxy` mode, it is `${ARTIFACTS_BASE_URL}/${artifactId}/${filename}`, served by the ADK server's `/artifacts` route.
 5. Worker composes the artifact onto `task.artifacts`, replies with the download URL, marks the task `TASK_STATE_COMPLETED`.
-6. Client polls `tasks/get`, extracts `fileWithUri`, and downloads the bytes.
+6. Client polls `tasks/get`, extracts the part's `url`, and downloads the bytes.
 
 ## Where artifacts land
 

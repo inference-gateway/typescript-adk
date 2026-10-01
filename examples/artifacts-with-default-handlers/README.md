@@ -60,14 +60,14 @@ pnpm --filter @inference-gateway/adk-example-artifacts-with-default-handlers sta
 
 Server (`server.ts`):
 
-| Env var                 | Default                                 | Description                                                                                                                                |
-| ----------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `A2A_AGENT_NAME`        | `artifacts-with-default-handlers-agent` | Agent card `name`.                                                                                                                         |
-| `A2A_AGENT_DESCRIPTION` | (see source)                            | Agent card `description`.                                                                                                                  |
-| `A2A_AGENT_VERSION`     | `0.0.0`                                 | Agent card `version`.                                                                                                                      |
-| `A2A_SERVER_HOST`       | `127.0.0.1`                             | Listen host.                                                                                                                               |
-| `A2A_SERVER_PORT`       | `8080`                                  | Listen port.                                                                                                                               |
-| `ARTIFACTS_BASE_URL`    | `memory://artifacts`                    | Base URL emitted in `FilePart.fileWithUri`. Defaults to a non-HTTP scheme since the bytes live in-memory and are not externally fetchable. |
+| Env var                 | Default                                 | Description                                                                                                                          |
+| ----------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `A2A_AGENT_NAME`        | `artifacts-with-default-handlers-agent` | Agent card `name`.                                                                                                                   |
+| `A2A_AGENT_DESCRIPTION` | (see source)                            | Agent card `description`.                                                                                                            |
+| `A2A_AGENT_VERSION`     | `0.0.0`                                 | Agent card `version`.                                                                                                                |
+| `A2A_SERVER_HOST`       | `127.0.0.1`                             | Listen host.                                                                                                                         |
+| `A2A_SERVER_PORT`       | `8080`                                  | Listen port.                                                                                                                         |
+| `ARTIFACTS_BASE_URL`    | `memory://artifacts`                    | Base URL emitted in the part's `url`. Defaults to a non-HTTP scheme since the bytes live in-memory and are not externally fetchable. |
 
 Client (`client.ts`):
 
@@ -84,7 +84,7 @@ Client (`client.ts`):
 1. Client sends `message/send`.
 2. Server creates a `PENDING` task, enqueues it, replies with the wire-format task.
 3. Worker dequeues, runs the custom background handler.
-4. The handler calls `artifactService.createFileArtifact(...)` to persist the user text under a server-minted artifact id. The bytes land in the in-memory store; the `Artifact` carries a `FilePart` with `fileWithUri` set to `${ARTIFACTS_BASE_URL}/<artifactId>/<filename>`.
+4. The handler calls `artifactService.createFileArtifact(...)` to persist the user text under a server-minted artifact id. The bytes land in the in-memory store; the `Artifact` carries a file part with `url` set to `${ARTIFACTS_BASE_URL}/<artifactId>/<filename>`.
 5. Handler attaches the artifact to `task.artifacts`, appends an agent reply, transitions to `TASK_STATE_COMPLETED`.
 6. Client polls `tasks/get`, observes the terminal task with `artifacts.length === 1`, and prints the URI.
 

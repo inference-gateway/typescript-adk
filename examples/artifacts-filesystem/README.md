@@ -55,7 +55,7 @@ Server (`server.ts`):
 | `A2A_SERVER_HOST`       | `127.0.0.1`                                              | Listen host.                                                                                                                       |
 | `A2A_SERVER_PORT`       | `8080`                                                   | Listen port.                                                                                                                       |
 | `ARTIFACTS_ROOT`        | `<os.tmpdir>/adk-artifacts-filesystem`                   | Root directory on disk under which artifact files and their sidecars are written. Created lazily on first write with mode `0o700`. |
-| `ARTIFACTS_BASE_URL`    | `http://${A2A_SERVER_HOST}:${A2A_SERVER_PORT}/artifacts` | Base URL emitted in `FilePart.fileWithUri`. Defaults to point at this server's built-in `/artifacts` endpoint.                     |
+| `ARTIFACTS_BASE_URL`    | `http://${A2A_SERVER_HOST}:${A2A_SERVER_PORT}/artifacts` | Base URL emitted in the part's `url`. Defaults to point at this server's built-in `/artifacts` endpoint.                           |
 
 Client (`client.ts`):
 
@@ -70,7 +70,7 @@ Client (`client.ts`):
 2. Server creates a `PENDING` task, enqueues it, and replies with the wire-format task.
 3. Worker dequeues the task, calls `artifactService.createFileArtifact(...)` to write the user text to `${ARTIFACTS_ROOT}/<artifactId>/note-<task-prefix>.txt`, and produces a sidecar `note-<task-prefix>.txt.adk-meta.json` next to it.
 4. Worker composes the artifact onto `task.artifacts`, appends an agent reply with the download URL, and stores the now-`TASK_STATE_COMPLETED` task into the dead-letter mirror.
-5. Client polls `tasks/get`, observes the terminal task, extracts `task.artifacts[].parts[].file.fileWithUri`, and downloads each URL through the server's `/artifacts` endpoint.
+5. Client polls `tasks/get`, observes the terminal task, extracts `task.artifacts[].parts[].url`, and downloads each URL through the server's `/artifacts` endpoint.
 
 ## Where artifacts land
 

@@ -13,7 +13,7 @@ import {
   type TaskUpdateNotification,
 } from '../../src/server/index.js';
 import type {
-  PushNotificationConfig,
+  TaskPushNotificationConfig,
   Task,
 } from '../../src/types/generated/a2a.js';
 
@@ -127,7 +127,7 @@ describe('HTTPPushNotificationSender.sendTaskUpdate', () => {
   it('POSTs the task_update payload to the webhook URL', async () => {
     const { fetch, calls } = fakeFetch({ status: 200 });
     const sender = new HTTPPushNotificationSender({ fetch, ...noRetry });
-    const config: PushNotificationConfig = {
+    const config: TaskPushNotificationConfig = {
       url: 'https://example.com/hook',
     };
     const task = makeTask();
@@ -171,7 +171,7 @@ describe('HTTPPushNotificationSender.sendTaskUpdate', () => {
       {
         url: 'https://example.com/hook',
         token: 'tok-old',
-        authentication: { schemes: ['bearer'], credentials: 'tok-new' },
+        authentication: { scheme: 'bearer', credentials: 'tok-new' },
       },
       makeTask()
     );
@@ -186,7 +186,7 @@ describe('HTTPPushNotificationSender.sendTaskUpdate', () => {
       {
         url: 'https://example.com/hook',
         authentication: {
-          schemes: ['basic'],
+          scheme: 'basic',
           credentials: Buffer.from('user:pass').toString('base64'),
         },
       },
@@ -349,7 +349,7 @@ describe('HTTPPushNotificationSender.deliverTaskUpdate', () => {
   it('delivers to every config and returns ok results', async () => {
     const { fetch, calls } = fakeFetch({ status: 200 });
     const sender = new HTTPPushNotificationSender({ fetch, ...noRetry });
-    const configs: PushNotificationConfig[] = [
+    const configs: TaskPushNotificationConfig[] = [
       { id: 'a', url: 'https://example.com/a' },
       { id: 'b', url: 'https://example.com/b' },
       { id: 'c', url: 'https://example.com/c' },
@@ -377,7 +377,7 @@ describe('HTTPPushNotificationSender.deliverTaskUpdate', () => {
       logger,
       ...noRetry,
     });
-    const configs: PushNotificationConfig[] = [
+    const configs: TaskPushNotificationConfig[] = [
       { id: 'a', url: 'https://example.com/a' },
       { id: 'b', url: 'https://example.com/b' },
       { id: 'c', url: 'https://example.com/c' },
@@ -409,7 +409,7 @@ describe('HTTPPushNotificationSender.deliverTaskUpdate', () => {
       fetch: fetchImpl,
       ...noRetry,
     });
-    const configs: PushNotificationConfig[] = Array.from(
+    const configs: TaskPushNotificationConfig[] = Array.from(
       { length: 10 },
       (_, i) => ({ id: `c-${i}`, url: `https://example.com/${i}` })
     );
@@ -433,7 +433,7 @@ describe('HTTPPushNotificationSender.deliverTaskUpdate', () => {
       fetch: fetchImpl,
       ...noRetry,
     });
-    const configs: PushNotificationConfig[] = [
+    const configs: TaskPushNotificationConfig[] = [
       { url: 'https://example.com/a' },
       { url: 'https://example.com/b' },
     ];
@@ -448,7 +448,7 @@ describe('HTTPPushNotificationSender.deliverTaskUpdate', () => {
   it('treats invalid concurrency (0, negative) as 1', async () => {
     const { fetch, calls } = fakeFetch({ status: 200 });
     const sender = new HTTPPushNotificationSender({ fetch, ...noRetry });
-    const configs: PushNotificationConfig[] = [
+    const configs: TaskPushNotificationConfig[] = [
       { url: 'https://example.com/a' },
       { url: 'https://example.com/b' },
     ];
