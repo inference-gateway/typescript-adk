@@ -1,0 +1,14 @@
+---
+version: '3'
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  schemas-sync:
+    desc: Pin the A2A schema (SCHEMAS_REF=refs/tags/vX.Y.Z, a branch ref, or a SHA) and regenerate the types
+    cmds:
+      - printf '%s\n' '{{.SCHEMAS_REF | default "refs/heads/main" | trimPrefix "refs/tags/"}}' > scripts/schemas-ref
+      - pnpm generate:types
