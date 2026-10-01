@@ -6,19 +6,23 @@
  * produce without writing. CI uses this mode to fail on schema drift.
  */
 import { compile, type JSONSchema } from 'json-schema-to-typescript';
+import { readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Pin the schema by release tag so regeneration is reproducible.
-// Bump this when the upstream schema you want to consume changes.
+const ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
+
+// The schema is pinned by release tag in scripts/schemas-ref so regeneration is
+// reproducible. `task schemas-sync SCHEMAS_REF=...` bumps it; edit it by hand to
+// consume a different upstream revision.
 export const SCHEMA_REPO = 'inference-gateway/schemas';
 export const SCHEMA_PATH = 'a2a/a2a-schema.json';
-export const SCHEMA_REF = 'v0.34.3';
+export const SCHEMA_REF_FILE = resolve(ROOT, 'scripts/schemas-ref');
+export const SCHEMA_REF = readFileSync(SCHEMA_REF_FILE, 'utf8').trim();
 
 export const SCHEMA_URL = `https://raw.githubusercontent.com/${SCHEMA_REPO}/${SCHEMA_REF}/${SCHEMA_PATH}`;
 
-const ROOT = resolve(fileURLToPath(import.meta.url), '..', '..');
 export const OUTPUT_FILE = resolve(ROOT, 'src/types/generated/a2a.ts');
 
 const HEADER = `// Code generated from A2A schema. DO NOT EDIT.
