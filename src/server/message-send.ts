@@ -8,8 +8,7 @@ import {
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
   Message,
-  SendMessageConfiguration,
-  Struct,
+  SendMessageRequest,
   Task,
 } from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
@@ -22,20 +21,6 @@ import type { MethodHandler } from './method-registry.js';
  * spelling stays in lockstep with conformance tests and other consumers.
  */
 export const MESSAGE_SEND_METHOD = 'message/send';
-
-/**
- * JSON-RPC params accepted by the A2A `message/send` method.
- *
- * Mirrors `types.MessageSendParams` in the Go ADK (see
- * https://github.com/inference-gateway/adk/blob/main/types/types.go) - the
- * generated A2A schema models the HTTP-level `SendMessageRequest` envelope,
- * which is a different shape from the JSON-RPC `params` payload.
- */
-export interface MessageSendParams {
-  readonly configuration?: SendMessageConfiguration;
-  readonly message: Message;
-  readonly metadata?: Struct;
-}
 
 export interface MessageSendHandlerOptions {
   /** Storage backend used to persist and enqueue the created task. */
@@ -157,11 +142,11 @@ function appendAndResume(
 
 export { appendAndResume, findResumableTask };
 
-function validateMessageSendParams(params: unknown): MessageSendParams {
+function validateMessageSendParams(params: unknown): SendMessageRequest {
   if (params === null || typeof params !== 'object' || Array.isArray(params)) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: expected MessageSendParams object'
+      'invalid params: expected SendMessageRequest object'
     );
   }
   const obj = params as Record<string, unknown>;
@@ -184,7 +169,7 @@ function validateMessageSendParams(params: unknown): MessageSendParams {
       'invalid params: message.parts must be a non-empty array'
     );
   }
-  return params as MessageSendParams;
+  return params as SendMessageRequest;
 }
 
 function enrichMessage(

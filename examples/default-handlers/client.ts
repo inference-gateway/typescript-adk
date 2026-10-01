@@ -87,9 +87,11 @@ for await (const event of readSSEEvents(response.body)) {
   if (event.type === AGENT_EVENT_TYPE.TASK_STATUS_CHANGED) {
     const data = event.data as TaskStatusUpdateEvent;
     console.log(
-      `[frame ${frameCount}] task.status.changed state=${data.status.state} final=${data.final}`
+      `[frame ${frameCount}] task.status.changed state=${data.status.state}`
     );
-    if (data.final === true) {
+    if (
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED|REJECTED)$/.test(data.status.state)
+    ) {
       finalStatus = data;
     }
   } else {

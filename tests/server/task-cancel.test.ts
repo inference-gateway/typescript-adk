@@ -24,7 +24,7 @@ function makeCard(): AgentCard {
     name: 'task-cancel-agent',
     description: 'Agent under test',
     version: '0.0.0',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: { streaming: false },
@@ -134,12 +134,10 @@ describe('createTaskCancelHandler', () => {
       storage,
       now: fixedNow('2026-05-26T12:03:00.000Z'),
     });
-    const result = handler({ taskId: 'task-1' }, ctx) as Task;
+    const result = handler({ id: 'task-1' }, ctx) as Task;
 
     expect(result.id).toBe('task-1');
-    expect(result.status.state).toBe(
-      'TASK_STATE_CANCELLED' satisfies TaskState
-    );
+    expect(result.status.state).toBe('TASK_STATE_CANCELED' satisfies TaskState);
     expect(result.status.timestamp).toBe('2026-05-26T12:03:00.000Z');
     expect(storage.queueLength()).toBe(0);
     expect(storage.getActive('task-1')).toBeUndefined();
@@ -159,15 +157,13 @@ describe('createTaskCancelHandler', () => {
       registry,
       now: fixedNow('2026-05-26T12:03:00.000Z'),
     });
-    const result = handler({ taskId: 'task-1' }, ctx) as Task;
+    const result = handler({ id: 'task-1' }, ctx) as Task;
 
     expect(controller.signal.aborted).toBe(true);
     expect(controller.signal.reason).toBeInstanceOf(DOMException);
     expect((controller.signal.reason as DOMException).name).toBe('AbortError');
     expect(registry.has('task-1')).toBe(false);
-    expect(result.status.state).toBe(
-      'TASK_STATE_CANCELLED' satisfies TaskState
-    );
+    expect(result.status.state).toBe('TASK_STATE_CANCELED' satisfies TaskState);
     expect(storage.getActive('task-1')).toBeUndefined();
     expect(storage.getTask('task-1')?.state).toBe(TASK_STATE.CANCELLED);
   });
@@ -182,11 +178,9 @@ describe('createTaskCancelHandler', () => {
       registry,
       now: fixedNow('2026-05-26T12:03:00.000Z'),
     });
-    const result = handler({ taskId: 'task-1' }, ctx) as Task;
+    const result = handler({ id: 'task-1' }, ctx) as Task;
 
-    expect(result.status.state).toBe(
-      'TASK_STATE_CANCELLED' satisfies TaskState
-    );
+    expect(result.status.state).toBe('TASK_STATE_CANCELED' satisfies TaskState);
     expect(storage.getTask('task-1')?.state).toBe(TASK_STATE.CANCELLED);
   });
 
@@ -212,11 +206,9 @@ describe('createTaskCancelHandler', () => {
       storage,
       now: fixedNow('2026-05-26T12:03:00.000Z'),
     });
-    const result = handler({ taskId: 'task-input' }, ctx) as Task;
+    const result = handler({ id: 'task-input' }, ctx) as Task;
 
-    expect(result.status.state).toBe(
-      'TASK_STATE_CANCELLED' satisfies TaskState
-    );
+    expect(result.status.state).toBe('TASK_STATE_CANCELED' satisfies TaskState);
     expect(storage.getTask('task-input')?.state).toBe(TASK_STATE.CANCELLED);
   });
 
@@ -225,11 +217,9 @@ describe('createTaskCancelHandler', () => {
     seedPendingTask(storage);
 
     const handler = createTaskCancelHandler({ storage });
-    const result = handler({ taskId: 'task-1' }, ctx) as Task;
+    const result = handler({ id: 'task-1' }, ctx) as Task;
 
-    expect(result.status.state).toBe(
-      'TASK_STATE_CANCELLED' satisfies TaskState
-    );
+    expect(result.status.state).toBe('TASK_STATE_CANCELED' satisfies TaskState);
   });
 
   it('does not invoke other registered controllers when cancelling one task', () => {
@@ -244,7 +234,7 @@ describe('createTaskCancelHandler', () => {
     registry.register('task-2', b);
 
     const handler = createTaskCancelHandler({ storage, registry });
-    handler({ taskId: 'task-1' }, ctx);
+    handler({ id: 'task-1' }, ctx);
 
     expect(a.signal.aborted).toBe(true);
     expect(b.signal.aborted).toBe(false);
@@ -290,7 +280,7 @@ describe('createTaskCancelHandler', () => {
         expect((err as JSONRPCError).code).toBe(
           JSONRPC_ERROR_CODES.INVALID_PARAMS
         );
-        expect((err as JSONRPCError).message).toContain('taskId');
+        expect((err as JSONRPCError).message).toContain('id');
         return;
       }
       throw new Error('expected JSONRPCError to be thrown');
@@ -298,7 +288,7 @@ describe('createTaskCancelHandler', () => {
 
     it('throws -32602 when taskId is the empty string', () => {
       try {
-        handler({ taskId: '' } as unknown, ctx);
+        handler({ id: '' } as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
@@ -311,7 +301,7 @@ describe('createTaskCancelHandler', () => {
 
     it('throws -32602 when taskId is not a string', () => {
       try {
-        handler({ taskId: 42 } as unknown, ctx);
+        handler({ id: 42 } as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
@@ -324,7 +314,7 @@ describe('createTaskCancelHandler', () => {
 
     it('throws -32602 when metadata is not an object', () => {
       try {
-        handler({ taskId: 'task-1', metadata: 'bad' } as unknown, ctx);
+        handler({ id: 'task-1', metadata: 'bad' } as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
@@ -338,7 +328,7 @@ describe('createTaskCancelHandler', () => {
 
     it('throws -32602 with "task not found" for an unknown task id', () => {
       try {
-        handler({ taskId: 'unknown' } as unknown, ctx);
+        handler({ id: 'unknown' } as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
@@ -365,7 +355,7 @@ describe('createTaskCancelHandler', () => {
         const handler = createTaskCancelHandler({ storage });
 
         try {
-          handler({ taskId: 'task-1' }, ctx);
+          handler({ id: 'task-1' }, ctx);
         } catch (err) {
           expect(err).toBeInstanceOf(JSONRPCError);
           expect((err as JSONRPCError).code).toBe(
@@ -409,7 +399,7 @@ describe('tasks/cancel JSON-RPC conformance', () => {
       jsonrpc: '2.0',
       id: 1,
       method: TASK_CANCEL_METHOD,
-      params: { taskId: 'task-1' },
+      params: { id: 'task-1' },
     });
     expect(res.status).toBe(200);
 
@@ -422,7 +412,7 @@ describe('tasks/cancel JSON-RPC conformance', () => {
     expect(body.id).toBe(1);
     expect(body.result.id).toBe('task-1');
     expect(body.result.status.state).toBe(
-      'TASK_STATE_CANCELLED' satisfies TaskState
+      'TASK_STATE_CANCELED' satisfies TaskState
     );
     expect(storage.queueLength()).toBe(0);
   });
@@ -446,13 +436,13 @@ describe('tasks/cancel JSON-RPC conformance', () => {
       jsonrpc: '2.0',
       id: 2,
       method: TASK_CANCEL_METHOD,
-      params: { taskId: 'task-1' },
+      params: { id: 'task-1' },
     });
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as { result: Task };
     expect(body.result.status.state).toBe(
-      'TASK_STATE_CANCELLED' satisfies TaskState
+      'TASK_STATE_CANCELED' satisfies TaskState
     );
     expect(controller.signal.aborted).toBe(true);
     expect(registry.has('task-1')).toBe(false);
@@ -472,7 +462,7 @@ describe('tasks/cancel JSON-RPC conformance', () => {
       jsonrpc: '2.0',
       id: 3,
       method: TASK_CANCEL_METHOD,
-      params: { taskId: 'missing' },
+      params: { id: 'missing' },
     });
     expect(res.status).toBe(200);
 
@@ -500,7 +490,7 @@ describe('tasks/cancel JSON-RPC conformance', () => {
       jsonrpc: '2.0',
       id: 4,
       method: TASK_CANCEL_METHOD,
-      params: { taskId: 'task-1' },
+      params: { id: 'task-1' },
     });
     expect(res.status).toBe(200);
 
@@ -533,6 +523,6 @@ describe('tasks/cancel JSON-RPC conformance', () => {
       error: { code: number; message: string };
     };
     expect(body.error.code).toBe(JSONRPC_ERROR_CODES.INVALID_PARAMS);
-    expect(body.error.message).toContain('taskId');
+    expect(body.error.message).toContain('id');
   });
 });

@@ -90,7 +90,7 @@ function sampleAgentCard(): AgentCard {
     name: 'mock-agent',
     description: 'agent for unit tests',
     version: '0.0.1',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: { streaming: false },
@@ -381,10 +381,10 @@ describe('A2AClient.getTask', () => {
     expect(result).toEqual(task);
     const body = JSON.parse(calls[0]?.init.body as string) as {
       method: string;
-      params: { taskId: string };
+      params: { id: string };
     };
     expect(body.method).toBe('tasks/get');
-    expect(body.params).toEqual({ taskId: 'task-1' });
+    expect(body.params).toEqual({ id: 'task-1' });
   });
 
   it('passes historyLength and metadata through when supplied', async () => {
@@ -401,10 +401,10 @@ describe('A2AClient.getTask', () => {
       metadata: { trace: 'abc' },
     });
     const body = JSON.parse(calls[0]?.init.body as string) as {
-      params: { taskId: string; historyLength: number; metadata: unknown };
+      params: { id: string; historyLength: number; metadata: unknown };
     };
     expect(body.params).toEqual({
-      taskId: 'task-1',
+      id: 'task-1',
       historyLength: 5,
       metadata: { trace: 'abc' },
     });

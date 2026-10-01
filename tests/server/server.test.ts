@@ -12,7 +12,7 @@ function makeCard(overrides: Partial<AgentCard> = {}): AgentCard {
     name: 'discovery-agent',
     description: 'Agent under test',
     version: '1.2.3',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: { streaming: true },
@@ -129,7 +129,6 @@ describe('A2AServer agent card discovery', () => {
       capabilities: {
         streaming: true,
         pushNotifications: false,
-        stateTransitionHistory: false,
       },
       skills: [
         {

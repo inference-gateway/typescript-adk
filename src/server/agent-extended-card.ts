@@ -12,19 +12,6 @@ import type { MethodHandler } from './method-registry.js';
 export const GET_AUTHENTICATED_EXTENDED_CARD_METHOD =
   'agent/getAuthenticatedExtendedCard';
 
-/**
- * JSON-RPC params accepted by `agent/getAuthenticatedExtendedCard`.
- *
- * Mirrors `types.GetAuthenticatedExtendedCardParams` in the Go ADK and the
- * generated `GetExtendedAgentCardRequest` shape, but every field is optional
- * because the spec allows callers to omit `params` entirely. `tenant`, when
- * provided, is opaque to the framework and forwarded to logs only - matching
- * the Go reference handler in `adk/server/task_handler.go`.
- */
-export interface GetAuthenticatedExtendedCardParams {
-  readonly tenant?: string;
-}
-
 export interface GetAuthenticatedExtendedCardHandlerOptions {
   /**
    * The extended card returned to authenticated callers. Typically the public
@@ -91,7 +78,7 @@ function validateParams(params: unknown): void {
   if (typeof params !== 'object' || Array.isArray(params)) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: expected GetAuthenticatedExtendedCardParams object'
+      'invalid params: expected GetExtendedAgentCardRequest object'
     );
   }
   const obj = params as Record<string, unknown>;

@@ -120,7 +120,7 @@ The Inference Gateway is the recommended way to mediate access: it normalizes pr
 Other terminal states are possible:
 
 - `state=TASK_STATE_INPUT_REQUIRED` if the LLM invokes the reserved `input_required` tool. An `adk.agent.input.required` frame carrying the prompt precedes the terminal status frame. The task remains in storage so a subsequent `message/stream` or `message/send` on the same `contextId` can resume it.
-- `state=TASK_STATE_CANCELLED` if the client disconnects, the server shuts down, or `tasks/cancel` fires during the run.
+- `state=TASK_STATE_CANCELED` if the client disconnects, the server shuts down, or `tasks/cancel` fires during the run.
 - `state=TASK_STATE_FAILED` if the iteration cap is hit or the executor throws. The terminal frame embeds the error text in `status.message`.
 
 ## Example client output

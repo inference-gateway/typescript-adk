@@ -79,7 +79,7 @@ Server (`server.ts`):
 | `A2A_AGENT_CLIENT_API_KEY`  | falls back to `<PROVIDER>_API_KEY`                       | Explicit API key. Required when the provider's default env var is not set.                                                                                 |
 | `A2A_AGENT_SYSTEM_PROMPT`   | (see source)                                             | System prompt prepended to every LLM call. The default nudges the model to prefer `create_artifact` over inlining content into replies.                    |
 | `ARTIFACTS_ROOT`            | `<os.tmpdir>/adk-artifacts-autonomous`                   | Root directory on disk under which artifact files and sidecars are written.                                                                                |
-| `ARTIFACTS_BASE_URL`        | `http://${A2A_SERVER_HOST}:${A2A_SERVER_PORT}/artifacts` | Base URL emitted in `FilePart.fileWithUri` and returned to the LLM in the tool result.                                                                     |
+| `ARTIFACTS_BASE_URL`        | `http://${A2A_SERVER_HOST}:${A2A_SERVER_PORT}/artifacts` | Base URL emitted in the part's `url` and returned to the LLM in the tool result.                                                                           |
 | `A2A_AGENT_NAME`            | `artifacts-autonomous-tool-agent`                        | Agent card `name`.                                                                                                                                         |
 | `A2A_AGENT_DESCRIPTION`     | (see source)                                             | Agent card `description`.                                                                                                                                  |
 | `A2A_AGENT_VERSION`         | `0.0.0`                                                  | Agent card `version`.                                                                                                                                      |
@@ -106,7 +106,7 @@ Client (`client.ts`):
    - Returns a JSON string `{success, message, artifact_id, url, filename}` to the LLM.
 6. The handler drains the pending-artifacts bag at the end of the iteration (or on terminal transition) and attaches every drained artifact to `task.artifacts`.
 7. The LLM produces a final assistant message referring to the artifact by filename; the handler transitions the task to `TASK_STATE_COMPLETED`.
-8. Client polls `tasks/get`, extracts `task.artifacts[].parts[].file.fileWithUri`, and downloads each URL through the server's `/artifacts` endpoint.
+8. Client polls `tasks/get`, extracts `task.artifacts[].parts[].url`, and downloads each URL through the server's `/artifacts` endpoint.
 
 ## Where artifacts land
 

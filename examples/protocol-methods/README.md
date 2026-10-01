@@ -16,7 +16,7 @@ Mirrors the Go ADK's [`examples/protocol-methods/`](https://github.com/inference
   6. `tasks/get` (poll until terminal) - wait for completion + verify response
   7. `tasks/get` with `historyLength` - cap message history
   8. `tasks/list` - list all tasks with optional pagination
-  9. `tasks/list` filtered by `state` - filter to COMPLETED tasks
+  9. `tasks/list` filtered by `status` - filter to COMPLETED tasks
   10. `tasks/cancel` - cancel a non-terminal task + verify via `tasks/get`
   11. `tasks/pushNotificationConfig/{set,get,list,delete}` - push notification config CRUD
   12. `message/stream` - SSE streaming with word-by-word deltas
@@ -92,14 +92,19 @@ The server exposes its public `AgentCard` at `GET /.well-known/agent-card.json`.
   "name": "protocol-methods-agent",
   "description": "A full-featured A2A agent exercising every JSON-RPC method.",
   "version": "0.0.0",
-  "protocolVersion": "0.3.0",
+  "supportedInterfaces": [
+    {
+      "url": "http://127.0.0.1:8080",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+    }
+  ],
   "url": "http://127.0.0.1:8080",
   "defaultInputModes": ["text/plain"],
   "defaultOutputModes": ["text/plain"],
   "capabilities": {
     "streaming": true,
-    "pushNotifications": true,
-    "stateTransitionHistory": true
+    "pushNotifications": true
   },
   "skills": [
     {
@@ -117,7 +122,7 @@ The server exposes its public `AgentCard` at `GET /.well-known/agent-card.json`.
 - `card.name` is a non-empty string
 - `card.capabilities.streaming === true`
 - `card.capabilities.pushNotifications === true`
-- `card.capabilities.stateTransitionHistory === true`
+- `card.capabilities.pushNotifications === true`
 
 ---
 
@@ -164,8 +169,7 @@ The server exposes an extended agent card via the `agent/getAuthenticatedExtende
   "description": "A full-featured A2A agent exercising every JSON-RPC method. [authenticated view]",
   "capabilities": {
     "streaming": true,
-    "pushNotifications": true,
-    "stateTransitionHistory": true
+    "pushNotifications": true
   }
 }
 ```
@@ -314,7 +318,7 @@ Retrieves the same task but caps the returned `history` to the most recent 1 mes
 
 ### 8. `tasks/list` (list all tasks)
 
-Lists tasks across the active and dead-letter stores. Results are FIFO-ordered by creation time. Keyset pagination via an opaque `nextCursor` token.
+Lists tasks across the active and dead-letter stores. Results are FIFO-ordered by creation time. Keyset pagination via an opaque `pageToken` returned as `nextPageToken`.
 
 **JSON-RPC request:**
 
@@ -336,14 +340,16 @@ Lists tasks across the active and dead-letter stores. Results are FIFO-ordered b
     { "id": "<task-2>", "status": { "state": "CANCELLED" } },
     { "id": "<task-3>", "status": { "state": "COMPLETED" } }
   ],
-  "nextCursor": "<base64-encoded-cursor>"
+  "pageSize": 100,
+  "totalSize": 3,
+  "nextPageToken": "<base64-encoded-cursor>"
 }
 ```
 
 **Client assertions:**
 
 - `tasks` is a non-empty array
-- `nextCursor` is present when there are more tasks than fit on a page
+- `nextPageToken` is non-empty when there are more tasks than fit on a page
 
 ---
 
@@ -454,7 +460,7 @@ Retrieves a specific config by task id + config id.
   "method": "tasks/pushNotificationConfig/get",
   "params": {
     "taskId": "<task-uuid>",
-    "pushNotificationConfigId": "<config-uuid>"
+    "id": "<config-uuid>"
   }
 }
 ```
@@ -496,7 +502,7 @@ Deletes a config by task id + config id. Returns `null` on success.
   "method": "tasks/pushNotificationConfig/delete",
   "params": {
     "taskId": "<task-uuid>",
-    "pushNotificationConfigId": "<config-uuid>"
+    "id": "<config-uuid>"
   }
 }
 ```
@@ -534,7 +540,7 @@ Invokes the `message/stream` method, which returns a Server-Sent Events stream i
 **SSE response (each frame is a CloudEvent):**
 
 ```
-data: {"type":"adk.agent.task.status.changed","data":{"taskId":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_WORKING","timestamp":"..."},"final":false},"subject":"<uuid>"}
+data: {"type":"adk.agent.task.status.changed","data":{"taskId":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_WORKING","timestamp":"..."}},"subject":"<uuid>"}
 
 data: {"type":"adk.agent.delta","data":{"messageId":"<uuid>","contextId":"<uuid>","taskId":"<uuid>","role":"ROLE_AGENT","parts":[{"text":"Hello"}]}}
 
@@ -544,7 +550,7 @@ data: {"type":"adk.agent.delta","data":{"messageId":"<uuid>","contextId":"<uuid>
 
 data: {"type":"adk.agent.delta","data":{"messageId":"<uuid>","contextId":"<uuid>","taskId":"<uuid>","role":"ROLE_AGENT","parts":[{"text":" deltas."}]}}
 
-data: {"type":"adk.agent.task.status.changed","data":{"taskId":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_COMPLETED","timestamp":"...","message":{"messageId":"<uuid>","contextId":"<uuid>","taskId":"<uuid>","role":"ROLE_AGENT","parts":[{"text":"Hello from the protocol-methods agent. This is a streaming response with word-by-word deltas."}]}},"final":true},"subject":"<uuid>"}
+data: {"type":"adk.agent.task.status.changed","data":{"taskId":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_COMPLETED","timestamp":"...","message":{"messageId":"<uuid>","contextId":"<uuid>","taskId":"<uuid>","role":"ROLE_AGENT","parts":[{"text":"Hello from the protocol-methods agent. This is a streaming response with word-by-word deltas."}]}}},"subject":"<uuid>"}
 ```
 
 **Client assertions:**
@@ -573,7 +579,7 @@ Allows a client to re-subscribe to a completed (or in-progress) task's event str
 **SSE response:**
 
 ```
-data: {"type":"adk.agent.task.status.changed","data":{"taskId":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_COMPLETED","timestamp":"..."},"final":true},"subject":"<uuid>"}
+data: {"type":"adk.agent.task.status.changed","data":{"taskId":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_COMPLETED","timestamp":"..."}},"subject":"<uuid>"}
 ```
 
 **Client assertions:**
@@ -691,7 +697,7 @@ Client (abbreviated - UUIDs and timestamps will differ):
 ── 10. tasks/cancel ──────────────────────────────────────
   ✓ cancel-task created (PENDING; got TASK_STATE_SUBMITTED)
   ✓ returned task id matches
-  ✓ task state is CANCELLED (got TASK_STATE_CANCELLED)
+  ✓ task state is CANCELLED (got TASK_STATE_CANCELED)
   ✓ verify cancelled via tasks/get
 
 ── 11. push notification config CRUD ─────────────────────
@@ -737,7 +743,7 @@ The server is built using the raw `A2AServer` constructor (not the `A2AServerBui
 
 Key components:
 
-1. **Agent card** - Declares `streaming: true`, `pushNotifications: true`, and `stateTransitionHistory: true` so every capability is visible to clients.
+1. **Agent card** - Declares `streaming: true` and `pushNotifications: true` so every capability is visible to clients.
 
 2. **Handlers** - 11 handlers registered via `registerMethod()` / `registerStreamingMethod()`:
    - `message/send` → `createMessageSendHandler`

@@ -25,7 +25,7 @@ function makeCard(pushNotifications = false): AgentCard {
     name: 'push-config-agent',
     description: 'Agent under test',
     version: '0.0.0',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: { streaming: false, pushNotifications },
@@ -62,21 +62,16 @@ describe('createTaskPushNotificationConfigSetHandler', () => {
     const result = handler(
       {
         taskId: 'task-1',
-        pushNotificationConfig: {
-          id: 'cfg-1',
-          url: 'https://example.com/webhook',
-          token: 'bearer-xyz',
-        },
+
+        id: 'cfg-1',
+        url: 'https://example.com/webhook',
+        token: 'bearer-xyz',
       },
       ctx
     ) as TaskPushNotificationConfig;
-
-    expect(result.name).toBe('tasks/task-1/pushNotificationConfigs/cfg-1');
-    expect(result.pushNotificationConfig.id).toBe('cfg-1');
-    expect(result.pushNotificationConfig.url).toBe(
-      'https://example.com/webhook'
-    );
-    expect(result.pushNotificationConfig.token).toBe('bearer-xyz');
+    expect(result.id).toBe('cfg-1');
+    expect(result.url).toBe('https://example.com/webhook');
+    expect(result.token).toBe('bearer-xyz');
     expect(storage.getPushConfig('task-1', 'cfg-1')).toBeDefined();
   });
 
@@ -87,16 +82,13 @@ describe('createTaskPushNotificationConfigSetHandler', () => {
     const result = handler(
       {
         taskId: 'task-1',
-        pushNotificationConfig: { url: 'https://example.com/webhook' },
+        url: 'https://example.com/webhook',
       },
       ctx
     ) as TaskPushNotificationConfig;
 
-    expect(result.pushNotificationConfig.id).toMatch(
+    expect(result.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
-    );
-    expect(result.name).toBe(
-      `tasks/task-1/pushNotificationConfigs/${result.pushNotificationConfig.id}`
     );
   });
 
@@ -107,13 +99,12 @@ describe('createTaskPushNotificationConfigSetHandler', () => {
     handler(
       {
         taskId: 'task-1',
-        pushNotificationConfig: {
-          id: 'cfg-1',
-          url: 'https://example.com/webhook',
-          authentication: {
-            schemes: ['Bearer'],
-            credentials: 'opaque-token',
-          },
+
+        id: 'cfg-1',
+        url: 'https://example.com/webhook',
+        authentication: {
+          scheme: 'Bearer',
+          credentials: 'opaque-token',
         },
       },
       ctx
@@ -121,7 +112,7 @@ describe('createTaskPushNotificationConfigSetHandler', () => {
 
     const stored = storage.getPushConfig('task-1', 'cfg-1');
     expect(stored?.authentication).toEqual({
-      schemes: ['Bearer'],
+      scheme: 'Bearer',
       credentials: 'opaque-token',
     });
   });
@@ -158,30 +149,25 @@ describe('createTaskPushNotificationConfigSetHandler', () => {
     });
 
     it('throws when taskId is missing', () => {
-      expectInvalidParams(
-        { pushNotificationConfig: { url: 'https://example.com' } },
-        'taskId'
-      );
+      expectInvalidParams({ url: 'https://example.com' }, 'taskId');
     });
 
     it('throws when pushNotificationConfig is missing', () => {
-      expectInvalidParams({ taskId: 'task-1' }, 'pushNotificationConfig');
+      expectInvalidParams({ taskId: 'task-1' }, 'url');
     });
 
     it('throws when pushNotificationConfig.url is missing', () => {
-      expectInvalidParams(
-        { taskId: 'task-1', pushNotificationConfig: {} },
-        'url'
-      );
+      expectInvalidParams({ taskId: 'task-1' }, 'url');
     });
 
     it('throws when pushNotificationConfig.id is the empty string', () => {
       expectInvalidParams(
         {
           taskId: 'task-1',
-          pushNotificationConfig: { id: '', url: 'https://example.com' },
+          id: '',
+          url: 'https://example.com',
         },
-        'pushNotificationConfig.id'
+        'id'
       );
     });
 
@@ -189,10 +175,9 @@ describe('createTaskPushNotificationConfigSetHandler', () => {
       expectInvalidParams(
         {
           taskId: 'task-1',
-          pushNotificationConfig: {
-            url: 'https://example.com',
-            token: 123,
-          },
+
+          url: 'https://example.com',
+          token: 123,
         },
         'token'
       );
@@ -202,12 +187,11 @@ describe('createTaskPushNotificationConfigSetHandler', () => {
       expectInvalidParams(
         {
           taskId: 'task-1',
-          pushNotificationConfig: {
-            url: 'https://example.com',
-            authentication: {},
-          },
+
+          url: 'https://example.com',
+          authentication: {},
         },
-        'schemes'
+        'scheme'
       );
     });
   });
@@ -223,14 +207,10 @@ describe('createTaskPushNotificationConfigGetHandler', () => {
     const handler = createTaskPushNotificationConfigGetHandler({ storage });
 
     const result = handler(
-      { taskId: 'task-1', pushNotificationConfigId: 'cfg-1' },
+      { taskId: 'task-1', id: 'cfg-1' },
       ctx
     ) as TaskPushNotificationConfig;
-
-    expect(result.name).toBe('tasks/task-1/pushNotificationConfigs/cfg-1');
-    expect(result.pushNotificationConfig.url).toBe(
-      'https://example.com/webhook'
-    );
+    expect(result.url).toBe('https://example.com/webhook');
   });
 
   it('throws -32602 with "not found" message for an unknown config', () => {
@@ -238,7 +218,7 @@ describe('createTaskPushNotificationConfigGetHandler', () => {
     const handler = createTaskPushNotificationConfigGetHandler({ storage });
 
     try {
-      handler({ taskId: 'task-1', pushNotificationConfigId: 'cfg-1' }, ctx);
+      handler({ taskId: 'task-1', id: 'cfg-1' }, ctx);
     } catch (err) {
       expect(err).toBeInstanceOf(JSONRPCError);
       expect((err as JSONRPCError).code).toBe(
@@ -259,9 +239,7 @@ describe('createTaskPushNotificationConfigGetHandler', () => {
     try {
       handler({ taskId: 'task-1' } as unknown, ctx);
     } catch (err) {
-      expect((err as JSONRPCError).message).toContain(
-        'pushNotificationConfigId'
-      );
+      expect((err as JSONRPCError).message).toContain('id');
       return;
     }
     throw new Error('expected JSONRPCError to be thrown');
@@ -284,8 +262,8 @@ describe('createTaskPushNotificationConfigListHandler', () => {
     const result = handler({ taskId: 'task-1' }, ctx) as { configs: unknown[] };
 
     expect(result.configs).toHaveLength(2);
-    expect(result.configs).toContainEqual(a);
-    expect(result.configs).toContainEqual(b);
+    expect(result.configs).toContainEqual({ ...a, taskId: 'task-1' });
+    expect(result.configs).toContainEqual({ ...b, taskId: 'task-1' });
   });
 
   it('returns an empty configs array for a task with no configs', () => {
@@ -318,10 +296,7 @@ describe('createTaskPushNotificationConfigDeleteHandler', () => {
     });
     const handler = createTaskPushNotificationConfigDeleteHandler({ storage });
 
-    const result = handler(
-      { taskId: 'task-1', pushNotificationConfigId: 'cfg-1' },
-      ctx
-    );
+    const result = handler({ taskId: 'task-1', id: 'cfg-1' }, ctx);
 
     expect(result).toBeNull();
     expect(storage.getPushConfig('task-1', 'cfg-1')).toBeUndefined();
@@ -332,7 +307,7 @@ describe('createTaskPushNotificationConfigDeleteHandler', () => {
     const handler = createTaskPushNotificationConfigDeleteHandler({ storage });
 
     try {
-      handler({ taskId: 'task-1', pushNotificationConfigId: 'cfg-1' }, ctx);
+      handler({ taskId: 'task-1', id: 'cfg-1' }, ctx);
     } catch (err) {
       expect((err as JSONRPCError).message).toBe(
         'push notification config not found'
@@ -381,31 +356,28 @@ describe('push notification config JSON-RPC conformance', () => {
       method: TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD,
       params: {
         taskId: 'task-1',
-        pushNotificationConfig: {
-          id: 'cfg-1',
-          url: 'https://example.com/webhook',
-          token: 'bearer-xyz',
-        },
+
+        id: 'cfg-1',
+        url: 'https://example.com/webhook',
+        token: 'bearer-xyz',
       },
     });
     const setBody = (await setRes.json()) as {
       result: TaskPushNotificationConfig;
     };
-    expect(setBody.result.pushNotificationConfig.id).toBe('cfg-1');
-    expect(setBody.result.pushNotificationConfig.token).toBe('bearer-xyz');
+    expect(setBody.result.id).toBe('cfg-1');
+    expect(setBody.result.token).toBe('bearer-xyz');
 
     const getRes = await postJSON(baseUrl, {
       jsonrpc: JSONRPC_VERSION,
       id: 2,
       method: TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD,
-      params: { taskId: 'task-1', pushNotificationConfigId: 'cfg-1' },
+      params: { taskId: 'task-1', id: 'cfg-1' },
     });
     const getBody = (await getRes.json()) as {
       result: TaskPushNotificationConfig;
     };
-    expect(getBody.result.pushNotificationConfig.url).toBe(
-      'https://example.com/webhook'
-    );
+    expect(getBody.result.url).toBe('https://example.com/webhook');
 
     const listRes = await postJSON(baseUrl, {
       jsonrpc: JSONRPC_VERSION,
@@ -422,7 +394,7 @@ describe('push notification config JSON-RPC conformance', () => {
       jsonrpc: JSONRPC_VERSION,
       id: 4,
       method: TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD,
-      params: { taskId: 'task-1', pushNotificationConfigId: 'cfg-1' },
+      params: { taskId: 'task-1', id: 'cfg-1' },
     });
     const delBody = (await delRes.json()) as { result: null };
     expect(delBody.result).toBeNull();
@@ -453,7 +425,7 @@ describe('push notification config JSON-RPC conformance', () => {
       jsonrpc: JSONRPC_VERSION,
       id: 6,
       method: TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD,
-      params: { taskId: 'task-1', pushNotificationConfigId: 'cfg-1' },
+      params: { taskId: 'task-1', id: 'cfg-1' },
     });
     const body = (await res.json()) as {
       error: { code: number; message: string };
@@ -476,7 +448,7 @@ describe('push notification config JSON-RPC conformance', () => {
       jsonrpc: JSONRPC_VERSION,
       id: 7,
       method: TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD,
-      params: { taskId: 'task-1', pushNotificationConfigId: 'missing' },
+      params: { taskId: 'task-1', id: 'missing' },
     });
     const body = (await res.json()) as {
       error: { code: number; message: string };

@@ -1,5 +1,5 @@
 import type { ManagedTask, ManagedTaskState } from '../agent/task.js';
-import type { PushNotificationConfig } from '../types/generated/a2a.js';
+import type { TaskPushNotificationConfig } from '../types/generated/a2a.js';
 
 /**
  * Filter passed to {@link TaskStorage.listTasks}. All fields are optional:
@@ -31,12 +31,12 @@ export interface TaskStorageStats {
 }
 
 /**
- * A {@link PushNotificationConfig} after it has been persisted - its `id` is
+ * A {@link TaskPushNotificationConfig} after it has been persisted - its `id` is
  * guaranteed to be set (storage assigns one when the caller omits it). Use
- * this rather than the wire `PushNotificationConfig` whenever the post-store
+ * this rather than the wire `TaskPushNotificationConfig` whenever the post-store
  * id is load-bearing (resource name encoding, return values to the caller).
  */
-export type StoredPushNotificationConfig = PushNotificationConfig & {
+export type StoredPushNotificationConfig = TaskPushNotificationConfig & {
   readonly id: string;
 };
 
@@ -202,7 +202,7 @@ export interface TaskStorage {
    */
   setPushConfig(
     taskId: string,
-    config: PushNotificationConfig
+    config: TaskPushNotificationConfig
   ): StoredPushNotificationConfig;
 
   /**

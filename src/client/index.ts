@@ -5,7 +5,6 @@ export type {
   GetTaskOptions,
   HealthResponse,
   RequestOptions,
-  SendMessageParams,
 } from './client.js';
 export {
   A2AAbortError,

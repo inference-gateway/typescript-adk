@@ -728,14 +728,14 @@ function registerPushConfigTests(ctx: Context): void {
           url: 'https://example.com/webhook',
           token: 'bearer-xyz',
           authentication: {
-            schemes: ['Bearer'],
+            scheme: 'Bearer',
             credentials: 'secret-credentials',
           },
         });
 
         expect(stored.token).toBe('bearer-xyz');
         expect(stored.authentication).toEqual({
-          schemes: ['Bearer'],
+          scheme: 'Bearer',
           credentials: 'secret-credentials',
         });
       });

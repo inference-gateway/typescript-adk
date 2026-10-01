@@ -18,7 +18,7 @@ function makeCard(overrides: Partial<AgentCard> = {}): AgentCard {
     name: 'artifact-agent',
     description: 'Agent serving artifacts',
     version: '0.0.1',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: { streaming: false },

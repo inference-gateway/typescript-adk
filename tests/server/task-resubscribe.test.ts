@@ -33,7 +33,7 @@ function makeCard(): AgentCard {
     name: 'resubscribe-agent',
     description: 'Agent under test',
     version: '0.0.0',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: { streaming: true },
@@ -177,7 +177,7 @@ describe('createTaskResubscribeHandler', () => {
     it('throws JSONRPCError(-32602) when taskId is missing or empty', () => {
       const storage = new InMemoryTaskStorage();
       const handler = createTaskResubscribeHandler({ storage });
-      for (const params of [{}, { taskId: '' }, { taskId: 42 }]) {
+      for (const params of [{}, { id: '' }, { id: 42 }]) {
         try {
           handler(params, { signal: new AbortController().signal });
           throw new Error('expected handler to throw');
@@ -186,7 +186,7 @@ describe('createTaskResubscribeHandler', () => {
           expect((err as JSONRPCError).code).toBe(
             JSONRPC_ERROR_CODES.INVALID_PARAMS
           );
-          expect((err as JSONRPCError).message).toContain('taskId');
+          expect((err as JSONRPCError).message).toContain('id');
         }
       }
     });
@@ -195,10 +195,7 @@ describe('createTaskResubscribeHandler', () => {
       const storage = new InMemoryTaskStorage();
       const handler = createTaskResubscribeHandler({ storage });
       try {
-        handler(
-          { taskId: 'missing' },
-          { signal: new AbortController().signal }
-        );
+        handler({ id: 'missing' }, { signal: new AbortController().signal });
         throw new Error('expected handler to throw');
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
@@ -206,21 +203,6 @@ describe('createTaskResubscribeHandler', () => {
           JSONRPC_ERROR_CODES.INVALID_PARAMS
         );
         expect((err as JSONRPCError).message).toBe('task not found');
-      }
-    });
-
-    it('rejects metadata that is not an object', () => {
-      const storage = new InMemoryTaskStorage();
-      const handler = createTaskResubscribeHandler({ storage });
-      try {
-        handler(
-          { taskId: 'task-1', metadata: 'not-an-object' },
-          { signal: new AbortController().signal }
-        );
-        throw new Error('expected handler to throw');
-      } catch (err) {
-        expect(err).toBeInstanceOf(JSONRPCError);
-        expect((err as JSONRPCError).message).toContain('metadata');
       }
     });
   });
@@ -232,7 +214,7 @@ describe('createTaskResubscribeHandler', () => {
 
       const handler = createTaskResubscribeHandler({ storage });
       const { readable, done } = handler(
-        { taskId: 'task-1' },
+        { id: 'task-1' },
         { signal: new AbortController().signal }
       );
 
@@ -243,7 +225,9 @@ describe('createTaskResubscribeHandler', () => {
       const data = frames[0]?.json.data as TaskStatusUpdateEvent;
       expect(data.taskId).toBe('task-1');
       expect(data.status.state).toBe(TASK_STATE.COMPLETED);
-      expect(data.final).toBe(true);
+      expect(data.status.state).toMatch(
+        /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+      );
     });
 
     for (const terminal of [TASK_STATE.FAILED, TASK_STATE.CANCELLED] as const) {
@@ -253,7 +237,7 @@ describe('createTaskResubscribeHandler', () => {
 
         const handler = createTaskResubscribeHandler({ storage });
         const { readable, done } = handler(
-          { taskId: 'task-1' },
+          { id: 'task-1' },
           { signal: new AbortController().signal }
         );
 
@@ -262,7 +246,9 @@ describe('createTaskResubscribeHandler', () => {
         expect(frames).toHaveLength(1);
         const data = frames[0]?.json.data as TaskStatusUpdateEvent;
         expect(data.status.state).toBe(terminal);
-        expect(data.final).toBe(true);
+        expect(data.status.state).toMatch(
+          /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+        );
       });
     }
   });
@@ -274,7 +260,7 @@ describe('createTaskResubscribeHandler', () => {
 
       const handler = createTaskResubscribeHandler({ storage });
       const { readable, done } = handler(
-        { taskId: 'task-1' },
+        { id: 'task-1' },
         { signal: new AbortController().signal }
       );
 
@@ -283,7 +269,9 @@ describe('createTaskResubscribeHandler', () => {
       expect(frames).toHaveLength(1);
       const data = frames[0]?.json.data as TaskStatusUpdateEvent;
       expect(data.status.state).toBe(TASK_STATE.IN_PROGRESS);
-      expect(data.final).toBe(false);
+      expect(data.status.state).not.toMatch(
+        /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+      );
     });
 
     it('uses the bus replay buffer when present even if no listeners are live', async () => {
@@ -301,7 +289,6 @@ describe('createTaskResubscribeHandler', () => {
           taskId: 'task-1',
           contextId: 'ctx-1',
           status: { state: TASK_STATE.IN_PROGRESS },
-          final: false,
         } satisfies TaskStatusUpdateEvent,
       });
       bus.close();
@@ -311,7 +298,7 @@ describe('createTaskResubscribeHandler', () => {
         eventBusRegistry: registry,
       });
       const { readable, done } = handler(
-        { taskId: 'task-1' },
+        { id: 'task-1' },
         { signal: new AbortController().signal }
       );
 
@@ -352,7 +339,7 @@ describe('tasks/resubscribe end-to-end via A2AServer', () => {
         jsonrpc: JSONRPC_VERSION,
         id: 1,
         method: TASK_RESUBSCRIBE_METHOD,
-        params: { taskId: 'missing' },
+        params: { id: 'missing' },
       }),
     });
 
@@ -457,7 +444,7 @@ describe('tasks/resubscribe end-to-end via A2AServer', () => {
         jsonrpc: JSONRPC_VERSION,
         id: 2,
         method: TASK_RESUBSCRIBE_METHOD,
-        params: { taskId: 'task-1' },
+        params: { id: 'task-1' },
       }),
     });
     expect(resubRes.status).toBe(200);
@@ -494,12 +481,16 @@ describe('tasks/resubscribe end-to-end via A2AServer', () => {
 
     const initial = resubFrames[0]?.json.data as TaskStatusUpdateEvent;
     expect(initial.status.state).toBe(TASK_STATE.IN_PROGRESS);
-    expect(initial.final).toBe(false);
+    expect(initial.status.state).not.toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
 
     const final = resubFrames[resubFrames.length - 1]?.json
       .data as TaskStatusUpdateEvent;
     expect(final.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(final.final).toBe(true);
+    expect(final.status.state).toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
   });
 
   it('fans out the same stream to multiple concurrent resubscribers', async () => {
@@ -574,7 +565,7 @@ describe('tasks/resubscribe end-to-end via A2AServer', () => {
         jsonrpc: JSONRPC_VERSION,
         id: 2,
         method: TASK_RESUBSCRIBE_METHOD,
-        params: { taskId: 'task-1' },
+        params: { id: 'task-1' },
       }),
     });
     const subB = await fetch(`${baseUrl}/`, {
@@ -584,7 +575,7 @@ describe('tasks/resubscribe end-to-end via A2AServer', () => {
         jsonrpc: JSONRPC_VERSION,
         id: 3,
         method: TASK_RESUBSCRIBE_METHOD,
-        params: { taskId: 'task-1' },
+        params: { id: 'task-1' },
       }),
     });
     expect(subA.status).toBe(200);
@@ -612,8 +603,12 @@ describe('tasks/resubscribe end-to-end via A2AServer', () => {
       .data as TaskStatusUpdateEvent;
     const lastB = framesB[framesB.length - 1]?.json
       .data as TaskStatusUpdateEvent;
-    expect(lastA.final).toBe(true);
-    expect(lastB.final).toBe(true);
+    expect(lastA.status.state).toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
+    expect(lastB.status.state).toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
     expect(lastA.status.state).toBe(TASK_STATE.COMPLETED);
     expect(lastB.status.state).toBe(TASK_STATE.COMPLETED);
 
@@ -647,7 +642,7 @@ describe('tasks/resubscribe end-to-end via A2AServer', () => {
         jsonrpc: JSONRPC_VERSION,
         id: 1,
         method: TASK_RESUBSCRIBE_METHOD,
-        params: { taskId: 'task-done' },
+        params: { id: 'task-done' },
       }),
     });
 
@@ -658,7 +653,9 @@ describe('tasks/resubscribe end-to-end via A2AServer', () => {
     expect(frames).toHaveLength(1);
     const data = frames[0]?.json.data as TaskStatusUpdateEvent;
     expect(data.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(data.final).toBe(true);
+    expect(data.status.state).toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
   });
 });
 

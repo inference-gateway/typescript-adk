@@ -1,12 +1,16 @@
 // Code generated from A2A schema. DO NOT EDIT.
 //
-// Source: https://github.com/inference-gateway/schemas/blob/v0.34.3/a2a/a2a-schema.json
+// Source: https://github.com/inference-gateway/schemas/blob/v1.0.1/a2a/a2a-schema.json
 // Regenerate with: pnpm generate:types
 
 /**
  * Defines optional capabilities supported by an agent.
  */
 export interface AgentCapabilities {
+  /**
+   * Indicates if the agent supports providing an extended agent card when authenticated.
+   */
+  extendedAgentCard?: boolean;
   /**
    * A list of protocol extensions supported by the agent.
    */
@@ -16,26 +20,18 @@ export interface AgentCapabilities {
    */
   pushNotifications?: boolean;
   /**
-   * Indicates if the agent provides a history of state transitions for a task.
-   */
-  stateTransitionHistory?: boolean;
-  /**
    * Indicates if the agent supports streaming responses.
    */
   streaming?: boolean;
 }
 
 /**
- * AgentCard is a self-describing manifest for an agent. It provides essential
+ * A self-describing manifest for an agent. It provides essential
  *  metadata including the agent's identity, capabilities, skills, supported
  *  communication methods, and security requirements.
  *  Next ID: 20
  */
 export interface AgentCard {
-  /**
-   * DEPRECATED: Use 'supported_interfaces' instead.
-   */
-  additionalInterfaces?: AgentInterface[];
   capabilities: AgentCapabilities;
   /**
    * protolint:enable REPEATED_FIELD_NAMES_PLURALIZED
@@ -54,11 +50,11 @@ export interface AgentCard {
    */
   description: string;
   /**
-   * A url to provide additional documentation about the agent.
+   * A URL providing additional documentation about the agent.
    */
   documentationUrl?: string;
   /**
-   * An optional URL to an icon for the agent.
+   * Optional. A URL to an icon for the agent.
    */
   iconUrl?: string;
   /**
@@ -66,21 +62,11 @@ export interface AgentCard {
    *  Example: "Recipe Agent"
    */
   name: string;
-  /**
-   * DEPRECATED: Use 'supported_interfaces' instead.
-   */
-  preferredTransport?: string;
-  /**
-   * The version of the A2A protocol this agent supports.
-   *  Default: "1.0"
-   */
-  protocolVersion: string;
   provider?: AgentProvider;
   /**
-   * protolint:disable REPEATED_FIELD_NAMES_PLURALIZED
-   *  Security requirements for contacting the agent.
+   * Security requirements for contacting the agent.
    */
-  security?: Security[];
+  securityRequirements?: SecurityRequirement[];
   /**
    * The security scheme details used for authenticating with this agent.
    */
@@ -88,27 +74,19 @@ export interface AgentCard {
     [k: string]: SecurityScheme | undefined;
   };
   /**
-   * JSON Web Signatures computed for this AgentCard.
+   * JSON Web Signatures computed for this `AgentCard`.
    */
   signatures?: AgentCardSignature[];
   /**
-   * Skills represent an ability of an agent. It is largely
-   *  a descriptive concept but represents a more focused set of behaviors that the
+   * Skills represent the abilities of an agent.
+   *  It is largely a descriptive concept but represents a more focused set of behaviors that the
    *  agent is likely to succeed at.
    */
   skills: AgentSkill[];
   /**
-   * Ordered list of supported interfaces. First entry is preferred.
+   * Ordered list of supported interfaces. The first entry is preferred.
    */
-  supportedInterfaces?: AgentInterface[];
-  /**
-   * Whether the agent supports providing an extended agent card when authenticated.
-   */
-  supportsExtendedAgentCard?: boolean;
-  /**
-   * DEPRECATED: Use 'supported_interfaces' instead.
-   */
-  url?: string;
+  supportedInterfaces: AgentInterface[];
   /**
    * The version of the agent.
    *  Example: "1.0.0"
@@ -123,12 +101,14 @@ export interface AgentCard {
 export interface AgentCardSignature {
   header?: Struct;
   /**
-   * The protected JWS header for the signature. This is always a
-   *  base64url-encoded JSON object. Required.
+   * (-- api-linter: core::0140::reserved-words=disabled
+   *      aip.dev/not-precedent: Backwards compatibility --)
+   *  Required. The protected JWS header for the signature. This is always a
+   *  base64url-encoded JSON object.
    */
   protected: string;
   /**
-   * The computed signature, base64url-encoded. Required.
+   * Required. The computed signature, base64url-encoded.
    */
   signature: string;
 }
@@ -153,7 +133,7 @@ export interface AgentExtension {
 }
 
 /**
- * Declares a combination of a target URL and a transport protocol for interacting with the agent.
+ * Declares a combination of a target URL, transport and protocol version for interacting with the agent.
  *  This allows agents to expose the same functionality over multiple protocol binding mechanisms.
  */
 export interface AgentInterface {
@@ -164,7 +144,18 @@ export interface AgentInterface {
    */
   protocolBinding: string;
   /**
-   * Tenant to be set in the request when calling the agent.
+   * The version of the A2A protocol this interface exposes.
+   *  Use the latest supported minor version per major version.
+   *  Examples: "0.3", "1.0"
+   */
+  protocolVersion: string;
+  /**
+   * Optional. An opaque string used for routing requests to a specific agent
+   *  or tenant when multiple agents are served behind a single A2A endpoint.
+   *  When set, clients MUST include this value in the `tenant` field of all
+   *  request messages sent to this interface. The server is responsible for
+   *  interpreting the value and routing requests accordingly; the protocol
+   *  does not define its format or semantics.
    */
   tenant?: string;
   /**
@@ -219,10 +210,9 @@ export interface AgentSkill {
    */
   outputModes?: string[];
   /**
-   * protolint:disable REPEATED_FIELD_NAMES_PLURALIZED
-   *  Security schemes necessary for this skill.
+   * Security schemes necessary for this skill.
    */
-  security?: Security[];
+  securityRequirements?: SecurityRequirement[];
   /**
    * A set of keywords describing the skill's capabilities.
    */
@@ -252,12 +242,11 @@ export interface APIKeySecurityScheme {
  */
 export interface Artifact {
   /**
-   * Unique identifier (e.g. UUID) for the artifact. It must be at least unique
-   *  within a task.
+   * Unique identifier (e.g. UUID) for the artifact. It must be unique within a task.
    */
   artifactId: string;
   /**
-   * A human readable description of the artifact, optional.
+   * Optional. A human readable description of the artifact.
    */
   description?: string;
   /**
@@ -280,13 +269,15 @@ export interface Artifact {
  */
 export interface AuthenticationInfo {
   /**
-   * Optional credentials
+   * Push Notification credentials. Format depends on the scheme (e.g., token for Bearer).
    */
   credentials?: string;
   /**
-   * A list of supported authentication schemes (e.g., 'Basic', 'Bearer').
+   * HTTP Authentication Scheme from the [IANA registry](https://www.iana.org/assignments/http-authschemes/).
+   *  Examples: `Bearer`, `Basic`, `Digest`.
+   *  Scheme names are case-insensitive per [RFC 9110 Section 11.1](https://www.rfc-editor.org/rfc/rfc9110#section-11.1).
    */
-  schemes: string[];
+  scheme: string;
 }
 
 /**
@@ -297,6 +288,11 @@ export interface AuthorizationCodeOAuthFlow {
    * The authorization URL to be used for this flow.
    */
   authorizationUrl: string;
+  /**
+   * Indicates if PKCE (RFC 7636) is required for this flow.
+   *  PKCE should always be used for public clients and is recommended for all clients.
+   */
+  pkceRequired?: boolean;
   /**
    * The URL to be used for obtaining refresh tokens.
    */
@@ -314,16 +310,17 @@ export interface AuthorizationCodeOAuthFlow {
 }
 
 /**
- * Represents a request for the `tasks/cancel` method.
+ * Represents a request for the `CancelTask` method.
  */
 export interface CancelTaskRequest {
   /**
-   * The resource name of the task to cancel.
-   *  Format: tasks/{task_id}
+   * The resource ID of the task to cancel.
    */
-  name?: string;
+  id: string;
+  metadata?: Struct;
   /**
-   * Optional tenant, provided as a path parameter.
+   * Optional. Opaque routing identifier. Must match the `tenant` value from
+   *  the selected `AgentInterface` in the Agent Card when that field is set.
    */
   tenant?: string;
 }
@@ -349,86 +346,98 @@ export interface ClientCredentialsOAuthFlow {
 }
 
 /**
- * DataPart represents a structured blob.
- */
-export interface DataPart {
-  data: Struct;
-}
-
-/**
- * Represents a request for the `tasks/pushNotificationConfig/delete` method.
+ * Represents a request for the `DeleteTaskPushNotificationConfig` method.
  */
 export interface DeleteTaskPushNotificationConfigRequest {
   /**
-   * The resource name of the config to delete.
-   *  Format: tasks/{task_id}/pushNotificationConfigs/{config_id}
+   * The resource ID of the configuration to delete.
    */
-  name?: string;
+  id: string;
   /**
-   * Optional tenant, provided as a path parameter.
+   * The parent task resource ID.
+   */
+  taskId: string;
+  /**
+   * Optional. Opaque routing identifier. Must match the `tenant` value from
+   *  the selected `AgentInterface` in the Agent Card when that field is set.
    */
   tenant?: string;
 }
 
 /**
- * FilePart represents the different ways files can be provided. If files are
- *  small, directly feeding the bytes is supported via file_with_bytes. If the
- *  file is large, the agent should read the content as appropriate directly
- *  from the file_with_uri source.
+ * Defines configuration details for the OAuth 2.0 Device Code flow (RFC 8628).
+ *  This flow is designed for input-constrained devices such as IoT devices,
+ *  and CLI tools where the user authenticates on a separate device.
  */
-export interface FilePart {
+export interface DeviceCodeOAuthFlow {
   /**
-   * The base64-encoded content of the file.
+   * The device authorization endpoint URL.
    */
-  fileWithBytes?: string;
+  deviceAuthorizationUrl: string;
   /**
-   * A URL pointing to the file's content.
+   * The URL to be used for obtaining refresh tokens.
    */
-  fileWithUri?: string;
+  refreshUrl?: string;
   /**
-   * The media type of the file (e.g., "application/pdf").
+   * The available scopes for the OAuth2 security scheme.
    */
-  mediaType?: string;
+  scopes: {
+    [k: string]: string | undefined;
+  };
   /**
-   * An optional name for the file (e.g., "document.pdf").
+   * The token URL to be used for this flow.
    */
-  name?: string;
+  tokenUrl: string;
 }
 
+/**
+ * Represents a request for the `GetExtendedAgentCard` method.
+ */
 export interface GetExtendedAgentCardRequest {
   /**
-   * Optional tenant, provided as a path parameter.
-   */
-  tenant?: string;
-}
-
-export interface GetTaskPushNotificationConfigRequest {
-  /**
-   * The resource name of the config to retrieve.
-   *  Format: tasks/{task_id}/pushNotificationConfigs/{config_id}
-   */
-  name?: string;
-  /**
-   * Optional tenant, provided as a path parameter.
+   * Optional. Opaque routing identifier. Must match the `tenant` value from
+   *  the selected `AgentInterface` in the Agent Card when that field is set.
    */
   tenant?: string;
 }
 
 /**
- * Represents a request for the `tasks/get` method.
+ * Represents a request for the `GetTaskPushNotificationConfig` method.
+ */
+export interface GetTaskPushNotificationConfigRequest {
+  /**
+   * The resource ID of the configuration to retrieve.
+   */
+  id: string;
+  /**
+   * The parent task resource ID.
+   */
+  taskId: string;
+  /**
+   * Optional. Opaque routing identifier. Must match the `tenant` value from
+   *  the selected `AgentInterface` in the Agent Card when that field is set.
+   */
+  tenant?: string;
+}
+
+/**
+ * Represents a request for the `GetTask` method.
  */
 export interface GetTaskRequest {
   /**
-   * The maximum number of messages to include in the history.
+   * The maximum number of most recent messages from the task's history to retrieve. An
+   *  unset value means the client does not impose any limit. A value of zero is
+   *  a request to not include any messages. The server MUST NOT return more
+   *  messages than the provided value, but MAY apply a lower limit.
    */
   historyLength?: number;
   /**
-   * The resource name of the task.
-   *  Format: tasks/{task_id}
+   * The resource ID of the task to retrieve.
    */
-  name: string;
+  id: string;
   /**
-   * Optional tenant, provided as a path parameter.
+   * Optional. Opaque routing identifier. Must match the `tenant` value from
+   *  the selected `AgentInterface` in the Agent Card when that field is set.
    */
   tenant?: string;
 }
@@ -439,7 +448,7 @@ export interface GetTaskRequest {
 export interface HTTPAuthSecurityScheme {
   /**
    * A hint to the client to identify how the bearer token is formatted (e.g., "JWT").
-   *  This is primarily for documentation purposes.
+   *  Primarily for documentation purposes.
    */
   bearerFormat?: string;
   /**
@@ -455,57 +464,62 @@ export interface HTTPAuthSecurityScheme {
 }
 
 /**
- * Defines configuration details for the OAuth 2.0 Implicit flow.
+ * Deprecated: Use Authorization Code + PKCE instead.
  */
 export interface ImplicitOAuthFlow {
   /**
-   * The authorization URL to be used for this flow.
+   * The authorization URL to be used for this flow. This MUST be in the
+   *  form of a URL. The OAuth2 standard requires the use of TLS
    */
-  authorizationUrl: string;
+  authorizationUrl?: string;
   /**
-   * The URL to be used for obtaining refresh tokens.
+   * The URL to be used for obtaining refresh tokens. This MUST be in the
+   *  form of a URL. The OAuth2 standard requires the use of TLS.
    */
   refreshUrl?: string;
   /**
-   * The available scopes for the OAuth2 security scheme.
+   * The available scopes for the OAuth2 security scheme. A map between the
+   *  scope name and a short description for it. The map MAY be empty.
    */
-  scopes: {
+  scopes?: {
     [k: string]: string | undefined;
   };
 }
 
-export interface ListTaskPushNotificationConfigRequest {
+/**
+ * Represents a request for the `ListTaskPushNotificationConfigs` method.
+ */
+export interface ListTaskPushNotificationConfigsRequest {
   /**
    * The maximum number of configurations to return.
    */
   pageSize?: number;
   /**
-   * A page token received from a previous ListTaskPushNotificationConfigRequest call.
+   * A page token received from a previous `ListTaskPushNotificationConfigsRequest` call.
    */
   pageToken?: string;
   /**
-   * The parent task resource.
-   *  Format: tasks/{task_id}
+   * The parent task resource ID.
    */
-  parent?: string;
+  taskId: string;
   /**
-   * Optional tenant, provided as a path parameter.
+   * Optional. Opaque routing identifier. Must match the `tenant` value from
+   *  the selected `AgentInterface` in the Agent Card when that field is set.
    */
   tenant?: string;
 }
 
 /**
- * Represents a successful response for the `tasks/pushNotificationConfig/list`
+ * Represents a successful response for the `ListTaskPushNotificationConfigs`
  *  method.
  */
-export interface ListTaskPushNotificationConfigResponse {
+export interface ListTaskPushNotificationConfigsResponse {
   /**
    * The list of push notification configurations.
    */
   configs?: TaskPushNotificationConfig[];
   /**
-   * A token, which can be sent as `page_token` to retrieve the next page.
-   *  If this field is omitted, there are no subsequent pages.
+   * A token to retrieve the next page of results, or empty if there are no more results in the list.
    */
   nextPageToken?: string;
 }
@@ -528,36 +542,37 @@ export interface ListTasksRequest {
    */
   includeArtifacts?: boolean;
   /**
-   * Filter tasks updated after this timestamp (milliseconds since epoch).
-   *  Only tasks with a last updated time greater than or equal to this value will be returned.
-   */
-  lastUpdatedAfter?: number;
-  /**
-   * Maximum number of tasks to return. Must be between 1 and 100.
-   *  Defaults to 50 if not specified.
+   * The maximum number of tasks to return. The service may return fewer than this value.
+   *  If unspecified, at most 50 tasks will be returned.
+   *  The minimum value is 1.
+   *  The maximum value is 100.
    */
   pageSize?: number;
   /**
-   * Token for pagination. Use the next_page_token from a previous ListTasksResponse.
+   * A page token, received from a previous `ListTasks` call.
+   *  `ListTasksResponse.next_page_token`.
+   *  Provide this to retrieve the subsequent page.
    */
   pageToken?: string;
   status?: TaskState;
+  statusTimestampAfter?: Timestamp;
   /**
-   * Optional tenant, provided as a path parameter.
+   * Optional. Opaque routing identifier. Must match the `tenant` value from
+   *  the selected `AgentInterface` in the Agent Card when that field is set.
    */
   tenant?: string;
 }
 
 /**
- * Result object for tasks/list method containing an array of tasks and pagination information.
+ * Result object for `ListTasks` method containing an array of tasks and pagination information.
  */
 export interface ListTasksResponse {
   /**
-   * Token for retrieving the next page. Empty string if no more results.
+   * A token to retrieve the next page of results, or empty if there are no more results in the list.
    */
   nextPageToken: string;
   /**
-   * The size of page requested.
+   * The page size used for this response.
    */
   pageSize: number;
   /**
@@ -571,18 +586,16 @@ export interface ListTasksResponse {
 }
 
 /**
- * Message is one unit of communication between client and server. It is
- *  associated with a context and optionally a task. Since the server is
- *  responsible for the context definition, it must always provide a context_id
- *  in its messages. The client can optionally provide the context_id if it
- *  knows the context to associate the message to. Similarly for task_id,
- *  except the server decides if a task is created and whether to include the
- *  task_id.
+ * `Message` is one unit of communication between client and server. It can be
+ *  associated with a context and/or a task. For server messages, `context_id` must
+ *  be provided, and `task_id` only if a task was created. For client messages, both
+ *  fields are optional, with the caveat that if both are provided, they have to
+ *  match (the `context_id` has to be the one that is set on the task). If only
+ *  `task_id` is provided, the server will infer `context_id` from it.
  */
 export interface Message {
   /**
-   * The context id of the message. This is optional and if set, the message
-   *  will be associated with the given context.
+   * Optional. The context id of the message. If set, the message will be associated with the given context.
    */
   contextId?: string;
   /**
@@ -590,14 +603,12 @@ export interface Message {
    */
   extensions?: string[];
   /**
-   * The unique identifier (e.g. UUID) of the message. This is required and
-   *  created by the message creator.
+   * The unique identifier (e.g. UUID) of the message. This is created by the message creator.
    */
   messageId: string;
   metadata?: Struct;
   /**
-   * protolint:disable REPEATED_FIELD_NAMES_PLURALIZED
-   *  Parts is the container of the message content.
+   * Parts is the container of the message content.
    */
   parts: Part[];
   /**
@@ -606,8 +617,7 @@ export interface Message {
   referenceTaskIds?: string[];
   role: Role;
   /**
-   * The task id of the message. This is optional and if set, the message
-   *  will be associated with the given task.
+   * Optional. The task id of the message. If set, the message will be associated with the given task.
    */
   taskId?: string;
 }
@@ -632,8 +642,8 @@ export interface OAuth2SecurityScheme {
   description?: string;
   flows: OAuthFlows;
   /**
-   * URL to the oauth2 authorization server metadata
-   *  RFC8414 (https://datatracker.ietf.org/doc/html/rfc8414). TLS is required.
+   * URL to the OAuth2 authorization server metadata [RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414).
+   *  TLS is required.
    */
   oauth2MetadataUrl?: string;
 }
@@ -644,6 +654,7 @@ export interface OAuth2SecurityScheme {
 export interface OAuthFlows {
   authorizationCode?: AuthorizationCodeOAuthFlow;
   clientCredentials?: ClientCredentialsOAuthFlow;
+  deviceCode?: DeviceCodeOAuthFlow;
   implicit?: ImplicitOAuthFlow;
   password?: PasswordOAuthFlow;
 }
@@ -657,69 +668,74 @@ export interface OpenIdConnectSecurityScheme {
    */
   description?: string;
   /**
-   * The OpenID Connect Discovery URL for the OIDC provider's metadata.
-   *  See: https://openid.net/specs/openid-connect-discovery-1_0.html
+   * The [OpenID Connect Discovery URL](https://openid.net/specs/openid-connect-discovery-1_0.html) for the OIDC provider's metadata.
    */
   openIdConnectUrl: string;
 }
 
 /**
- * Part represents a container for a section of communication content.
+ * `Part` represents a container for a section of communication content.
  *  Parts can be purely textual, some sort of file (image, video, etc) or
  *  a structured data blob (i.e. JSON).
  */
 export interface Part {
-  data?: DataPart;
-  file?: FilePart;
+  data?: Value;
+  /**
+   * An optional `filename` for the file (e.g., "document.pdf").
+   */
+  filename?: string;
+  /**
+   * The `media_type` (MIME type) of the part content (e.g., "text/plain", "application/json", "image/png").
+   *  This field is available for all part types.
+   */
+  mediaType?: string;
   metadata?: Struct;
   /**
-   * The string content of the text part.
+   * The `raw` byte content of a file. In JSON serialization, this is encoded as a base64 string.
+   */
+  raw?: string;
+  /**
+   * The string content of the `text` part.
    */
   text?: string;
+  /**
+   * A `url` pointing to the file's content.
+   */
+  url?: string;
 }
 
 /**
- * Defines configuration details for the OAuth 2.0 Resource Owner Password flow.
+ * Deprecated: Use Authorization Code + PKCE or Device Code.
  */
 export interface PasswordOAuthFlow {
   /**
-   * The URL to be used for obtaining refresh tokens.
+   * The URL to be used for obtaining refresh tokens. This MUST be in the
+   *  form of a URL. The OAuth2 standard requires the use of TLS.
    */
   refreshUrl?: string;
   /**
-   * The available scopes for the OAuth2 security scheme.
+   * The available scopes for the OAuth2 security scheme. A map between the
+   *  scope name and a short description for it. The map MAY be empty.
    */
-  scopes: {
+  scopes?: {
     [k: string]: string | undefined;
   };
   /**
-   * The token URL to be used for this flow.
+   * The token URL to be used for this flow. This MUST be in the form of a URL.
+   *  The OAuth2 standard requires the use of TLS.
    */
-  tokenUrl: string;
-}
-
-/**
- * Configuration for setting up push notifications for task updates.
- */
-export interface PushNotificationConfig {
-  authentication?: AuthenticationInfo;
-  /**
-   * A unique identifier (e.g. UUID) for this push notification.
-   */
-  id?: string;
-  /**
-   * Token unique for this task/session
-   */
-  token?: string;
-  /**
-   * Url to send the notification too
-   */
-  url: string;
+  tokenUrl?: string;
 }
 
 export type Role = 'ROLE_UNSPECIFIED' | 'ROLE_USER' | 'ROLE_AGENT';
 
-export interface Security {
+/**
+ * Defines the security requirements for an agent.
+ */
+export interface SecurityRequirement {
+  /**
+   * A map of security schemes to the required scopes.
+   */
   schemes?: {
     [k: string]: StringList | undefined;
   };
@@ -743,60 +759,48 @@ export interface SecurityScheme {
  */
 export interface SendMessageConfiguration {
   /**
-   * A list of media types the client is prepared to accept for response parts. Agents SHOULD use this to tailor their output.
+   * A list of media types the client is prepared to accept for response parts.
+   *  Agents SHOULD use this to tailor their output.
    */
   acceptedOutputModes?: string[];
   /**
-   * If true, the operation waits until the task reaches a terminal state before returning. Default is false.
-   */
-  blocking?: boolean;
-  /**
-   * The maximum number of messages to include in the history.
+   * The maximum number of most recent messages from the task's history to retrieve in
+   *  the response. An unset value means the client does not impose any limit. A
+   *  value of zero is a request to not include any messages. The server MUST NOT
+   *  return more messages than the provided value, but MAY apply a lower limit.
    */
   historyLength?: number;
-  pushNotificationConfig?: PushNotificationConfig;
+  /**
+   * If `true`, the operation returns immediately after creating the task,
+   *  even if processing is still in progress.
+   *  If `false` (default), the operation MUST wait until the task reaches a
+   *  terminal (`COMPLETED`, `FAILED`, `CANCELED`, `REJECTED`) or interrupted
+   *  (`INPUT_REQUIRED`, `AUTH_REQUIRED`) state before returning.
+   */
+  returnImmediately?: boolean;
+  taskPushNotificationConfig?: TaskPushNotificationConfig;
 }
 
 /**
- * /////////// Request Messages ///////////
- *  Represents a request for the `message/send` method.
+ * Represents a request for the `SendMessage` method.
  */
 export interface SendMessageRequest {
   configuration?: SendMessageConfiguration;
   message: Message;
   metadata?: Struct;
   /**
-   * Optional tenant, provided as a path parameter.
+   * Optional. Opaque routing identifier. Must match the `tenant` value from
+   *  the selected `AgentInterface` in the Agent Card when that field is set.
    */
   tenant?: string;
 }
 
 /**
- * ////// Response Messages ///////////
+ * Represents the response for the `SendMessage` method.
  */
 export interface SendMessageResponse {
   message?: Message;
   task?: Task;
-}
-
-/**
- * Represents a request for the `tasks/pushNotificationConfig/set` method.
- */
-export interface SetTaskPushNotificationConfigRequest {
-  config: TaskPushNotificationConfig;
-  /**
-   * The ID for the new config.
-   */
-  configId: string;
-  /**
-   * The parent task resource for this config.
-   *  Format: tasks/{task_id}
-   */
-  parent: string;
-  /**
-   * Optional tenant, provided as a path parameter.
-   */
-  tenant?: string;
 }
 
 /**
@@ -811,44 +815,51 @@ export interface StreamResponse {
 
 /**
  * protolint:disable REPEATED_FIELD_NAMES_PLURALIZED
+ *  A list of strings.
  */
 export interface StringList {
+  /**
+   * The individual string values.
+   */
   list?: string[];
 }
 
 export interface Struct {}
 
+/**
+ * Represents a request for the `SubscribeToTask` method.
+ */
 export interface SubscribeToTaskRequest {
   /**
-   * The resource name of the task to subscribe to.
-   *  Format: tasks/{task_id}
+   * The resource ID of the task to subscribe to.
    */
-  name?: string;
+  id: string;
   /**
-   * Optional tenant, provided as a path parameter.
+   * Optional. Opaque routing identifier. Must match the `tenant` value from
+   *  the selected `AgentInterface` in the Agent Card when that field is set.
    */
   tenant?: string;
 }
 
 /**
- * Task is the core unit of action for A2A. It has a current status
+ * `Task` is the core unit of action for A2A. It has a current status
  *  and when results are created for the task they are stored in the
  *  artifact. If there are multiple turns for a task, these are stored in
  *  history.
  */
 export interface Task {
   /**
-   * A set of output artifacts for a Task.
+   * A set of output artifacts for a `Task`.
    */
   artifacts?: Artifact[];
   /**
    * Unique identifier (e.g. UUID) for the contextual collection of interactions
-   *  (tasks and messages). Created by the A2A server.
+   *  (tasks and messages).
    */
-  contextId: string;
+  contextId?: string;
   /**
    * protolint:disable REPEATED_FIELD_NAMES_PLURALIZED
-   *  The history of interactions from a task.
+   *  The history of interactions from a `Task`.
    */
   history?: Message[];
   /**
@@ -861,8 +872,7 @@ export interface Task {
 }
 
 /**
- * TaskArtifactUpdateEvent represents a task delta where an artifact has
- *  been generated.
+ * A task delta where an artifact has been generated.
  */
 export interface TaskArtifactUpdateEvent {
   /**
@@ -872,7 +882,7 @@ export interface TaskArtifactUpdateEvent {
   append?: boolean;
   artifact: Artifact;
   /**
-   * The id of the context that this task belongs to.
+   * The ID of the context that this task belongs to.
    */
   contextId: string;
   /**
@@ -881,22 +891,38 @@ export interface TaskArtifactUpdateEvent {
   lastChunk?: boolean;
   metadata?: Struct;
   /**
-   * The id of the task for this artifact.
+   * The ID of the task for this artifact.
    */
   taskId: string;
 }
 
 /**
- * A container associating a push notification configuration with a specific
- *  task.
+ * A container associating a push notification configuration with a specific task.
  */
 export interface TaskPushNotificationConfig {
+  authentication?: AuthenticationInfo;
   /**
-   * The resource name of the config.
-   *  Format: tasks/{task_id}/pushNotificationConfigs/{config_id}
+   * The push notification configuration details.
+   *  A unique identifier (e.g. UUID) for this push notification configuration.
    */
-  name: string;
-  pushNotificationConfig: PushNotificationConfig;
+  id?: string;
+  /**
+   * The ID of the task this configuration is associated with.
+   */
+  taskId?: string;
+  /**
+   * Optional. Opaque routing identifier. Must match the `tenant` value from
+   *  the selected `AgentInterface` in the Agent Card when that field is set.
+   */
+  tenant?: string;
+  /**
+   * A token unique for this task or session.
+   */
+  token?: string;
+  /**
+   * The URL where the notification should be sent.
+   */
+  url: string;
 }
 
 export type TaskState =
@@ -905,7 +931,7 @@ export type TaskState =
   | 'TASK_STATE_WORKING'
   | 'TASK_STATE_COMPLETED'
   | 'TASK_STATE_FAILED'
-  | 'TASK_STATE_CANCELLED'
+  | 'TASK_STATE_CANCELED'
   | 'TASK_STATE_INPUT_REQUIRED'
   | 'TASK_STATE_REJECTED'
   | 'TASK_STATE_AUTH_REQUIRED';
@@ -920,24 +946,23 @@ export interface TaskStatus {
 }
 
 /**
- * An event sent by the agent to notify the client of a change in a task's
- *  status.
+ * An event sent by the agent to notify the client of a change in a task's status.
  */
 export interface TaskStatusUpdateEvent {
   /**
-   * The id of the context that the task belongs to
+   * The ID of the context that the task belongs to.
    */
   contextId: string;
-  /**
-   * If true, this is the final event in the stream for this interaction.
-   */
-  final: boolean;
   metadata?: Struct;
   status: TaskStatus;
   /**
-   * The id of the task that is changed
+   * The ID of the task that has changed.
    */
   taskId: string;
 }
 
 export type Timestamp = string;
+
+export interface Value {
+  [k: string]: unknown | undefined;
+}

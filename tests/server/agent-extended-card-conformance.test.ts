@@ -29,14 +29,13 @@ function publicCard(overrides: Partial<AgentCard> = {}): AgentCard {
     name: 'extended-agent',
     description: 'Agent under test',
     version: '1.0.0',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
-    capabilities: { streaming: false },
+    capabilities: { streaming: false, extendedAgentCard: true },
     skills: [
       { id: 'echo', name: 'Echo', description: 'Echo input.', tags: [] },
     ],
-    supportsExtendedAgentCard: true,
     ...overrides,
   };
 }
@@ -53,7 +52,7 @@ function extendedCard(): AgentCard {
         },
       },
     },
-    security: [{ schemes: { oidc: { list: [] } } }],
+    securityRequirements: [{ schemes: { oidc: { list: [] } } }],
   };
 }
 
@@ -154,7 +153,7 @@ describe('agent/getAuthenticatedExtendedCard conformance', () => {
     expect(body.id).toBe(1);
     expect(body.result.name).toBe('extended-agent');
     expect(body.result.securitySchemes).toBeDefined();
-    expect(body.result.security).toBeDefined();
+    expect(body.result.securityRequirements).toBeDefined();
   });
 
   it('accepts an optional tenant param', async () => {
@@ -250,13 +249,15 @@ describe('agent/getAuthenticatedExtendedCard conformance', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as AgentCard;
     expect(body.securitySchemes).toBeUndefined();
-    expect(body.security).toBeUndefined();
-    expect(body.supportsExtendedAgentCard).toBe(true);
+    expect(body.securityRequirements).toBeUndefined();
+    expect(body.capabilities.extendedAgentCard).toBe(true);
   });
 
   it('returns unsupported-operation-error when supportsExtendedAgentCard is false', async () => {
     const server = createA2AServer({
-      card: publicCard({ supportsExtendedAgentCard: false }),
+      card: publicCard({
+        capabilities: { streaming: false, extendedAgentCard: false },
+      }),
       authenticator: new OIDCAuthenticator(buildVerifier()),
     });
     const { baseUrl, close: stop } = await startServer(server);
@@ -286,7 +287,9 @@ describe('agent/getAuthenticatedExtendedCard conformance', () => {
 
   it('returns not-configured-error when supportsExtendedAgentCard is true but no extended card', async () => {
     const server = createA2AServer({
-      card: publicCard({ supportsExtendedAgentCard: true }),
+      card: publicCard({
+        capabilities: { streaming: false, extendedAgentCard: true },
+      }),
       authenticator: new OIDCAuthenticator(buildVerifier()),
     });
     const { baseUrl, close: stop } = await startServer(server);

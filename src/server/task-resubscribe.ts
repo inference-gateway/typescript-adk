@@ -1,7 +1,7 @@
 import { isTerminal } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
-  Struct,
+  SubscribeToTaskRequest,
   TaskStatus,
   TaskStatusUpdateEvent,
 } from '../types/generated/a2a.js';
@@ -24,20 +24,6 @@ import type { TaskEventBusRegistry } from './task-event-bus.js';
  * spelling stays in lockstep with conformance tests and other consumers.
  */
 export const TASK_RESUBSCRIBE_METHOD = 'tasks/resubscribe';
-
-/**
- * JSON-RPC params accepted by the A2A `tasks/resubscribe` method.
- *
- * Uses the field name `taskId` to match {@link
- * import('./task-cancel.js').TaskCancelParams} and {@link
- * import('./task-get.js').TaskGetParams} across the `tasks/*` family. The Go
- * ADK currently uses `name` here for historical reasons; the TS ADK is
- * deliberately consistent with its other `tasks/*` shapes.
- */
-export interface TaskResubscribeParams {
-  readonly taskId: string;
-  readonly metadata?: Struct;
-}
 
 export interface TaskResubscribeHandlerOptions {
   /** Storage backend to look up tasks in (both active and dead-letter). */
@@ -105,7 +91,7 @@ export function createTaskResubscribeHandler(
 
   return (params: unknown, context: MethodContext): StreamingMethodResult => {
     const validated = validateTaskResubscribeParams(params);
-    const task = storage.getTask(validated.taskId);
+    const task = storage.getTask(validated.id);
     if (task === undefined) {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
@@ -146,7 +132,7 @@ export function createTaskResubscribeHandler(
               // Synthesize the current state so the subscriber still sees a
               // first frame immediately.
               writer.emit(
-                buildStatusEvent(task.id, task.contextId, task.status, false, {
+                buildStatusEvent(task.id, task.contextId, task.status, {
                   source: options.eventSource,
                 })
               );
@@ -173,13 +159,9 @@ export function createTaskResubscribeHandler(
           writer.emitCloudEvent(lastStatus);
         } else {
           writer.emit(
-            buildStatusEvent(
-              task.id,
-              task.contextId,
-              task.status,
-              taskIsTerminal,
-              { source: options.eventSource }
-            )
+            buildStatusEvent(task.id, task.contextId, task.status, {
+              source: options.eventSource,
+            })
           );
         }
       } finally {
@@ -199,7 +181,6 @@ function buildStatusEvent(
   taskId: string,
   contextId: string,
   status: TaskStatus,
-  final: boolean,
   options: BuildStatusEventOptions
 ): {
   readonly type: AgentEventType;
@@ -211,7 +192,6 @@ function buildStatusEvent(
     taskId,
     contextId,
     status,
-    final,
   };
   return {
     type: AGENT_EVENT_TYPE.TASK_STATUS_CHANGED satisfies AgentEventType,
@@ -221,39 +201,26 @@ function buildStatusEvent(
   };
 }
 
-function validateTaskResubscribeParams(params: unknown): TaskResubscribeParams {
+function validateTaskResubscribeParams(
+  params: unknown
+): SubscribeToTaskRequest {
   if (params === null || typeof params !== 'object' || Array.isArray(params)) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: expected TaskResubscribeParams object'
+      'invalid params: expected SubscribeToTaskRequest object'
     );
   }
   const obj = params as Record<string, unknown>;
 
-  const taskId = obj['taskId'];
+  const taskId = obj['id'];
   if (typeof taskId !== 'string' || taskId.length === 0) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: taskId is required and must be a non-empty string'
+      'invalid params: id is required and must be a non-empty string'
     );
   }
 
-  const rawMetadata = obj['metadata'];
-  if (rawMetadata !== undefined) {
-    if (
-      rawMetadata === null ||
-      typeof rawMetadata !== 'object' ||
-      Array.isArray(rawMetadata)
-    ) {
-      throw new JSONRPCError(
-        JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: metadata must be an object'
-      );
-    }
-    return { taskId, metadata: rawMetadata as Struct };
-  }
-
-  return { taskId };
+  return { id: taskId };
 }
 
 // Re-export `CloudEvent` so TS-DOC links from the handler are resolvable

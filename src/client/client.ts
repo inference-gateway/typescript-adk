@@ -2,8 +2,7 @@ import pkg from '../../package.json' with { type: 'json' };
 import { createTLSFetch, type ClientTLSConfig } from '../tls/index.js';
 import type {
   AgentCard,
-  Message,
-  SendMessageConfiguration,
+  SendMessageRequest,
   Struct,
   Task,
 } from '../types/generated/a2a.js';
@@ -65,16 +64,6 @@ export type FetchLike = (
  */
 export interface HealthResponse {
   readonly status: string;
-}
-
-/**
- * JSON-RPC params accepted by the `message/send` method. Mirrors
- * `MessageSendParams` in `src/server/message-send.ts` - keep these in lockstep.
- */
-export interface SendMessageParams {
-  readonly message: Message;
-  readonly configuration?: SendMessageConfiguration;
-  readonly metadata?: Struct;
 }
 
 export interface A2AClientConfig {
@@ -281,7 +270,7 @@ export class A2AClient {
    * the server creates and enqueues.
    */
   async sendMessage(
-    params: SendMessageParams,
+    params: SendMessageRequest,
     opts: RequestOptions = {}
   ): Promise<Task> {
     return await this.executeJSONRPC<Task>('message/send', params, opts.signal);
@@ -292,7 +281,7 @@ export class A2AClient {
    * with `history` capped to the last `historyLength` messages when supplied.
    */
   async getTask(taskId: string, opts: GetTaskOptions = {}): Promise<Task> {
-    const params: Record<string, unknown> = { taskId };
+    const params: Record<string, unknown> = { id: taskId };
     if (opts.historyLength !== undefined) {
       params['historyLength'] = opts.historyLength;
     }

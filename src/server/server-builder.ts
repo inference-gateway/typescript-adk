@@ -479,7 +479,10 @@ export class A2AServerBuilder<
 
     const publicCard: AgentCard =
       extendedCard !== undefined
-        ? { ...card, supportsExtendedAgentCard: true }
+        ? {
+            ...card,
+            capabilities: { ...card.capabilities, extendedAgentCard: true },
+          }
         : card;
 
     const serverConfig: A2AServerConfig = {

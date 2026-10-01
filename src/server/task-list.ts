@@ -1,6 +1,10 @@
 import { toWireTask, type ManagedTask } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
-import type { Struct, Task, TaskState } from '../types/generated/a2a.js';
+import type {
+  ListTasksRequest,
+  ListTasksResponse,
+  TaskState,
+} from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
 import type { MethodHandler } from './method-registry.js';
 
@@ -25,49 +29,6 @@ export const DEFAULT_TASK_LIST_LIMIT = 100;
  * its pagination caps). Configurable via {@link TaskListHandlerOptions.maxLimit}.
  */
 export const MAX_TASK_LIST_LIMIT = 100;
-
-/**
- * JSON-RPC params accepted by the A2A `tasks/list` method.
- *
- * Mirrors the Go ADK's `types.TaskListParams` in spirit but swaps offset+limit
- * for keyset pagination - `cursor` is the opaque continuation token returned
- * as `nextCursor` on the previous page. Stable under inserts/deletes because
- * the cursor encodes the `(createdAt, id)` of the last item on the previous
- * page; subsequent pages start at the first task strictly after that point.
- *
- * Field names are deliberately simpler than the A2A wire schema
- * (`ListTasksRequest`) - `limit`/`cursor` rather than `pageSize`/`pageToken` -
- * to match the issue's stated API shape and stay terse for callers.
- */
-export interface TaskListParams {
-  /** Filter to tasks whose `status.state` equals this value. */
-  readonly state?: TaskState;
-  /** Filter to tasks whose `contextId` equals this value. */
-  readonly contextId?: string;
-  /**
-   * Maximum number of tasks to return. Clamped to `[1, maxLimit]`; defaults
-   * to {@link TaskListHandlerOptions.defaultLimit} when omitted.
-   */
-  readonly limit?: number;
-  /**
-   * Opaque continuation token from the `nextCursor` field of a previous
-   * response. Treat it as a black box on the client side - the encoding is an
-   * implementation detail and may change.
-   */
-  readonly cursor?: string;
-  readonly metadata?: Struct;
-}
-
-/**
- * JSON-RPC result returned by the A2A `tasks/list` method.
- *
- * `nextCursor` is omitted when the returned page is the last page; clients
- * should stop paginating once they receive a response without it.
- */
-export interface TaskListResult {
-  readonly tasks: Task[];
-  readonly nextCursor?: string;
-}
 
 export interface TaskListHandlerOptions {
   /** Storage backend to list tasks from. */
@@ -109,7 +70,7 @@ export interface TaskListHandlerOptions {
  */
 export function createTaskListHandler(
   options: TaskListHandlerOptions
-): MethodHandler<unknown, TaskListResult> {
+): MethodHandler<unknown, ListTasksResponse> {
   const { storage } = options;
   const maxLimit = options.maxLimit ?? MAX_TASK_LIST_LIMIT;
   if (!Number.isInteger(maxLimit) || maxLimit <= 0) {
@@ -121,12 +82,12 @@ export function createTaskListHandler(
   }
   const defaultLimit = Math.min(rawDefault, maxLimit);
 
-  return (params: unknown): TaskListResult => {
+  return (params: unknown): ListTasksResponse => {
     const validated = validateTaskListParams(params);
 
     const limit =
-      validated.limit !== undefined
-        ? Math.min(validated.limit, maxLimit)
+      validated.pageSize !== undefined
+        ? Math.min(validated.pageSize, maxLimit)
         : defaultLimit;
 
     // `state` from A2A `TaskState` is a superset of `ManagedTaskState`. Pass
@@ -136,30 +97,33 @@ export function createTaskListHandler(
       ...(validated.contextId !== undefined
         ? { contextId: validated.contextId }
         : {}),
-      ...(validated.state !== undefined ? { state: validated.state } : {}),
+      ...(validated.status !== undefined ? { state: validated.status } : {}),
     } as Parameters<TaskStorage['listTasks']>[0];
 
     const all = storage.listTasks(filter);
     const startIndex =
-      validated.cursor !== undefined
-        ? findCursorStartIndex(all, decodeCursor(validated.cursor))
+      validated.pageToken !== undefined
+        ? findCursorStartIndex(all, decodeCursor(validated.pageToken))
         : 0;
 
     const page = all.slice(startIndex, startIndex + limit);
     const wireTasks = page.map((task) => toWireTask(task));
 
-    const hasMore = startIndex + limit < all.length;
-    if (!hasMore || page.length === 0) {
-      return { tasks: wireTasks };
-    }
-    const last = page[page.length - 1];
-    if (last === undefined) {
-      return { tasks: wireTasks };
-    }
-    return {
+    const result = {
       tasks: wireTasks,
-      nextCursor: encodeCursor({ createdAt: last.createdAt, id: last.id }),
+      pageSize: limit,
+      totalSize: all.length,
+      nextPageToken: '',
     };
+    const last = page[page.length - 1];
+    const hasMore = startIndex + limit < all.length;
+    if (hasMore && last !== undefined) {
+      result.nextPageToken = encodeCursor({
+        createdAt: last.createdAt,
+        id: last.id,
+      });
+    }
+    return result;
   };
 }
 
@@ -245,29 +209,30 @@ function compareKey(
   return 0;
 }
 
-function validateTaskListParams(params: unknown): TaskListParams {
+function validateTaskListParams(params: unknown): ListTasksRequest {
   if (params === undefined) {
     return {};
   }
   if (params === null || typeof params !== 'object' || Array.isArray(params)) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: expected TaskListParams object'
+      'invalid params: expected ListTasksRequest object'
     );
   }
   const obj = params as Record<string, unknown>;
 
-  const out: { -readonly [K in keyof TaskListParams]: TaskListParams[K] } = {};
+  const out: { -readonly [K in keyof ListTasksRequest]: ListTasksRequest[K] } =
+    {};
 
-  const rawState = obj['state'];
+  const rawState = obj['status'];
   if (rawState !== undefined) {
     if (typeof rawState !== 'string' || rawState.length === 0) {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: state must be a non-empty string'
+        'invalid params: status must be a non-empty string'
       );
     }
-    out.state = rawState as TaskState;
+    out.status = rawState as TaskState;
   }
 
   const rawContextId = obj['contextId'];
@@ -281,7 +246,7 @@ function validateTaskListParams(params: unknown): TaskListParams {
     out.contextId = rawContextId;
   }
 
-  const rawLimit = obj['limit'];
+  const rawLimit = obj['pageSize'];
   if (rawLimit !== undefined) {
     if (
       typeof rawLimit !== 'number' ||
@@ -290,36 +255,21 @@ function validateTaskListParams(params: unknown): TaskListParams {
     ) {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: limit must be a positive integer'
+        'invalid params: pageSize must be a positive integer'
       );
     }
-    out.limit = rawLimit;
+    out.pageSize = rawLimit;
   }
 
-  const rawCursor = obj['cursor'];
+  const rawCursor = obj['pageToken'];
   if (rawCursor !== undefined) {
     if (typeof rawCursor !== 'string' || rawCursor.length === 0) {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: cursor must be a non-empty string'
+        'invalid params: pageToken must be a non-empty string'
       );
     }
-    out.cursor = rawCursor;
-  }
-
-  const rawMetadata = obj['metadata'];
-  if (rawMetadata !== undefined) {
-    if (
-      rawMetadata === null ||
-      typeof rawMetadata !== 'object' ||
-      Array.isArray(rawMetadata)
-    ) {
-      throw new JSONRPCError(
-        JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: metadata must be an object'
-      );
-    }
-    out.metadata = rawMetadata as Struct;
+    out.pageToken = rawCursor;
   }
 
   return out;

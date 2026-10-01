@@ -11,7 +11,7 @@ import type { TaskStorage } from '../storage/task-storage.js';
 import type {
   Artifact,
   Message,
-  SendMessageConfiguration,
+  SendMessageRequest,
   Struct,
   TaskArtifactUpdateEvent,
   TaskStatus,
@@ -57,18 +57,6 @@ export const STREAMING_STATUS_UPDATE_INTERVAL_ENV =
  * `server/config/config.go`.
  */
 export const DEFAULT_STREAMING_STATUS_UPDATE_INTERVAL_MS = 1000;
-
-/**
- * JSON-RPC params accepted by the A2A `message/stream` method. Structurally
- * identical to {@link import('./message-send.js').MessageSendParams} - the only
- * difference between `message/send` and `message/stream` is the response shape
- * (single JSON-RPC result vs. SSE event stream).
- */
-export interface MessageStreamParams {
-  readonly configuration?: SendMessageConfiguration;
-  readonly message: Message;
-  readonly metadata?: Struct;
-}
 
 /**
  * Single event yielded by a {@link StreamingTaskExecutor}.
@@ -391,14 +379,14 @@ export function createMessageStreamHandler(
             now: clock,
           });
         }
-        emitStatusEvent(writer, task, false, emitOptions);
+        emitStatusEvent(writer, task, emitOptions);
 
         if (statusUpdateIntervalMs > 0) {
           periodicTimer = setInterval(() => {
             if (task.state !== TASK_STATE.IN_PROGRESS) {
               return;
             }
-            emitStatusEvent(writer, task, false, emitOptions);
+            emitStatusEvent(writer, task, emitOptions);
           }, statusUpdateIntervalMs);
           const t = periodicTimer as { unref?: () => void };
           if (typeof t.unref === 'function') {
@@ -436,12 +424,12 @@ export function createMessageStreamHandler(
           task = transitionAndPersist(task, TASK_STATE.CANCELLED, storage, {
             now: clock,
           });
-          emitStatusEvent(writer, task, true, emitOptions);
+          emitStatusEvent(writer, task, emitOptions);
         } else if (!isTerminal(task.state)) {
           task = transitionAndPersist(task, TASK_STATE.COMPLETED, storage, {
             now: clock,
           });
-          emitStatusEvent(writer, task, true, emitOptions);
+          emitStatusEvent(writer, task, emitOptions);
         }
       } catch (err) {
         if (!isTerminal(task.state)) {
@@ -455,7 +443,7 @@ export function createMessageStreamHandler(
               storage,
               { now: clock, message: errorMessage }
             );
-            emitStatusEvent(writer, task, true, emitOptions);
+            emitStatusEvent(writer, task, emitOptions);
           } catch {
             // Task was already in a terminal state via a concurrent path; the
             // previously-emitted final status event is sufficient.
@@ -527,7 +515,7 @@ function handleExecutorEvent(
           ...(event.message !== undefined ? { message: event.message } : {}),
         }
       );
-      emitStatusEvent(writer, next, isTerminal(next.state), emitOptions);
+      emitStatusEvent(writer, next, emitOptions);
       return next;
     }
     case 'inputRequired': {
@@ -545,7 +533,7 @@ function handleExecutorEvent(
         storage,
         { now: clock, message: event.message }
       );
-      emitStatusEvent(writer, next, false, emitOptions);
+      emitStatusEvent(writer, next, emitOptions);
       return next;
     }
     case 'inputRequiredNotice': {
@@ -592,7 +580,6 @@ function handleExecutorEvent(
 function emitStatusEvent(
   writer: SSEStreamWriter,
   task: ManagedTask,
-  final: boolean,
   emitOptions: EmitOptions
 ): CloudEvent<TaskStatusUpdateEvent> | undefined {
   const status: TaskStatus = toWireStatus(task.status);
@@ -600,7 +587,6 @@ function emitStatusEvent(
     taskId: task.id,
     contextId: task.contextId,
     status,
-    final,
     ...(task.metadata !== undefined ? { metadata: task.metadata } : {}),
   };
   const emitted = writer.emit({
@@ -863,11 +849,11 @@ function buildErrorMessage(err: unknown, newId: () => string): Message {
   };
 }
 
-function validateMessageStreamParams(params: unknown): MessageStreamParams {
+function validateMessageStreamParams(params: unknown): SendMessageRequest {
   if (params === null || typeof params !== 'object' || Array.isArray(params)) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: expected MessageStreamParams object'
+      'invalid params: expected SendMessageRequest object'
     );
   }
   const obj = params as Record<string, unknown>;
@@ -890,7 +876,7 @@ function validateMessageStreamParams(params: unknown): MessageStreamParams {
       'invalid params: message.parts must be a non-empty array'
     );
   }
-  return params as MessageStreamParams;
+  return params as SendMessageRequest;
 }
 
 function enrichMessage(

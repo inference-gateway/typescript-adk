@@ -221,7 +221,7 @@ export class A2AServer {
           ? { card: config.extendedCard }
           : {}),
         supportsExtendedAgentCard:
-          config.card.supportsExtendedAgentCard ?? false,
+          config.card.capabilities.extendedAgentCard ?? false,
       })
     );
 

@@ -31,7 +31,15 @@ const storage = new InMemoryTaskStorage();
 // when you don't need the card outside the builder.
 // ---------------------------------------------------------------------------
 const card = loadAgentCardFromFile(AGENT_CARD_FILE, {
-  overrides: { url: `http://${HOST}:${PORT}` },
+  overrides: {
+    supportedInterfaces: [
+      {
+        url: `http://${HOST}:${PORT}`,
+        protocolBinding: 'JSONRPC',
+        protocolVersion: '1.0',
+      },
+    ],
+  },
 });
 
 const builder = new A2AServerBuilder({ storage })
@@ -178,7 +186,7 @@ function renderResponse(
       `  name:        ${card.name}`,
       `  version:     ${card.version}`,
       `  description: ${card.description}`,
-      `  url:         ${card.url ?? '(unset)'}`,
+      `  url:         ${card.supportedInterfaces[0]?.url ?? '(unset)'}`,
       `  skills:`,
       skillList,
     ].join('\n');

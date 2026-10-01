@@ -103,7 +103,7 @@ describe('create_artifact tool: end-to-end agent loop (background handler)', () 
     const artifact = finalTask.artifacts[0] as Artifact;
     expect(artifact.name).toBe('Quarterly report');
     expect(artifact.parts).toHaveLength(1);
-    const uri = artifact.parts[0]?.file?.fileWithUri;
+    const uri = artifact.parts[0]?.url;
     expect(uri).toEqual(expect.stringContaining('http://artifacts.local'));
     expect(uri).toEqual(expect.stringContaining(filename));
 
@@ -175,7 +175,7 @@ describe('create_artifact tool: end-to-end agent loop (streaming handler)', () =
 
     expect(eventTypes).toContain('artifactCreated');
     expect(observedArtifact).toBeDefined();
-    const uri = observedArtifact?.parts[0]?.file?.fileWithUri;
+    const uri = observedArtifact?.parts[0]?.url;
     expect(uri).toEqual(expect.stringContaining(filename));
     expect(observedArtifact?.name).toBe('Generated Content');
 

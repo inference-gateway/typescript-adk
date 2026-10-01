@@ -96,9 +96,11 @@ for await (const event of readSSEEvents(response.body)) {
     const data = event.data as TaskStatusUpdateEvent;
     streamTaskId = data.taskId;
     console.log(
-      `[status] state=${data.status.state} final=${data.final}${data.metadata !== undefined ? '  metadata=yes' : ''}`
+      `[status] state=${data.status.state}${data.metadata !== undefined ? '  metadata=yes' : ''}`
     );
-    if (data.final === true) {
+    if (
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED|REJECTED)$/.test(data.status.state)
+    ) {
       finalStatus = data;
     }
   } else if (event.type === AGENT_EVENT_TYPE.DELTA) {

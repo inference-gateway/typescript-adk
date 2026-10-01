@@ -64,15 +64,15 @@ for await (const event of readSSEEvents(response.body)) {
     case AGENT_EVENT_TYPE.TASK_STATUS_CHANGED: {
       const data = event.data as TaskStatusUpdateEvent;
       if (data.status.state === TASK_STATE.IN_PROGRESS) {
-        console.log(
-          `[task ${data.taskId}] status=IN_PROGRESS final=${data.final}`
-        );
+        console.log(`[task ${data.taskId}] status=IN_PROGRESS`);
         console.log('---');
-      } else if (data.final === true) {
+      } else if (
+        /TASK_STATE_(COMPLETED|FAILED|CANCELED|REJECTED)$/.test(
+          data.status.state
+        )
+      ) {
         console.log('\n---');
-        console.log(
-          `[task ${data.taskId}] status=${data.status.state} final=true`
-        );
+        console.log(`[task ${data.taskId}] status=${data.status.state}`);
         finalStatus = data;
       }
       break;

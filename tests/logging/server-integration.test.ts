@@ -13,7 +13,7 @@ function makeCard(): AgentCard {
     name: 'logger-agent',
     description: 'Agent under test',
     version: '0.0.1',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: {},

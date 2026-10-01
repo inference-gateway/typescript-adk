@@ -23,7 +23,7 @@ function makeCard(): AgentCard {
     name: 'task-get-agent',
     description: 'Agent under test',
     version: '0.0.0',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: { streaming: false },
@@ -87,7 +87,7 @@ describe('createTaskGetHandler', () => {
     seedActiveTask(storage);
     const handler = createTaskGetHandler({ storage });
 
-    const result = handler({ taskId: 'task-1' }, ctx) as Task;
+    const result = handler({ id: 'task-1' }, ctx) as Task;
 
     expect(result.id).toBe('task-1');
     expect(result.contextId).toBe('ctx-1');
@@ -111,7 +111,7 @@ describe('createTaskGetHandler', () => {
     storage.storeDeadLetter(completed);
 
     const handler = createTaskGetHandler({ storage });
-    const result = handler({ taskId: 'task-1' }, ctx) as Task;
+    const result = handler({ id: 'task-1' }, ctx) as Task;
 
     expect(result.id).toBe('task-1');
     expect(result.status.state).toBe(
@@ -129,7 +129,7 @@ describe('createTaskGetHandler', () => {
     seedActiveTask(storage, { messages });
     const handler = createTaskGetHandler({ storage });
 
-    const result = handler({ taskId: 'task-1' }, ctx) as Task;
+    const result = handler({ id: 'task-1' }, ctx) as Task;
 
     expect(result.history).toEqual(messages);
   });
@@ -145,7 +145,7 @@ describe('createTaskGetHandler', () => {
     seedActiveTask(storage, { messages });
     const handler = createTaskGetHandler({ storage });
 
-    const result = handler({ taskId: 'task-1', historyLength: 2 }, ctx) as Task;
+    const result = handler({ id: 'task-1', historyLength: 2 }, ctx) as Task;
 
     expect(result.history).toEqual([
       makeMessage('m-3', 'three'),
@@ -160,7 +160,7 @@ describe('createTaskGetHandler', () => {
     });
     const handler = createTaskGetHandler({ storage });
 
-    const result = handler({ taskId: 'task-1', historyLength: 0 }, ctx) as Task;
+    const result = handler({ id: 'task-1', historyLength: 0 }, ctx) as Task;
 
     expect(result.history).toEqual([]);
   });
@@ -171,10 +171,7 @@ describe('createTaskGetHandler', () => {
     seedActiveTask(storage, { messages });
     const handler = createTaskGetHandler({ storage });
 
-    const result = handler(
-      { taskId: 'task-1', historyLength: 99 },
-      ctx
-    ) as Task;
+    const result = handler({ id: 'task-1', historyLength: 99 }, ctx) as Task;
 
     expect(result.history).toEqual(messages);
   });
@@ -218,7 +215,7 @@ describe('createTaskGetHandler', () => {
         expect((err as JSONRPCError).code).toBe(
           JSONRPC_ERROR_CODES.INVALID_PARAMS
         );
-        expect((err as JSONRPCError).message).toContain('taskId');
+        expect((err as JSONRPCError).message).toContain('id');
         return;
       }
       throw new Error('expected JSONRPCError to be thrown');
@@ -226,7 +223,7 @@ describe('createTaskGetHandler', () => {
 
     it('throws -32602 when taskId is not a string', () => {
       try {
-        handler({ taskId: 42 } as unknown, ctx);
+        handler({ id: 42 } as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
@@ -239,7 +236,7 @@ describe('createTaskGetHandler', () => {
 
     it('throws -32602 when taskId is the empty string', () => {
       try {
-        handler({ taskId: '' } as unknown, ctx);
+        handler({ id: '' } as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
@@ -252,7 +249,7 @@ describe('createTaskGetHandler', () => {
 
     it('throws -32602 when historyLength is negative', () => {
       try {
-        handler({ taskId: 'task-1', historyLength: -1 } as unknown, ctx);
+        handler({ id: 'task-1', historyLength: -1 } as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
@@ -266,7 +263,7 @@ describe('createTaskGetHandler', () => {
 
     it('throws -32602 when historyLength is not an integer', () => {
       try {
-        handler({ taskId: 'task-1', historyLength: 1.5 } as unknown, ctx);
+        handler({ id: 'task-1', historyLength: 1.5 } as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
@@ -279,7 +276,7 @@ describe('createTaskGetHandler', () => {
 
     it('throws -32602 when the task id is unknown', () => {
       try {
-        handler({ taskId: 'does-not-exist' } as unknown, ctx);
+        handler({ id: 'does-not-exist' } as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
@@ -315,7 +312,7 @@ describe('tasks/get JSON-RPC conformance', () => {
       jsonrpc: '2.0',
       id: 1,
       method: TASK_GET_METHOD,
-      params: { taskId: 'task-1' },
+      params: { id: 'task-1' },
     });
     expect(res.status).toBe(200);
 
@@ -345,7 +342,7 @@ describe('tasks/get JSON-RPC conformance', () => {
       jsonrpc: '2.0',
       id: 2,
       method: TASK_GET_METHOD,
-      params: { taskId: 'missing' },
+      params: { id: 'missing' },
     });
     expect(res.status).toBe(200);
 
@@ -375,7 +372,7 @@ describe('tasks/get JSON-RPC conformance', () => {
       jsonrpc: '2.0',
       id: 3,
       method: TASK_GET_METHOD,
-      params: { taskId: 'task-1', historyLength: 1 },
+      params: { id: 'task-1', historyLength: 1 },
     });
     expect(res.status).toBe(200);
 
@@ -402,6 +399,6 @@ describe('tasks/get JSON-RPC conformance', () => {
       error: { code: number; message: string };
     };
     expect(body.error.code).toBe(JSONRPC_ERROR_CODES.INVALID_PARAMS);
-    expect(body.error.message).toContain('taskId');
+    expect(body.error.message).toContain('id');
   });
 });

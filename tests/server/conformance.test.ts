@@ -14,7 +14,7 @@ function makeCard(): AgentCard {
     name: 'rpc-agent',
     description: 'Agent under test',
     version: '0.0.0',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: { streaming: false },

@@ -42,12 +42,7 @@ export interface LoadAgentCardOptions {
   readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
-const REQUIRED_STRING_FIELDS = [
-  'description',
-  'name',
-  'protocolVersion',
-  'version',
-] as const;
+const REQUIRED_STRING_FIELDS = ['description', 'name', 'version'] as const;
 
 const REQUIRED_STRING_ARRAY_FIELDS = [
   'defaultInputModes',

@@ -26,14 +26,18 @@ const card: AgentCard = {
   name: AGENT_NAME,
   description: AGENT_DESCRIPTION,
   version: AGENT_VERSION,
-  protocolVersion: '0.3.0',
-  url: `http://${HOST}:${PORT}`,
+  supportedInterfaces: [
+    {
+      url: `http://${HOST}:${PORT}`,
+      protocolBinding: 'JSONRPC',
+      protocolVersion: '1.0',
+    },
+  ],
   defaultInputModes: ['text/plain'],
   defaultOutputModes: ['text/plain'],
   capabilities: {
     streaming: true,
     pushNotifications: false,
-    stateTransitionHistory: false,
   },
   skills: [
     {

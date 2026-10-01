@@ -184,9 +184,13 @@ describe('createMessageStreamHandler', () => {
     expect(first.data.taskId).toBe('id-1');
     expect(first.data.contextId).toBe('ctx-existing');
     expect(first.data.status.state).toBe(TASK_STATE.IN_PROGRESS);
-    expect(first.data.final).toBe(false);
+    expect(first.data.status.state).not.toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
     expect(second.data.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(second.data.final).toBe(true);
+    expect(second.data.status.state).toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
 
     const stored = storage.getTask('id-1');
     expect(stored).toBeDefined();
@@ -257,7 +261,9 @@ describe('createMessageStreamHandler', () => {
       data: TaskStatusUpdateEvent;
     };
     expect(finalStatus.data.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(finalStatus.data.final).toBe(true);
+    expect(finalStatus.data.status.state).toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
   });
 
   it('transitions the task and emits a status frame when the executor yields statusChanged', async () => {
@@ -304,7 +310,9 @@ describe('createMessageStreamHandler', () => {
       AGENT_EVENT_TYPE.TASK_STATUS_CHANGED, // COMPLETED (final)
     ]);
     const last = frames[1]?.json as { data: TaskStatusUpdateEvent };
-    expect(last.data.final).toBe(true);
+    expect(last.data.status.state).toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
     expect(last.data.status.state).toBe(TASK_STATE.COMPLETED);
   });
 
@@ -339,7 +347,9 @@ describe('createMessageStreamHandler', () => {
 
     const inputFrame = frames[1]?.json as { data: TaskStatusUpdateEvent };
     expect(inputFrame.data.status.state).toBe(TASK_STATE.INPUT_REQUIRED);
-    expect(inputFrame.data.final).toBe(false);
+    expect(inputFrame.data.status.state).not.toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
 
     const stored = storage.getTask('id-1') as ManagedTask;
     expect(stored.state).toBe(TASK_STATE.INPUT_REQUIRED);
@@ -472,7 +482,9 @@ describe('createMessageStreamHandler', () => {
       data: TaskStatusUpdateEvent;
     };
     expect(last.data.status.state).toBe(TASK_STATE.FAILED);
-    expect(last.data.final).toBe(true);
+    expect(last.data.status.state).toMatch(
+      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+    );
     const failureMessage = last.data.status.message;
     expect(failureMessage?.parts[0]).toMatchObject({ text: 'boom' });
   });
@@ -638,7 +650,9 @@ describe('createMessageStreamHandler', () => {
         };
         expect(payload.type).toBe(AGENT_EVENT_TYPE.TASK_STATUS_CHANGED);
         expect(payload.data.status.state).toBe(TASK_STATE.IN_PROGRESS);
-        expect(payload.data.final).toBe(false);
+        expect(payload.data.status.state).not.toMatch(
+          /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+        );
       }
 
       release.abort();
@@ -836,7 +850,7 @@ describe('createMessageStreamHandler + tasks/cancel integration', () => {
 
     const cancelHandler = createTaskCancelHandler({ storage, registry });
     const cancelled = cancelHandler(
-      { taskId: 'id-1' },
+      { id: 'id-1' },
       { signal: new AbortController().signal }
     );
     expect(cancelled).toMatchObject({

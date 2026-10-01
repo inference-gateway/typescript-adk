@@ -176,7 +176,7 @@ describe('DefaultToolBox create_artifact executor', () => {
     );
     const pending = drainPendingArtifacts(context.state);
     expect(pending[0]?.name).toBe('Generated Content');
-    expect(pending[0]?.parts[0]?.file?.mediaType).toBe('application/json');
+    expect(pending[0]?.parts[0]?.mediaType).toBe('application/json');
   });
 
   it('returns success:false JSON when the schema does not match (no exception)', async () => {

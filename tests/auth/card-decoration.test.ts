@@ -11,7 +11,7 @@ function baseCard(): AgentCard {
     name: 'a',
     description: 'd',
     version: '0.0.1',
-    protocolVersion: '1.0',
+    supportedInterfaces: [],
     defaultInputModes: ['text/plain'],
     defaultOutputModes: ['text/plain'],
     capabilities: {},
@@ -53,9 +53,11 @@ describe('decorateAgentCardWithAuth', () => {
     expect(scheme?.openIdConnectSecurityScheme?.openIdConnectUrl).toBe(
       'https://issuer.test/.well-known/openid-configuration'
     );
-    expect(result.security).toHaveLength(1);
+    expect(result.securityRequirements).toHaveLength(1);
     expect(
-      result.security?.[0]?.schemes?.[DEFAULT_OIDC_SECURITY_SCHEME_NAME]
+      result.securityRequirements?.[0]?.schemes?.[
+        DEFAULT_OIDC_SECURITY_SCHEME_NAME
+      ]
     ).toBeDefined();
   });
 
@@ -88,13 +90,17 @@ describe('decorateAgentCardWithAuth', () => {
   it('preserves existing security requirements', () => {
     const card: AgentCard = {
       ...baseCard(),
-      security: [{ schemes: { api: { list: ['read'] } } }],
+      securityRequirements: [{ schemes: { api: { list: ['read'] } } }],
     };
     const result = decorateAgentCardWithAuth(card, enabledConfig);
-    expect(result.security).toHaveLength(2);
-    expect(result.security?.[0]?.schemes?.['api']?.list).toEqual(['read']);
+    expect(result.securityRequirements).toHaveLength(2);
+    expect(result.securityRequirements?.[0]?.schemes?.['api']?.list).toEqual([
+      'read',
+    ]);
     expect(
-      result.security?.[1]?.schemes?.[DEFAULT_OIDC_SECURITY_SCHEME_NAME]
+      result.securityRequirements?.[1]?.schemes?.[
+        DEFAULT_OIDC_SECURITY_SCHEME_NAME
+      ]
     ).toBeDefined();
   });
 
@@ -103,6 +109,8 @@ describe('decorateAgentCardWithAuth', () => {
       schemeName: 'keycloak',
     });
     expect(result.securitySchemes?.['keycloak']).toBeDefined();
-    expect(result.security?.[0]?.schemes?.['keycloak']).toBeDefined();
+    expect(
+      result.securityRequirements?.[0]?.schemes?.['keycloak']
+    ).toBeDefined();
   });
 });

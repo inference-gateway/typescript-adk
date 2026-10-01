@@ -5,7 +5,11 @@ import {
   transitionTask,
 } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
-import type { Struct, Task } from '../types/generated/a2a.js';
+import type {
+  CancelTaskRequest,
+  Struct,
+  Task,
+} from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
 import type { MethodHandler } from './method-registry.js';
 import type { TaskCancellationRegistry } from './task-cancellation.js';
@@ -17,20 +21,6 @@ import type { TaskCancellationRegistry } from './task-cancellation.js';
  * spelling stays in lockstep with conformance tests and other consumers.
  */
 export const TASK_CANCEL_METHOD = 'tasks/cancel';
-
-/**
- * JSON-RPC params accepted by the A2A `tasks/cancel` method.
- *
- * Mirrors `types.TaskIdParams` in the Go ADK (see
- * https://github.com/inference-gateway/adk/blob/main/types/types.go) but uses
- * the field name `taskId` rather than `id`, matching {@link
- * import('./task-get.js').TaskGetParams} for consistency across the
- * `tasks/*` family.
- */
-export interface TaskCancelParams {
-  readonly taskId: string;
-  readonly metadata?: Struct;
-}
 
 export interface TaskCancelHandlerOptions {
   /** Storage backend to look up and mutate tasks in. */
@@ -78,7 +68,7 @@ export function createTaskCancelHandler(
 
   return (params: unknown): Task => {
     const validated = validateTaskCancelParams(params);
-    const task = storage.getTask(validated.taskId);
+    const task = storage.getTask(validated.id);
     if (task === undefined) {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
@@ -111,20 +101,20 @@ export function createTaskCancelHandler(
   };
 }
 
-function validateTaskCancelParams(params: unknown): TaskCancelParams {
+function validateTaskCancelParams(params: unknown): CancelTaskRequest {
   if (params === null || typeof params !== 'object' || Array.isArray(params)) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: expected TaskCancelParams object'
+      'invalid params: expected CancelTaskRequest object'
     );
   }
   const obj = params as Record<string, unknown>;
 
-  const taskId = obj['taskId'];
+  const taskId = obj['id'];
   if (typeof taskId !== 'string' || taskId.length === 0) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: taskId is required and must be a non-empty string'
+      'invalid params: id is required and must be a non-empty string'
     );
   }
 
@@ -140,10 +130,10 @@ function validateTaskCancelParams(params: unknown): TaskCancelParams {
         'invalid params: metadata must be an object'
       );
     }
-    return { taskId, metadata: rawMetadata as Struct };
+    return { id: taskId, metadata: rawMetadata as Struct };
   }
 
-  return { taskId };
+  return { id: taskId };
 }
 
 function defaultNow(): Date {
