@@ -606,6 +606,31 @@ describe('createMessageSendHandler task lifecycle', () => {
     expect(storage.getStats().totalTasks).toBe(0);
   });
 
+  it('refuses an inline push config url carrying credentials without echoing them', async () => {
+    const storage = new InMemoryTaskStorage();
+    const handler = createMessageSendHandler({ storage });
+
+    await expect(
+      handler(
+        {
+          configuration: {
+            taskPushNotificationConfig: {
+              url: 'https://user:s3cret@example.com/hook',
+            },
+          },
+          message: makeMessage(),
+        },
+        ctx
+      )
+    ).rejects.toThrow(
+      expect.objectContaining({
+        code: JSONRPC_ERROR_CODES.INVALID_PARAMS,
+        message: expect.not.stringContaining('s3cret'),
+      })
+    );
+    expect(storage.getStats().totalTasks).toBe(0);
+  });
+
   it('registers a push notification config sent inline', async () => {
     const storage = new InMemoryTaskStorage();
     const handler = createMessageSendHandler({ storage });

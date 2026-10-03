@@ -1,4 +1,5 @@
 import pkg from '../../package.json' with { type: 'json' };
+import { hasCredentials } from '../internal/url.js';
 import { createTLSFetch, type ClientTLSConfig } from '../tls/index.js';
 import type {
   A2AMethod,
@@ -195,6 +196,11 @@ export class A2AClient {
   constructor(config: A2AClientConfig) {
     if (typeof config.baseURL !== 'string' || config.baseURL.length === 0) {
       throw new A2AClientError('baseURL is required');
+    }
+    if (hasCredentials(config.baseURL)) {
+      throw new A2AClientError(
+        'baseURL must not include credentials - pass them via headers'
+      );
     }
     this.baseURL = stripTrailingSlash(config.baseURL);
     this.timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;

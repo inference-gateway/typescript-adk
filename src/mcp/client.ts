@@ -2,9 +2,14 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { hasCredentials } from '../internal/url.js';
 import { NOOP_LOGGER, type Logger } from '../logging/index.js';
 import type { Struct } from '../types/generated/a2a.js';
-import { loadMCPConfigFromEnv, type MCPConfig } from './config.js';
+import {
+  loadMCPConfigFromEnv,
+  MCP_SERVERS_ENV,
+  type MCPConfig,
+} from './config.js';
 
 /**
  * A single tool discovered on an MCP server, flattened into the shape the
@@ -101,9 +106,14 @@ export class MCPClient implements MCPToolProvider {
     this.logger = options.logger ?? NOOP_LOGGER;
     this.clientName = options.clientName ?? '@inference-gateway/adk';
     this.clientVersion = options.clientVersion ?? '0.0.0';
-    for (const server of config.servers) {
+    config.servers.forEach((server, i) => {
+      if (hasCredentials(server)) {
+        throw new Error(
+          `mcp servers[${i}] (${MCP_SERVERS_ENV}) must not include credentials`
+        );
+      }
       this.servers.set(server, { client: undefined, tools: [] });
-    }
+    });
   }
 
   /**

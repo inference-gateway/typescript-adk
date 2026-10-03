@@ -1,3 +1,4 @@
+import { hasCredentials } from '../internal/url.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
   A2AMethod,
@@ -84,7 +85,7 @@ export interface TaskPushNotificationConfigHandlerOptions {
  *
  * Errors surface as JSON-RPC `-32602` (Invalid Params):
  *  - `params` not an object, missing `taskId`, missing `pushNotificationConfig`
- *  - `url` missing or empty
+ *  - `url` missing, empty, or carrying credentials (`user:pass@`)
  *  - `id` present but not a non-empty string
  *  - `token` present but not a string
  *
@@ -214,6 +215,12 @@ function validatePushNotificationConfig(
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.INVALID_PARAMS,
       'invalid params: url is required and must be a non-empty string'
+    );
+  }
+  if (hasCredentials(url)) {
+    throw new JSONRPCError(
+      JSONRPC_ERROR_CODES.INVALID_PARAMS,
+      'invalid params: url must not include credentials'
     );
   }
 
