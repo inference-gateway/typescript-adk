@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.18.1](https://github.com/inference-gateway/typescript-adk/compare/v0.18.0...v0.18.1) (2026-10-03)
+
+### 🐛 Bug Fixes
+
+* close the a2a v1.0.1 json-rpc protocol gaps found by the tck ([#242](https://github.com/inference-gateway/typescript-adk/issues/242)) ([2124c1c](https://github.com/inference-gateway/typescript-adk/commit/2124c1ca835f4579d24bc0d51fec3ffcfa1bb971)), references [#241](https://github.com/inference-gateway/typescript-adk/issues/241)
+
 ## [0.18.0](https://github.com/inference-gateway/typescript-adk/compare/v0.17.0...v0.18.0) (2026-10-03)
 
 ### ✨ Features
