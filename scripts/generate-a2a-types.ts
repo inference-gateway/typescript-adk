@@ -77,6 +77,16 @@ function isRecord(value: JsonValue): value is { [key: string]: JsonValue } {
  *    subtype and emits Struct1, Struct2, ... per occurrence even though
  *    they're structurally identical.
  */
+/**
+ * The protobuf JSON well-known types the A2A schema references: `Value` is any JSON value and
+ * `Struct` any JSON object. Untyped, json-schema-to-typescript would emit an index-signature
+ * interface and `{}` for them.
+ */
+const PROTOBUF_TS_TYPES: Record<string, string> = {
+  Value: 'unknown',
+  Struct: 'Record<string, unknown>',
+};
+
 function normalizeSchema(schema: RawSchema): RawSchema {
   const hoisted: Record<string, JsonValue> = {};
 
@@ -107,6 +117,11 @@ function normalizeSchema(schema: RawSchema): RawSchema {
   }
 
   const rewrittenDefs = visit(schema.definitions) as Record<string, JsonValue>;
+  for (const [name, tsType] of Object.entries(PROTOBUF_TS_TYPES)) {
+    if (isRecord(rewrittenDefs[name] ?? null)) {
+      rewrittenDefs[name] = { ...(rewrittenDefs[name] as object), tsType };
+    }
+  }
   return {
     ...schema,
     definitions: { ...rewrittenDefs, ...hoisted },

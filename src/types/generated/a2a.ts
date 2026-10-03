@@ -897,7 +897,7 @@ export interface StringList {
   list?: string[];
 }
 
-export interface Struct {}
+export type Struct = Record<string, unknown>;
 
 /**
  * Represents a request for the `SubscribeToTask` method.
@@ -1036,6 +1036,4 @@ export interface TaskStatusUpdateEvent {
 
 export type Timestamp = string;
 
-export interface Value {
-  [k: string]: unknown | undefined;
-}
+export type Value = unknown;
