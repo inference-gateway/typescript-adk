@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.2](https://github.com/inference-gateway/typescript-adk/compare/v0.19.1...v0.19.2) (2026-10-03)
+
+### 🐛 Bug Fixes
+
+* reject credentials in agent card, mcp, client and webhook urls ([#262](https://github.com/inference-gateway/typescript-adk/issues/262)) ([ca0a30a](https://github.com/inference-gateway/typescript-adk/commit/ca0a30a0ee0f5ce84e623835072405caa97974af)), closes [#261](https://github.com/inference-gateway/typescript-adk/issues/261)
+
 ## [0.19.1](https://github.com/inference-gateway/typescript-adk/compare/v0.19.0...v0.19.1) (2026-10-03)
 
 ### 🐛 Bug Fixes
