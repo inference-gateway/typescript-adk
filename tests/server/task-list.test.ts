@@ -375,6 +375,51 @@ describe('createTaskListHandler', () => {
     });
   });
 
+  describe('proto3 default values mean "unset"', () => {
+    function handlerWithTasks(count: number): {
+      handler: ReturnType<typeof createTaskListHandler>;
+    } {
+      const storage = new InMemoryTaskStorage();
+      for (let i = 1; i <= count; i++) {
+        makeTask(storage, i);
+      }
+      return { handler: createTaskListHandler({ storage }) };
+    }
+
+    it('treats an empty pageToken as the first page', () => {
+      const { handler } = handlerWithTasks(3);
+
+      const result = handler({ pageToken: '' } as unknown, ctx);
+
+      expect((result as ListTasksResponse).tasks.map((t) => t.id)).toEqual([
+        't-001',
+        't-002',
+        't-003',
+      ]);
+    });
+
+    it('treats pageSize 0 as the default page size', () => {
+      const { handler } = handlerWithTasks(1);
+
+      const result = handler({ pageSize: 0 } as unknown, ctx);
+
+      expect((result as ListTasksResponse).pageSize).toBe(
+        DEFAULT_TASK_LIST_LIMIT
+      );
+    });
+
+    it('treats empty status and contextId as no filter', () => {
+      const { handler } = handlerWithTasks(2);
+
+      const result = handler(
+        { status: '', contextId: '', pageToken: '', pageSize: 0 } as unknown,
+        ctx
+      );
+
+      expect((result as ListTasksResponse).totalSize).toBe(2);
+    });
+  });
+
   describe('invalid params', () => {
     function getHandler(): ReturnType<typeof createTaskListHandler> {
       const storage = new InMemoryTaskStorage();
@@ -419,27 +464,11 @@ describe('createTaskListHandler', () => {
       );
     });
 
-    it('throws -32602 when state is the empty string', () => {
-      const handler = getHandler();
-      expectInvalidParams(
-        () => handler({ status: '' } as unknown, ctx),
-        'status'
-      );
-    });
-
     it('throws -32602 when contextId is not a string', () => {
       const handler = getHandler();
       expectInvalidParams(
         () => handler({ contextId: 42 } as unknown, ctx),
         'contextId'
-      );
-    });
-
-    it('throws -32602 when limit is zero', () => {
-      const handler = getHandler();
-      expectInvalidParams(
-        () => handler({ pageSize: 0 } as unknown, ctx),
-        'pageSize'
       );
     });
 
@@ -614,7 +643,7 @@ describe('ListTasks JSON-RPC conformance', () => {
     expect(body.error.code).toBe(JSONRPC_ERROR_CODES.INVALID_PARAMS);
   });
 
-  it('returns -32602 when limit is invalid', async () => {
+  it('returns -32602 when pageSize is negative', async () => {
     const storage = new InMemoryTaskStorage();
     const server = createA2AServer({ card: makeCard() });
     server.registerMethod(TASK_LIST_METHOD, createTaskListHandler({ storage }));
@@ -625,7 +654,7 @@ describe('ListTasks JSON-RPC conformance', () => {
       jsonrpc: '2.0',
       id: 5,
       method: TASK_LIST_METHOD,
-      params: { pageSize: 0 },
+      params: { pageSize: -1 },
     });
     const body = (await res.json()) as {
       error: { code: number; message: string };
