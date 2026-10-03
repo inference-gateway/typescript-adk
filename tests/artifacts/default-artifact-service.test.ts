@@ -499,17 +499,20 @@ describe('DefaultArtifactService storage delegation', () => {
     expect(storage.list().map((m) => m.filename)).toEqual(['new.txt']);
   });
 
-  it('cleanupOldest keeps the N most recent files per artifact id', async () => {
+  it('cleanupOldest keeps the N most recent artifacts', async () => {
     let now = new Date('2026-01-01T00:00:00Z');
     const storage = new InMemoryArtifactStorage({ now: () => now });
-    let id = 'shared';
+    let id = 'a0';
     const service = new DefaultArtifactService({
       storage,
       idGenerator: () => id,
     });
 
+    // One artifact per file, as the real id generator mints: a per-file cap
+    // would never fire here.
     for (const i of [1, 2, 3, 4]) {
       now = new Date(now.getTime() + 1000);
+      id = `a${i}`;
       await service.createFileArtifact(
         'n',
         '',
@@ -517,14 +520,6 @@ describe('DefaultArtifactService storage delegation', () => {
         new TextEncoder().encode(`${i}`)
       );
     }
-    // Different artifact id - should be untouched by per-id cap of 2
-    id = 'other';
-    await service.createFileArtifact(
-      'n',
-      '',
-      'other.txt',
-      new TextEncoder().encode('other')
-    );
 
     const removed = await service.cleanupOldest(2);
     expect(removed).toBe(2);
@@ -532,7 +527,20 @@ describe('DefaultArtifactService storage delegation', () => {
       .list()
       .map((m) => m.filename)
       .sort();
-    expect(filenames).toEqual(['file-3.txt', 'file-4.txt', 'other.txt']);
+    expect(filenames).toEqual(['file-3.txt', 'file-4.txt']);
+  });
+
+  it('cleanupOldest with maxCount <= 0 is unlimited and removes nothing', async () => {
+    const { service, storage } = makeService();
+    await service.createFileArtifact(
+      'n',
+      '',
+      'keep.txt',
+      new TextEncoder().encode('keep')
+    );
+
+    expect(await service.cleanupOldest(0)).toBe(0);
+    expect(storage.list()).toHaveLength(1);
   });
 
   it('close releases the storage', async () => {

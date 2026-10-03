@@ -300,7 +300,7 @@ describe('FilesystemArtifactStorage', () => {
     expect(await storage.exists('abc', 'new.txt')).toBe(true);
   });
 
-  it('cleanupOldest with maxCount <= 0 wipes the store', async () => {
+  it('cleanupOldest with maxCount <= 0 is unlimited and removes nothing', async () => {
     const storage = new FilesystemArtifactStorage({ root });
     await storage.store(
       'abc',
@@ -315,44 +315,33 @@ describe('FilesystemArtifactStorage', () => {
       'application/octet-stream'
     );
 
-    const removed = await storage.cleanupOldest(0);
-    expect(removed).toBe(2);
-    expect(await storage.exists('abc', 'f1')).toBe(false);
-    expect(await storage.exists('abc', 'f2')).toBe(false);
+    expect(await storage.cleanupOldest(0)).toBe(0);
+    expect(await storage.cleanupOldest(-1)).toBe(0);
+    expect(await storage.exists('abc', 'f1')).toBe(true);
+    expect(await storage.exists('abc', 'f2')).toBe(true);
   });
 
-  it('cleanupOldest keeps maxCount most recent files per artifactId', async () => {
+  it('cleanupOldest keeps maxCount most recent artifacts, all their files', async () => {
     const storage = new FilesystemArtifactStorage({ root });
     const utimes = await import('node:fs/promises').then((m) => m.utimes);
 
-    const stamps = [
-      new Date('2026-01-01T00:00:01Z'),
-      new Date('2026-01-01T00:00:02Z'),
-      new Date('2026-01-01T00:00:03Z'),
-    ];
-    for (let i = 0; i < 3; i += 1) {
-      await storage.store(
-        'shared',
-        `f-${i + 1}.txt`,
-        new Uint8Array(),
-        'text/plain'
-      );
-      await utimes(
-        join(root, 'shared', `f-${i + 1}.txt`),
-
-        stamps[i]!,
-
-        stamps[i]!
-      );
+    const ids = ['a1', 'a2', 'a3'];
+    for (let i = 0; i < ids.length; i += 1) {
+      const stamp = new Date(`2026-01-01T00:00:0${i + 1}Z`);
+      for (const name of ['f-1.txt', 'f-2.txt']) {
+        await storage.store(ids[i]!, name, new Uint8Array(), 'text/plain');
+        await utimes(join(root, ids[i]!, name), stamp, stamp);
+      }
     }
-    await storage.store('other', 'o.txt', new Uint8Array(), 'text/plain');
 
-    const removed = await storage.cleanupOldest(1);
+    const removed = await storage.cleanupOldest(2);
     expect(removed).toBe(2);
-    expect(await storage.exists('shared', 'f-1.txt')).toBe(false);
-    expect(await storage.exists('shared', 'f-2.txt')).toBe(false);
-    expect(await storage.exists('shared', 'f-3.txt')).toBe(true);
-    expect(await storage.exists('other', 'o.txt')).toBe(true);
+    expect(await storage.exists('a1', 'f-1.txt')).toBe(false);
+    expect(await storage.exists('a1', 'f-2.txt')).toBe(false);
+    expect(await storage.exists('a2', 'f-1.txt')).toBe(true);
+    expect(await storage.exists('a2', 'f-2.txt')).toBe(true);
+    expect(await storage.exists('a3', 'f-1.txt')).toBe(true);
+    expect(await storage.exists('a3', 'f-2.txt')).toBe(true);
   });
 
   it('cleanup skips directories whose name does not match the artifactId pattern', async () => {
@@ -368,7 +357,8 @@ describe('FilesystemArtifactStorage', () => {
     );
     await writeFile(join(root, 'has space', 'rogue'), new Uint8Array());
 
-    const removed = await storage.cleanupOldest(0);
+    // negative maxAge puts the cutoff in the future, so every scanned file goes
+    const removed = await storage.cleanupExpired(-60_000);
     expect(removed).toBe(1);
     await expect(stat(join(root, 'has space'))).resolves.toBeDefined();
   });

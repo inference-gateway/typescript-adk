@@ -1,4 +1,5 @@
 import { ArtifactStorageError } from './artifact-service.js';
+import { selectEntriesOverArtifactCap } from './artifact-storage.js';
 import type {
   ArtifactMetadata,
   ArtifactStorageProvider,
@@ -165,31 +166,21 @@ export class InMemoryArtifactStorage implements ArtifactStorageProvider {
     this.assertNotAborted(signal);
 
     if (maxCount <= 0) {
-      const removed = this.entries.size;
-      this.entries.clear();
-      return removed;
+      return 0;
     }
 
-    // Group keys by artifactId, sorted by uploadedAt descending (newest first).
-    const byArtifact = new Map<
-      string,
-      Array<{ key: string; uploadedAt: number }>
-    >();
-    for (const [key, entry] of this.entries) {
-      const list = byArtifact.get(entry.metadata.artifactId) ?? [];
-      list.push({ key, uploadedAt: entry.metadata.uploadedAt.getTime() });
-      byArtifact.set(entry.metadata.artifactId, list);
+    const stale = selectEntriesOverArtifactCap(
+      [...this.entries].map(([key, entry]) => ({
+        key,
+        artifactId: entry.metadata.artifactId,
+        uploadedAt: entry.metadata.uploadedAt.getTime(),
+      })),
+      maxCount
+    );
+    for (const entry of stale) {
+      this.entries.delete(entry.key);
     }
-
-    let removed = 0;
-    for (const list of byArtifact.values()) {
-      list.sort((a, b) => b.uploadedAt - a.uploadedAt);
-      for (const stale of list.slice(maxCount)) {
-        this.entries.delete(stale.key);
-        removed += 1;
-      }
-    }
-    return removed;
+    return stale.length;
   }
 
   async close(): Promise<void> {

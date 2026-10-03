@@ -136,7 +136,7 @@ Artifacts persist in MinIO across server restarts — re-fetch them later by URL
 pnpm --filter @inference-gateway/adk-example-artifacts-minio minio:down
 ```
 
-For programmatic cleanup, call `artifactService.cleanupExpired(maxAgeMs)` or `artifactService.cleanupOldest(maxCount)`.
+For programmatic cleanup, call `artifactService.cleanupExpired(maxAgeMs)` to drop artifacts older than `maxAgeMs`, or `artifactService.cleanupOldest(maxCount)` to keep only the `maxCount` most-recent artifacts (deleting every file of the older ones; `0` or less means unlimited, a no-op).
 
 ## Related examples
 

@@ -11,6 +11,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { ArtifactStorageError } from './artifact-service.js';
+import { selectEntriesOverArtifactCap } from './artifact-storage.js';
 import type {
   ArtifactMetadata,
   ArtifactStorageProvider,
@@ -321,30 +322,15 @@ export class FilesystemArtifactStorage implements ArtifactStorageProvider {
   async cleanupOldest(maxCount: number, signal?: AbortSignal): Promise<number> {
     this.ensureOpen();
     this.assertNotAborted(signal);
-    const entries = await this.scan();
     if (maxCount <= 0) {
-      for (const entry of entries) {
-        this.assertNotAborted(signal);
-        await this.removeEntry(entry);
-      }
-      return entries.length;
+      return 0;
     }
-    const byArtifact = new Map<string, ScannedEntry[]>();
-    for (const entry of entries) {
-      const list = byArtifact.get(entry.artifactId) ?? [];
-      list.push(entry);
-      byArtifact.set(entry.artifactId, list);
+    const stale = selectEntriesOverArtifactCap(await this.scan(), maxCount);
+    for (const entry of stale) {
+      this.assertNotAborted(signal);
+      await this.removeEntry(entry);
     }
-    let removed = 0;
-    for (const list of byArtifact.values()) {
-      list.sort((a, b) => b.uploadedAt - a.uploadedAt);
-      for (const stale of list.slice(maxCount)) {
-        this.assertNotAborted(signal);
-        await this.removeEntry(stale);
-        removed += 1;
-      }
-    }
-    return removed;
+    return stale.length;
   }
 
   async close(): Promise<void> {

@@ -117,11 +117,12 @@ export interface ArtifactStorageProvider {
   cleanupExpired(maxAgeMs: number, signal?: AbortSignal): Promise<number>;
 
   /**
-   * Keep only the `maxCount` most-recent files per artifact id, removing
-   * older ones. Returns the count of files removed.
+   * Keep only the `maxCount` most-recent artifacts, removing every file that
+   * belongs to an older one. Returns the count of files removed.
    *
-   * "Most-recent" is measured by `uploadedAt`. When `maxCount` is `0` or
-   * negative the entire store is wiped.
+   * "Most-recent" is measured by an artifact's newest `uploadedAt`. When
+   * `maxCount` is `0` or negative the cap is unlimited and nothing is
+   * removed.
    */
   cleanupOldest(maxCount: number, signal?: AbortSignal): Promise<number>;
 
@@ -130,4 +131,37 @@ export interface ArtifactStorageProvider {
    * clients, etc). After `close()`, all other methods may throw.
    */
   close(): Promise<void>;
+}
+
+/**
+ * Pick the entries that `cleanupOldest(maxCount)` must remove: every file
+ * belonging to an artifact outside the `maxCount` most-recent artifacts.
+ *
+ * An artifact's recency is its newest entry's `uploadedAt`. Grouping happens
+ * at the artifact level, not the file level — a per-file cap would never fire,
+ * since the service mints a fresh artifact id per stored artifact. `maxCount`
+ * of `0` or less means unlimited: nothing is selected.
+ *
+ * Shared by the filesystem, MinIO, and in-memory providers so the retention
+ * semantics cannot drift between backends.
+ */
+export function selectEntriesOverArtifactCap<
+  T extends { readonly artifactId: string; readonly uploadedAt: number }
+>(entries: readonly T[], maxCount: number): T[] {
+  if (maxCount <= 0) return [];
+  const newestByArtifact = new Map<string, number>();
+  for (const entry of entries) {
+    const seen = newestByArtifact.get(entry.artifactId);
+    if (seen === undefined || entry.uploadedAt > seen) {
+      newestByArtifact.set(entry.artifactId, entry.uploadedAt);
+    }
+  }
+  if (newestByArtifact.size <= maxCount) return [];
+  const keep = new Set(
+    [...newestByArtifact]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, maxCount)
+      .map(([artifactId]) => artifactId)
+  );
+  return entries.filter((entry) => !keep.has(entry.artifactId));
 }
