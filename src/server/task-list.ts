@@ -61,9 +61,14 @@ export interface TaskListHandlerOptions {
  *  - If the task referenced by the cursor is deleted, pagination resumes from
  *    the first task strictly after that `(createdAt, id)`.
  *
+ * Per the proto3 JSON mapping, a default-valued optional field means "unset":
+ * `pageToken: ''` is the first page, `pageSize: 0` falls back to the default
+ * page size, and empty `status` / `contextId` apply no filter. Go ADK clients
+ * send these on the first call, so rejecting them would lock them out.
+ *
  * Errors surface as JSON-RPC `-32602` (Invalid Params) via {@link JSONRPCError}:
  *  - `params` not an object, or `state` / `contextId` / `cursor` of the wrong type
- *  - `limit` not a positive integer (`0`, negatives, and non-integers are rejected)
+ *  - `limit` not a non-negative integer (negatives and non-integers are rejected)
  *  - `cursor` not decodable as the expected `{ createdAt, id }` envelope
  *
  * Register on an {@link A2AServer} via
@@ -227,24 +232,28 @@ function validateTaskListParams(params: unknown): ListTasksRequest {
 
   const rawState = obj['status'];
   if (rawState !== undefined) {
-    if (typeof rawState !== 'string' || rawState.length === 0) {
+    if (typeof rawState !== 'string') {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: status must be a non-empty string'
+        'invalid params: status must be a string'
       );
     }
-    out.status = rawState as TaskState;
+    if (rawState.length > 0) {
+      out.status = rawState as TaskState;
+    }
   }
 
   const rawContextId = obj['contextId'];
   if (rawContextId !== undefined) {
-    if (typeof rawContextId !== 'string' || rawContextId.length === 0) {
+    if (typeof rawContextId !== 'string') {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: contextId must be a non-empty string'
+        'invalid params: contextId must be a string'
       );
     }
-    out.contextId = rawContextId;
+    if (rawContextId.length > 0) {
+      out.contextId = rawContextId;
+    }
   }
 
   const rawLimit = obj['pageSize'];
@@ -252,25 +261,29 @@ function validateTaskListParams(params: unknown): ListTasksRequest {
     if (
       typeof rawLimit !== 'number' ||
       !Number.isInteger(rawLimit) ||
-      rawLimit <= 0
+      rawLimit < 0
     ) {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: pageSize must be a positive integer'
+        'invalid params: pageSize must be a non-negative integer'
       );
     }
-    out.pageSize = rawLimit;
+    if (rawLimit > 0) {
+      out.pageSize = rawLimit;
+    }
   }
 
   const rawCursor = obj['pageToken'];
   if (rawCursor !== undefined) {
-    if (typeof rawCursor !== 'string' || rawCursor.length === 0) {
+    if (typeof rawCursor !== 'string') {
       throw new JSONRPCError(
         JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'invalid params: pageToken must be a non-empty string'
+        'invalid params: pageToken must be a string'
       );
     }
-    out.pageToken = rawCursor;
+    if (rawCursor.length > 0) {
+      out.pageToken = rawCursor;
+    }
   }
 
   return out;
