@@ -193,7 +193,11 @@ describe('DefaultArtifactService.createDataArtifact', () => {
   it('throws ArtifactValidationError for non-object payloads', () => {
     const { service } = makeService();
     expect(() =>
-      service.createDataArtifact('n', 'd', null as unknown as object)
+      service.createDataArtifact(
+        'n',
+        'd',
+        null as unknown as Record<string, unknown>
+      )
     ).toThrow(ArtifactValidationError);
   });
 });

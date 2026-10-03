@@ -90,7 +90,7 @@ function emptyExecutor(): StreamingTaskExecutor {
 
 describe('createMessageStreamHandler', () => {
   it('exposes the canonical method name constant', () => {
-    expect(MESSAGE_STREAM_METHOD).toBe('message/stream');
+    expect(MESSAGE_STREAM_METHOD).toBe('SendStreamingMessage');
   });
 
   it('exposes the default 1000 ms status-update interval', () => {
@@ -791,8 +791,8 @@ describe('createMessageStreamHandler', () => {
   });
 });
 
-describe('createMessageStreamHandler + tasks/cancel integration', () => {
-  it('tasks/cancel aborts an in-flight streaming executor via the shared registry', async () => {
+describe('createMessageStreamHandler + CancelTask integration', () => {
+  it('CancelTask aborts an in-flight streaming executor via the shared registry', async () => {
     const storage = new InMemoryTaskStorage();
     const registry = new TaskCancellationRegistry();
 
@@ -821,7 +821,7 @@ describe('createMessageStreamHandler + tasks/cancel integration', () => {
           'abort',
           () => {
             executorObservedAbort = true;
-            reject(new Error('aborted by tasks/cancel'));
+            reject(new Error('aborted by CancelTask'));
           },
           { once: true }
         );

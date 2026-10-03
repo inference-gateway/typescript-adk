@@ -1,6 +1,7 @@
 import { toWireTask, type ManagedTask } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
+  A2AMethod,
   ListTasksRequest,
   ListTasksResponse,
   TaskState,
@@ -9,12 +10,12 @@ import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
 import type { MethodHandler } from './method-registry.js';
 
 /**
- * Canonical JSON-RPC method name for the A2A `tasks/list` operation.
+ * Canonical JSON-RPC method name for the A2A `ListTasks` operation.
  *
  * Use this rather than a string literal when registering the handler so the
  * spelling stays in lockstep with conformance tests and other consumers.
  */
-export const TASK_LIST_METHOD = 'tasks/list';
+export const TASK_LIST_METHOD = 'ListTasks' satisfies A2AMethod;
 
 /**
  * Default cap on `limit` when the caller omits it. Mirrors the upper bound
@@ -47,7 +48,7 @@ export interface TaskListHandlerOptions {
 }
 
 /**
- * Build a handler for the A2A `tasks/list` JSON-RPC method.
+ * Build a handler for the A2A `ListTasks` JSON-RPC method.
  *
  * Lists tasks via {@link TaskStorage.listTasks} (which spans both active and
  * dead-letter stores in FIFO `createdAt` order), filters by the optional

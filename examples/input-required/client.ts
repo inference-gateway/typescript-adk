@@ -22,7 +22,7 @@ const initial: Message = {
   parts: [{ text: PROMPT }],
 };
 
-console.log(`POST ${SERVER_URL}/  message/send  "${PROMPT}"`);
+console.log(`POST ${SERVER_URL}/  SendMessage  "${PROMPT}"`);
 const created = await client.sendMessage({ message: initial });
 console.log(`created task id=${created.id} state=${created.status.state}`);
 
@@ -46,7 +46,7 @@ if (paused.status.state === TASK_STATE.INPUT_REQUIRED) {
   };
 
   console.log(
-    `POST ${SERVER_URL}/  message/send  "${FOLLOW_UP}" (resume, contextId=${contextId})`
+    `POST ${SERVER_URL}/  SendMessage  "${FOLLOW_UP}" (resume, contextId=${contextId})`
   );
   const resumed = await client.sendMessage({ message: resumeMessage });
   console.log(`resumed task id=${resumed.id} state=${resumed.status.state}`);

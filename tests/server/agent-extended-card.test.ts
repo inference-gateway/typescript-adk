@@ -36,9 +36,7 @@ describe('createGetAuthenticatedExtendedCardHandler', () => {
   const ctx = { signal: new AbortController().signal };
 
   it('exports the canonical method name', () => {
-    expect(GET_AUTHENTICATED_EXTENDED_CARD_METHOD).toBe(
-      'agent/getAuthenticatedExtendedCard'
-    );
+    expect(GET_AUTHENTICATED_EXTENDED_CARD_METHOD).toBe('GetExtendedAgentCard');
   });
 
   it('returns the configured extended card verbatim when params is absent', () => {

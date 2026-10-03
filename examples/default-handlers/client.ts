@@ -15,29 +15,29 @@ import {
 const SERVER_URL = process.env['SERVER_URL'] ?? 'http://127.0.0.1:8080';
 const SEND_PROMPT =
   process.env['SEND_PROMPT'] ??
-  'Hello via message/send - please walk this task to COMPLETED.';
+  'Hello via SendMessage - please walk this task to COMPLETED.';
 const STREAM_PROMPT =
   process.env['STREAM_PROMPT'] ??
-  'Hello via message/stream - please walk this task to COMPLETED.';
+  'Hello via SendStreamingMessage - please walk this task to COMPLETED.';
 const POLL_INTERVAL_MS = 300;
 const POLL_MAX_ATTEMPTS = 60;
 
 const client = createA2AClient({ baseURL: SERVER_URL });
 
-console.log('=== message/send (background path) ===');
+console.log('=== SendMessage (background path) ===');
 const sendMessage: Message = {
   messageId: crypto.randomUUID(),
   role: 'ROLE_USER',
   parts: [{ text: SEND_PROMPT }],
 };
-console.log(`POST ${SERVER_URL}/  message/send  "${SEND_PROMPT}"`);
+console.log(`POST ${SERVER_URL}/  SendMessage  "${SEND_PROMPT}"`);
 const created = await client.sendMessage({ message: sendMessage });
 console.log(`created task id=${created.id} state=${created.status.state}`);
 const completed = await pollUntilTerminal(created.id);
 console.log(`final state: ${completed.status.state}`);
 console.log(`final task:\n${JSON.stringify(completed, null, 2)}`);
 
-console.log('\n=== message/stream (streaming path) ===');
+console.log('\n=== SendStreamingMessage (streaming path) ===');
 const streamRequest = {
   jsonrpc: JSONRPC_VERSION,
   id: crypto.randomUUID(),
@@ -50,7 +50,7 @@ const streamRequest = {
     } satisfies Message,
   },
 };
-console.log(`POST ${SERVER_URL}/  message/stream  "${STREAM_PROMPT}"`);
+console.log(`POST ${SERVER_URL}/  SendStreamingMessage  "${STREAM_PROMPT}"`);
 
 const response = await fetch(`${SERVER_URL}/`, {
   method: 'POST',

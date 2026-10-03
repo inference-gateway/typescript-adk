@@ -1,7 +1,10 @@
 import pkg from '../../package.json' with { type: 'json' };
 import { createTLSFetch, type ClientTLSConfig } from '../tls/index.js';
 import type {
+  A2AMethod,
   AgentCard,
+  JSONRPCErrorResponse,
+  JSONRPCSuccessResponse,
   SendMessageRequest,
   Struct,
   Task,
@@ -136,26 +139,13 @@ export interface RequestOptions {
 
 /**
  * Options accepted by {@link A2AClient.getTask}, extending the base
- * {@link RequestOptions} with `tasks/get`-specific params.
+ * {@link RequestOptions} with `GetTask`-specific params.
  */
 export interface GetTaskOptions extends RequestOptions {
   /** Cap the returned `history` to this many most-recent messages. */
   readonly historyLength?: number;
   /** Arbitrary metadata forwarded to the server. */
   readonly metadata?: Struct;
-}
-
-interface JSONRPCErrorWire {
-  readonly code: number;
-  readonly message: string;
-  readonly data?: unknown;
-}
-
-interface JSONRPCResponseWire {
-  readonly jsonrpc?: string;
-  readonly id?: unknown;
-  readonly result?: unknown;
-  readonly error?: JSONRPCErrorWire;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -178,12 +168,12 @@ function composeSignals(
 /**
  * Client for the Agent-to-Agent (A2A) protocol. Wraps the agent's HTTP
  * surface - card discovery, health probe, and the JSON-RPC methods
- * `message/send` and `tasks/get` - behind a typed, Promise-based API.
+ * `SendMessage` and `GetTask` - behind a typed, Promise-based API.
  *
  * Mirrors `client.Client` in the Go ADK
  * (https://github.com/inference-gateway/adk/blob/main/client/client.go).
  *
- * Streaming methods (`message/stream`, `tasks/resubscribe`) are deliberately
+ * Streaming methods (`SendStreamingMessage`, `SubscribeToTask`) are deliberately
  * deferred - see issue #15 - but the constructor surface is shaped so they
  * slot in without API churn.
  */
@@ -266,18 +256,18 @@ export class A2AClient {
   }
 
   /**
-   * Invoke the JSON-RPC `message/send` method. Returns the wire-format `Task`
+   * Invoke the JSON-RPC `SendMessage` method. Returns the wire-format `Task`
    * the server creates and enqueues.
    */
   async sendMessage(
     params: SendMessageRequest,
     opts: RequestOptions = {}
   ): Promise<Task> {
-    return await this.executeJSONRPC<Task>('message/send', params, opts.signal);
+    return await this.executeJSONRPC<Task>('SendMessage', params, opts.signal);
   }
 
   /**
-   * Invoke the JSON-RPC `tasks/get` method. Returns the wire-format `Task`,
+   * Invoke the JSON-RPC `GetTask` method. Returns the wire-format `Task`,
    * with `history` capped to the last `historyLength` messages when supplied.
    */
   async getTask(taskId: string, opts: GetTaskOptions = {}): Promise<Task> {
@@ -288,7 +278,7 @@ export class A2AClient {
     if (opts.metadata !== undefined) {
       params['metadata'] = opts.metadata;
     }
-    return await this.executeJSONRPC<Task>('tasks/get', params, opts.signal);
+    return await this.executeJSONRPC<Task>('GetTask', params, opts.signal);
   }
 
   private async executeGET(
@@ -314,7 +304,7 @@ export class A2AClient {
   }
 
   private async executeJSONRPC<T>(
-    method: string,
+    method: A2AMethod,
     params: unknown,
     userSignal: AbortSignal | undefined
   ): Promise<T> {
@@ -350,7 +340,9 @@ export class A2AClient {
       if (!isPlainObject(envelope)) {
         throw new A2AClientError('invalid JSON-RPC response: not an object');
       }
-      const rpc = envelope as JSONRPCResponseWire;
+      const rpc = envelope as Partial<
+        JSONRPCSuccessResponse & JSONRPCErrorResponse
+      >;
       if (rpc.error !== undefined) {
         throw new A2AJSONRPCError(
           rpc.error.code,

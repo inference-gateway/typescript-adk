@@ -37,7 +37,7 @@ const prompts: readonly string[] = [
 
 for (const prompt of prompts) {
   console.log(`\n=== Sending message ===`);
-  console.log(`POST ${SERVER_URL}/  message/send  "${prompt}"`);
+  console.log(`POST ${SERVER_URL}/  SendMessage  "${prompt}"`);
 
   const sendMessage: Message = {
     messageId: crypto.randomUUID(),

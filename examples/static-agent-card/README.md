@@ -219,7 +219,7 @@ Version: 0.1.0
 ...
 
 === Sending message ===
-POST http://127.0.0.1:8080/  message/send  "Tell me about your static configuration."
+POST http://127.0.0.1:8080/  SendMessage  "Tell me about your static configuration."
 created task id=… state=TASK_STATE_SUBMITTED
 final state: TASK_STATE_COMPLETED
 agent reply:
@@ -233,7 +233,7 @@ agent reply:
     - config-info: Configuration Info
 
 === Sending message ===
-POST http://127.0.0.1:8080/  message/send  "Please echo this sentence back to me verbatim."
+POST http://127.0.0.1:8080/  SendMessage  "Please echo this sentence back to me verbatim."
 created task id=… state=TASK_STATE_SUBMITTED
 final state: TASK_STATE_COMPLETED
 agent reply:

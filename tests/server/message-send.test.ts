@@ -333,7 +333,7 @@ describe('createMessageSendHandler', () => {
   });
 });
 
-describe('message/send JSON-RPC conformance', () => {
+describe('SendMessage JSON-RPC conformance', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -343,7 +343,7 @@ describe('message/send JSON-RPC conformance', () => {
     }
   });
 
-  it('dispatches a happy-path message/send request and returns the Task', async () => {
+  it('dispatches a happy-path SendMessage request and returns the Task', async () => {
     const storage = new InMemoryTaskStorage();
     const server = createA2AServer({ card: makeCard() });
     server.registerMethod(

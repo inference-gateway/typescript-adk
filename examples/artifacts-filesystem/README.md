@@ -1,6 +1,6 @@
 # Artifacts: Filesystem
 
-End-to-end example wiring the [`FilesystemArtifactStorage`](../../src/artifacts/filesystem-storage.ts) provider into an A2A server. Each incoming `message/send` request is turned into a text artifact persisted on disk, and the server's built-in `/artifacts/:artifactId/:filename` endpoint streams the bytes back to clients.
+End-to-end example wiring the [`FilesystemArtifactStorage`](../../src/artifacts/filesystem-storage.ts) provider into an A2A server. Each incoming `SendMessage` request is turned into a text artifact persisted on disk, and the server's built-in `/artifacts/:artifactId/:filename` endpoint streams the bytes back to clients.
 
 Mirrors the Go ADK's [`examples/artifacts-filesystem/`](https://github.com/inference-gateway/adk/tree/main/examples/artifacts-filesystem).
 
@@ -15,7 +15,7 @@ Mirrors the Go ADK's [`examples/artifacts-filesystem/`](https://github.com/infer
 ```text
 examples/artifacts-filesystem/
 ├── README.md
-├── client.ts        # sendMessage + poll tasks/get + download the artifact
+├── client.ts        # sendMessage + poll GetTask + download the artifact
 ├── package.json     # workspace package, depends only on @inference-gateway/adk
 ├── server.ts        # createA2AServer + FilesystemArtifactStorage + worker
 └── tsconfig.json
@@ -66,11 +66,11 @@ Client (`client.ts`):
 
 ## Expected flow
 
-1. Client sends a `message/send` JSON-RPC request.
+1. Client sends a `SendMessage` JSON-RPC request.
 2. Server creates a `PENDING` task, enqueues it, and replies with the wire-format task.
 3. Worker dequeues the task, calls `artifactService.createFileArtifact(...)` to write the user text to `${ARTIFACTS_ROOT}/<artifactId>/note-<task-prefix>.txt`, and produces a sidecar `note-<task-prefix>.txt.adk-meta.json` next to it.
 4. Worker composes the artifact onto `task.artifacts`, appends an agent reply with the download URL, and stores the now-`TASK_STATE_COMPLETED` task into the dead-letter mirror.
-5. Client polls `tasks/get`, observes the terminal task, extracts `task.artifacts[].parts[].url`, and downloads each URL through the server's `/artifacts` endpoint.
+5. Client polls `GetTask`, observes the terminal task, extracts `task.artifacts[].parts[].url`, and downloads each URL through the server's `/artifacts` endpoint.
 
 ## Where artifacts land
 

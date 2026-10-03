@@ -101,7 +101,7 @@ const card: AgentCard = {
 };
 
 // ---------------------------------------------------------------------------
-// Extended card – served via agent/getAuthenticatedExtendedCard
+// Extended card – served via GetExtendedAgentCard
 // ---------------------------------------------------------------------------
 
 const extendedCard: AgentCard = {
@@ -128,7 +128,7 @@ const server = createA2AServer({
 });
 
 // ---------------------------------------------------------------------------
-// message/send – creates a PENDING task, enqueues it for background processing
+// SendMessage – creates a PENDING task, enqueues it for background processing
 // ---------------------------------------------------------------------------
 
 server.registerMethod(
@@ -137,20 +137,20 @@ server.registerMethod(
 );
 
 // ---------------------------------------------------------------------------
-// tasks/get – retrieves a task by id (active or dead-letter)
+// GetTask – retrieves a task by id (active or dead-letter)
 // ---------------------------------------------------------------------------
 
 server.registerMethod(TASK_GET_METHOD, createTaskGetHandler({ storage }));
 
 // ---------------------------------------------------------------------------
-// tasks/list – lists tasks with optional state / contextId filter and
+// ListTasks – lists tasks with optional state / contextId filter and
 //             keyset pagination
 // ---------------------------------------------------------------------------
 
 server.registerMethod(TASK_LIST_METHOD, createTaskListHandler({ storage }));
 
 // ---------------------------------------------------------------------------
-// tasks/cancel – cancels a non-terminal task by id
+// CancelTask – cancels a non-terminal task by id
 // ---------------------------------------------------------------------------
 
 server.registerMethod(
@@ -159,7 +159,7 @@ server.registerMethod(
 );
 
 // ---------------------------------------------------------------------------
-// message/stream – SSE streaming method
+// SendStreamingMessage – SSE streaming method
 // ---------------------------------------------------------------------------
 
 server.registerStreamingMethod(
@@ -173,7 +173,7 @@ server.registerStreamingMethod(
 );
 
 // ---------------------------------------------------------------------------
-// tasks/resubscribe – SSE resubscribe to a task's event stream
+// SubscribeToTask – SSE resubscribe to a task's event stream
 // ---------------------------------------------------------------------------
 
 server.registerStreamingMethod(
@@ -185,7 +185,7 @@ server.registerStreamingMethod(
 );
 
 // ---------------------------------------------------------------------------
-// tasks/pushNotificationConfig/{set,get,list,delete} – push notification
+// Create/Get/List/DeleteTaskPushNotificationConfig(s) – push notification
 // config CRUD
 // ---------------------------------------------------------------------------
 
@@ -210,7 +210,7 @@ server.registerMethod(
 );
 
 // ---------------------------------------------------------------------------
-// agent/getAuthenticatedExtendedCard – returns the extended card
+// GetExtendedAgentCard – returns the extended card
 // ---------------------------------------------------------------------------
 
 server.registerMethod(
@@ -315,8 +315,8 @@ async function runWorker(signal: AbortSignal): Promise<void> {
     }
     console.log(`background: task ${task.id} dequeued`);
 
-    // Sleep before completing so a `tasks/cancel` issued shortly after
-    // `message/send` can intercept the task while it's still PENDING.
+    // Sleep before completing so a `CancelTask` issued shortly after
+    // `SendMessage` can intercept the task while it's still PENDING.
     await sleep(WORKER_DELAY_MS, signal);
     if (signal.aborted) return;
 

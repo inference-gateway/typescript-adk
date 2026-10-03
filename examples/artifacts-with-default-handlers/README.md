@@ -1,12 +1,12 @@
 # Artifacts: with `A2AServerBuilder` default handlers
 
-End-to-end example combining [`A2AServerBuilder.withDefaultStreamingTaskHandler()`](../../src/server/server-builder.ts) with a **custom artifact-attaching background handler** that calls [`DefaultArtifactService.createFileArtifact(...)`](../../src/artifacts/default-artifact-service.ts) on every `message/send` request. The default streaming stub is left in place so the same server still answers `message/stream`.
+End-to-end example combining [`A2AServerBuilder.withDefaultStreamingTaskHandler()`](../../src/server/server-builder.ts) with a **custom artifact-attaching background handler** that calls [`DefaultArtifactService.createFileArtifact(...)`](../../src/artifacts/default-artifact-service.ts) on every `SendMessage` request. The default streaming stub is left in place so the same server still answers `SendStreamingMessage`.
 
 Mirrors the Go ADK's [`examples/artifacts-with-default-handlers/`](https://github.com/inference-gateway/adk/tree/main/examples/artifacts-with-default-handlers).
 
 ## What this example shows
 
-- The builder one-liner for setting up the protocol-level methods (`message/send`, `message/stream`, `tasks/cancel`, `tasks/resubscribe`).
+- The builder one-liner for setting up the protocol-level methods (`SendMessage`, `SendStreamingMessage`, `CancelTask`, `SubscribeToTask`).
 - Mixing a builder-installed **default** streaming stub with a builder-installed **custom** background handler — `withBackgroundTaskHandler(custom)` overrides the analogous stub while leaving the streaming stub alone.
 - Wiring an [`ArtifactService`](../../src/artifacts/artifact-service.ts) into the builder via [`withArtifactService`](../../src/server/server-builder.ts) for symmetry with the Go ADK.
 - Using [`InMemoryArtifactStorage`](../../src/artifacts/in-memory-storage.ts) so the example needs no docker/disk setup.
@@ -23,14 +23,14 @@ Its background counterpart `withDefaultBackgroundTaskHandler()` is the same idea
 4. Attaches the resulting `Artifact` to `task.artifacts`.
 5. Appends an agent reply and transitions to `COMPLETED`.
 
-The streaming stub is left untouched, so `message/stream` still answers with the canonical single-frame default-handler behavior — see [`examples/default-handlers/`](../default-handlers/) for what that frame looks like.
+The streaming stub is left untouched, so `SendStreamingMessage` still answers with the canonical single-frame default-handler behavior — see [`examples/default-handlers/`](../default-handlers/) for what that frame looks like.
 
 ## Layout
 
 ```text
 examples/artifacts-with-default-handlers/
 ├── README.md
-├── client.ts        # message/send (poll) + message/stream (SSE) in one run
+├── client.ts        # SendMessage (poll) + SendStreamingMessage (SSE) in one run
 ├── package.json     # workspace package, depends only on @inference-gateway/adk
 ├── server.ts        # A2AServerBuilder + custom artifact-attaching background handler
 └── tsconfig.json
@@ -71,26 +71,26 @@ Server (`server.ts`):
 
 Client (`client.ts`):
 
-| Env var         | Default                                                                         | Description                                |
-| --------------- | ------------------------------------------------------------------------------- | ------------------------------------------ |
-| `SERVER_URL`    | `http://127.0.0.1:8080`                                                         | Base URL of the A2A server.                |
-| `SEND_PROMPT`   | `Hello via message/send - please persist this note as an artifact.`             | Text written into the persisted artifact.  |
-| `STREAM_PROMPT` | `Hello via message/stream - please show me the streaming default handler stub.` | Text sent on the `message/stream` request. |
+| Env var         | Default                                                                               | Description                                      |
+| --------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `SERVER_URL`    | `http://127.0.0.1:8080`                                                               | Base URL of the A2A server.                      |
+| `SEND_PROMPT`   | `Hello via SendMessage - please persist this note as an artifact.`                    | Text written into the persisted artifact.        |
+| `STREAM_PROMPT` | `Hello via SendStreamingMessage - please show me the streaming default handler stub.` | Text sent on the `SendStreamingMessage` request. |
 
 ## Expected flow
 
-`message/send` path (custom background handler):
+`SendMessage` path (custom background handler):
 
-1. Client sends `message/send`.
+1. Client sends `SendMessage`.
 2. Server creates a `PENDING` task, enqueues it, replies with the wire-format task.
 3. Worker dequeues, runs the custom background handler.
 4. The handler calls `artifactService.createFileArtifact(...)` to persist the user text under a server-minted artifact id. The bytes land in the in-memory store; the `Artifact` carries a file part with `url` set to `${ARTIFACTS_BASE_URL}/<artifactId>/<filename>`.
 5. Handler attaches the artifact to `task.artifacts`, appends an agent reply, transitions to `TASK_STATE_COMPLETED`.
-6. Client polls `tasks/get`, observes the terminal task with `artifacts.length === 1`, and prints the URI.
+6. Client polls `GetTask`, observes the terminal task with `artifacts.length === 1`, and prints the URI.
 
-`message/stream` path (default streaming stub):
+`SendStreamingMessage` path (default streaming stub):
 
-1. Client opens an SSE connection via `message/stream`.
+1. Client opens an SSE connection via `SendStreamingMessage`.
 2. Server runs the builder-installed streaming default — emits a single `task.status.changed(state=COMPLETED, final=true)` CloudEvent and closes.
 3. Client reads frames until EOF.
 
@@ -102,7 +102,7 @@ In memory — see [`InMemoryArtifactStorage`](../../src/artifacts/in-memory-stor
 
 ## Related examples
 
-- [`examples/default-handlers/`](../default-handlers/) — `A2AServerBuilder.withDefaultTaskHandlers()` without artifacts. Shows the canonical message/send + message/stream stub behavior.
+- [`examples/default-handlers/`](../default-handlers/) — `A2AServerBuilder.withDefaultTaskHandlers()` without artifacts. Shows the canonical SendMessage + SendStreamingMessage stub behavior.
 - [`examples/artifacts-filesystem/`](../artifacts-filesystem/) — filesystem-backed artifact storage with a working `/artifacts` download endpoint.
 - [`examples/artifacts-minio/`](../artifacts-minio/) — MinIO/S3-backed artifact storage with presigned URLs.
 - [`examples/artifacts-autonomous-tool/`](../artifacts-autonomous-tool/) — LLM-driven artifact creation via the reserved `create_artifact` tool.

@@ -33,6 +33,7 @@ export * from './agent/index.js';
 export * from './artifacts/index.js';
 export * from './auth/index.js';
 export * from './server/index.js';
+export { JSONRPCError } from './server/index.js';
 export * from './storage/index.js';
 export * from './client/index.js';
 export * from './llm/index.js';

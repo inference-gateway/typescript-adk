@@ -1,13 +1,13 @@
 # Streaming A2A Example (no LLM)
 
-End-to-end example of `message/stream` over Server-Sent Events using `@inference-gateway/adk`: a server with a custom streaming handler that emits word-by-word `delta` events plus a final `task.status.changed` (state `COMPLETED`), and a client that consumes the SSE stream and prints each event as it arrives.
+End-to-end example of `SendStreamingMessage` over Server-Sent Events using `@inference-gateway/adk`: a server with a custom streaming handler that emits word-by-word `delta` events plus a final `task.status.changed` (state `COMPLETED`), and a client that consumes the SSE stream and prints each event as it arrives.
 
 Mirrors the Go ADK's [`examples/streaming/`](https://github.com/inference-gateway/adk/tree/main/examples/streaming).
 
 ## What this example shows
 
 - Boot an `A2AServer` with `capabilities.streaming = true` in its `AgentCard`.
-- Register the `message/stream` JSON-RPC method via `createMessageStreamHandler`.
+- Register the `SendStreamingMessage` JSON-RPC method via `createMessageStreamHandler`.
 - Provide a `StreamingTaskExecutor` (an `async function*`) that yields `delta` events for each word and a final `statusChanged` event carrying the full assembled message.
 - Drive it all from a plain `fetch`-based client that decodes the SSE frames and CloudEvents v1.0 envelopes inline - no third-party HTTP code, no LLM. Deltas are pure mock output, simulated with a small sleep between words.
 
@@ -16,7 +16,7 @@ Mirrors the Go ADK's [`examples/streaming/`](https://github.com/inference-gatewa
 ```text
 examples/streaming/
 ├── README.md
-├── client.ts        # POST message/stream + read SSE + print deltas live
+├── client.ts        # POST SendStreamingMessage + read SSE + print deltas live
 ├── package.json     # workspace package, depends only on @inference-gateway/adk
 ├── server.ts        # A2A server + mock streaming executor
 └── tsconfig.json
@@ -72,13 +72,13 @@ Server:
 streaming-agent listening on http://127.0.0.1:8080
   card:   http://127.0.0.1:8080/.well-known/agent-card.json
   health: http://127.0.0.1:8080/health
-  rpc:    POST http://127.0.0.1:8080/  method=message/stream
+  rpc:    POST http://127.0.0.1:8080/  method=SendStreamingMessage
 ```
 
 Client (abbreviated - UUIDs and timestamps will differ, and the response text streams in word-by-word):
 
 ```text
-POST http://127.0.0.1:8080/  message/stream  "Please write a short paragraph and stream it to me word by word."
+POST http://127.0.0.1:8080/  SendStreamingMessage  "Please write a short paragraph and stream it to me word by word."
 [task …] status=IN_PROGRESS final=false
 ---
 This is a mock streaming response. Each word appears with a small delay to simulate real-time token streaming without any LLM dependency.
@@ -107,7 +107,7 @@ final status: {
 
 ## How the streaming executor works
 
-`message/stream` is fundamentally different from `message/send`: the handler does not return a single JSON-RPC envelope, it opens an SSE stream and emits CloudEvents v1.0 frames until the task reaches a terminal state. The lifecycle implemented by `createMessageStreamHandler` is:
+`SendStreamingMessage` is fundamentally different from `SendMessage`: the handler does not return a single JSON-RPC envelope, it opens an SSE stream and emits CloudEvents v1.0 frames until the task reaches a terminal state. The lifecycle implemented by `createMessageStreamHandler` is:
 
 1. Validate params and create a `PENDING` task; enqueue it in `InMemoryTaskStorage`.
 2. Transition the task to `IN_PROGRESS` and emit a `adk.agent.task.status.changed` frame (`final: false`).
@@ -124,7 +124,7 @@ In this example the executor (`mockStreamingExecutor` in `server.ts`) walks a ha
 
 `A2AClient` does not yet expose a `streamMessage` helper (deferred to a later release), so this example drives the wire directly:
 
-1. `POST <SERVER_URL>/` with a JSON-RPC envelope (`method: "message/stream"`).
+1. `POST <SERVER_URL>/` with a JSON-RPC envelope (`method: "SendStreamingMessage"`).
 2. Confirm the response is `Content-Type: text/event-stream`.
 3. Read the body as a Web `ReadableStream<Uint8Array>`, decode UTF-8, and split on `\n\n` to recover individual SSE frames.
 4. For every `data: …` frame, parse the payload as a CloudEvents v1.0 envelope and dispatch on its `type` attribute (`adk.agent.delta`, `adk.agent.task.status.changed`).

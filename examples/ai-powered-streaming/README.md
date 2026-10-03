@@ -1,13 +1,13 @@
 # AI-Powered Streaming A2A Example
 
-End-to-end example of an LLM-backed A2A agent that streams its response over Server-Sent Events using `@inference-gateway/adk`: a server that wires `OpenAICompatibleLLMClient` into `DefaultStreamingTaskHandler`, exposes two tools (weather + time), and answers natural-language `message/stream` requests with live deltas; plus a client that consumes the SSE stream and prints each event as it arrives.
+End-to-end example of an LLM-backed A2A agent that streams its response over Server-Sent Events using `@inference-gateway/adk`: a server that wires `OpenAICompatibleLLMClient` into `DefaultStreamingTaskHandler`, exposes two tools (weather + time), and answers natural-language `SendStreamingMessage` requests with live deltas; plus a client that consumes the SSE stream and prints each event as it arrives.
 
 Mirrors the Go ADK's [`examples/ai-powered-streaming/`](https://github.com/inference-gateway/adk/tree/main/examples/ai-powered-streaming).
 
 ## What this example shows
 
 - Boot an `A2AServer` with `capabilities.streaming = true` in its `AgentCard`.
-- Register the `message/stream` JSON-RPC method via `createMessageStreamHandler`, with the executor supplied by `DefaultStreamingTaskHandler.asHandler()`.
+- Register the `SendStreamingMessage` JSON-RPC method via `createMessageStreamHandler`, with the executor supplied by `DefaultStreamingTaskHandler.asHandler()`.
 - Drive the chat-completion loop with `DefaultStreamingTaskHandler`, which iterates LLM calls, dispatches tool calls, and yields one `StreamingTaskEvent` per lifecycle step. The streaming pipeline translates each event into a CloudEvents v1.0 frame and flushes it to the client immediately.
 - Provide two tools via `DefaultToolBox` + `createTool(...)` (`get_weather`, `get_current_time`). The reserved `input_required` tool is registered automatically.
 - Plug a tiny adapter between `OpenAICompatibleLLMClient.chatCompletion` (wire-shaped, snake_case) and `DefaultStreamingTaskHandler`'s structural `LLMClient.createCompletion` (camelCase). The TS ADK does not yet ship this bridge built-in - the Go ADK plumbs it internally via `OpenAICompatibleAgent.RunWithStream`. The adapter is identical to the one in [`examples/ai-powered/`](../ai-powered/).
@@ -19,7 +19,7 @@ Mirrors the Go ADK's [`examples/ai-powered-streaming/`](https://github.com/infer
 examples/ai-powered-streaming/
 ├── .env.example     # provider API keys + agent/model config
 ├── README.md
-├── client.ts        # POST message/stream + read SSE + print events live
+├── client.ts        # POST SendStreamingMessage + read SSE + print events live
 ├── package.json     # workspace package, depends only on @inference-gateway/adk
 ├── server.ts        # A2A server + DefaultStreamingTaskHandler + tools
 └── tsconfig.json
@@ -104,7 +104,7 @@ The Inference Gateway is the recommended way to mediate access: it normalizes pr
 
 ## Expected event order
 
-`message/stream` opens an SSE response whose body is a sequence of CloudEvents v1.0 envelopes. For a single user prompt that triggers one tool call before the final answer, the wire stream looks like this (UUIDs and timestamps will differ):
+`SendStreamingMessage` opens an SSE response whose body is a sequence of CloudEvents v1.0 envelopes. For a single user prompt that triggers one tool call before the final answer, the wire stream looks like this (UUIDs and timestamps will differ):
 
 1. `adk.agent.task.status.changed` - `state=TASK_STATE_WORKING`, `final=false`. Marks the transition from `PENDING` and is the first frame the client sees.
 2. Zero or more periodic `adk.agent.task.status.changed` keep-alive frames at `STREAMING_STATUS_UPDATE_INTERVAL` (default `1s`), `final=false`. Suppressed in the example client output after the first one.
@@ -119,14 +119,14 @@ The Inference Gateway is the recommended way to mediate access: it normalizes pr
 
 Other terminal states are possible:
 
-- `state=TASK_STATE_INPUT_REQUIRED` if the LLM invokes the reserved `input_required` tool. An `adk.agent.input.required` frame carrying the prompt precedes the terminal status frame. The task remains in storage so a subsequent `message/stream` or `message/send` on the same `contextId` can resume it.
-- `state=TASK_STATE_CANCELED` if the client disconnects, the server shuts down, or `tasks/cancel` fires during the run.
+- `state=TASK_STATE_INPUT_REQUIRED` if the LLM invokes the reserved `input_required` tool. An `adk.agent.input.required` frame carrying the prompt precedes the terminal status frame. The task remains in storage so a subsequent `SendStreamingMessage` or `SendMessage` on the same `contextId` can resume it.
+- `state=TASK_STATE_CANCELED` if the client disconnects, the server shuts down, or `CancelTask` fires during the run.
 - `state=TASK_STATE_FAILED` if the iteration cap is hit or the executor throws. The terminal frame embeds the error text in `status.message`.
 
 ## Example client output
 
 ```text
-POST http://127.0.0.1:8080/  message/stream  "What's the weather in New York? Suggest a few activities that would suit it."
+POST http://127.0.0.1:8080/  SendStreamingMessage  "What's the weather in New York? Suggest a few activities that would suit it."
 [task <task-id>] status=IN_PROGRESS final=false
 ---
 
@@ -154,7 +154,7 @@ The exact wording, the number of delta frames, and which tools are called all va
 ## Troubleshooting
 
 - **`missing required environment variable: A2A_AGENT_CLIENT_PROVIDER`** - set `A2A_AGENT_CLIENT_PROVIDER` and `A2A_AGENT_CLIENT_MODEL` in your environment (or source `.env`). The server refuses to boot without them.
-- **`HTTP 406` from the client / `unexpected content-type`** - your prompt landed at a server without streaming support. Make sure the server logs show `rpc: ... method=message/stream` and that `capabilities.streaming` is true on the agent card.
+- **`HTTP 406` from the client / `unexpected content-type`** - your prompt landed at a server without streaming support. Make sure the server logs show `rpc: ... method=SendStreamingMessage` and that `capabilities.streaming` is true on the agent card.
 - **`LLMRequestError: llm request failed after 2 retries`** - the configured `baseURL`/`apiKey` is wrong, or the provider rejected the request. Check the gateway logs, the key spelling, and that the provider you selected actually serves the model id you asked for.
 - **Stream stalls / no deltas appear** - the model is taking a long time before emitting the first token. The periodic `IN_PROGRESS` keep-alive frames (every `STREAMING_STATUS_UPDATE_INTERVAL`) prove the connection is alive; raise the interval to reduce noise or drop it to `0` to suppress them entirely.
 - **Tool returns `Tool "x" is not available: no toolBox configured.`** - you instantiated `DefaultStreamingTaskHandler` without passing `toolBox`. The handler accepts tool calls but refuses to dispatch them without a toolbox.
@@ -162,5 +162,5 @@ The exact wording, the number of delta frames, and which tools are called all va
 ## Next steps
 
 - Try [`examples/streaming/`](../streaming/) for the same SSE pipeline with a hand-written mock executor (no LLM).
-- Try [`examples/ai-powered/`](../ai-powered/) for the non-streaming `message/send` variant of the same agent.
+- Try [`examples/ai-powered/`](../ai-powered/) for the non-streaming `SendMessage` variant of the same agent.
 - Try [`examples/input-required/`](../input-required/) for the pause / client-driven resume flow - the LLM-side version is what fires when the model calls the reserved `input_required` tool, surfaced through this example as an `adk.agent.input.required` frame.

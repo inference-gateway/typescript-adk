@@ -16,7 +16,7 @@ export type TaskEventCloseListener = () => void;
 /**
  * Handle returned by {@link TaskEventBus.subscribe}. `lastStatus` is the most
  * recent `adk.agent.task.status.changed` event the bus has observed (if any);
- * subscribers replay it as the first SSE frame so a late `tasks/resubscribe`
+ * subscribers replay it as the first SSE frame so a late `SubscribeToTask`
  * client immediately sees the current task state. `unsubscribe` is idempotent;
  * call it from a `finally` block to detach the listener.
  */
@@ -26,7 +26,7 @@ export interface TaskEventSubscription {
 }
 
 /**
- * Per-task pub/sub primitive used by `message/stream` and `tasks/resubscribe`
+ * Per-task pub/sub primitive used by `SendStreamingMessage` and `SubscribeToTask`
  * to fan out CloudEvents to one or more SSE subscribers.
  *
  * The producing side calls {@link publish} once per emitted event; every
@@ -157,9 +157,9 @@ export class TaskEventBus {
 }
 
 /**
- * Process-wide registry of per-task event buses. The `message/stream` handler
+ * Process-wide registry of per-task event buses. The `SendStreamingMessage` handler
  * creates a bus on task start and removes it when the task terminates; the
- * `tasks/resubscribe` handler looks up the bus by task id to attach an SSE
+ * `SubscribeToTask` handler looks up the bus by task id to attach an SSE
  * subscriber.
  *
  * Mirrors the role of the Go ADK's per-task subscription map in

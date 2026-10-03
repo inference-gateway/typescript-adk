@@ -15,7 +15,7 @@ import {
 const AGENT_NAME = process.env['A2A_AGENT_NAME'] ?? 'default-handlers-agent';
 const AGENT_DESCRIPTION =
   process.env['A2A_AGENT_DESCRIPTION'] ??
-  'A2A server wired up with A2AServerBuilder.withDefaultTaskHandlers() - exposes both message/send and message/stream with the built-in stub handlers.';
+  'A2A server wired up with A2AServerBuilder.withDefaultTaskHandlers() - exposes both SendMessage and SendStreamingMessage with the built-in stub handlers.';
 const AGENT_VERSION = process.env['A2A_AGENT_VERSION'] ?? '0.0.0';
 const HOST = process.env['A2A_SERVER_HOST'] ?? '127.0.0.1';
 const PORT = Number.parseInt(process.env['A2A_SERVER_PORT'] ?? '8080', 10);
@@ -42,7 +42,7 @@ const card: AgentCard = {
       id: 'default-handlers-demo',
       name: 'Default handlers demo',
       description:
-        'Demonstrates the builder-installed default task handlers. message/send walks tasks PENDING -> IN_PROGRESS -> COMPLETED via the background stub; message/stream emits a single statusChanged(COMPLETED) frame via the streaming stub.',
+        'Demonstrates the builder-installed default task handlers. SendMessage walks tasks PENDING -> IN_PROGRESS -> COMPLETED via the background stub; SendStreamingMessage emits a single statusChanged(COMPLETED) frame via the streaming stub.',
       tags: ['default-handlers', 'demo'],
     },
   ],
@@ -101,7 +101,7 @@ async function runWorker(
     storage.updateActive(task);
 
     const triggering = task.messages[task.messages.length - 1] as Message;
-    console.log(`task ${task.id.slice(0, 8)} dequeued (message/send path)`);
+    console.log(`task ${task.id.slice(0, 8)} dequeued (SendMessage path)`);
 
     let result: ManagedTask;
     try {

@@ -19,7 +19,7 @@ const AGENT_NAME =
   process.env['A2A_AGENT_NAME'] ?? 'artifacts-with-default-handlers-agent';
 const AGENT_DESCRIPTION =
   process.env['A2A_AGENT_DESCRIPTION'] ??
-  'A2A server combining A2AServerBuilder.withDefaultStreamingTaskHandler() with a custom artifact-attaching background handler. Both message/send and message/stream are exposed.';
+  'A2A server combining A2AServerBuilder.withDefaultStreamingTaskHandler() with a custom artifact-attaching background handler. Both SendMessage and SendStreamingMessage are exposed.';
 const AGENT_VERSION = process.env['A2A_AGENT_VERSION'] ?? '0.0.0';
 const HOST = process.env['A2A_SERVER_HOST'] ?? '127.0.0.1';
 const PORT = Number.parseInt(process.env['A2A_SERVER_PORT'] ?? '8080', 10);

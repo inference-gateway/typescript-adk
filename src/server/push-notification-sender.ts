@@ -62,7 +62,7 @@ export const DEFAULT_PUSH_NOTIFICATION_RETRY_CONFIG: PushNotificationRetryConfig
  * (`adk/server/push_notification_sender.go`).
  *
  * `timestamp` is RFC 3339 (ISO 8601 with a `Z` suffix). The full `task`
- * snapshot is included so receivers do not need a separate `tasks/get` to
+ * snapshot is included so receivers do not need a separate `GetTask` to
  * reconstruct context.
  */
 export interface TaskUpdateNotification {

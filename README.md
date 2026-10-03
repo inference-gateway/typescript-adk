@@ -83,7 +83,7 @@ Requires **Node.js 24 LTS or newer**. The package is ESM-only.
 
 A minimal A2A agent that echoes every message it receives, plus a client that sends one message and waits for the task to complete. This is the smallest end-to-end usage of the ADK - the full runnable version with shutdown handling, message extraction, and dead-lettering lives in [`examples/minimal/`](./examples/minimal/).
 
-**`server.ts`** - boot an A2A server with built-in `message/send`, `tasks/get`, and `tasks/list` handlers, plus an inline echo worker:
+**`server.ts`** - boot an A2A server with built-in `SendMessage`, `GetTask`, and `ListTasks` handlers, plus an inline echo worker:
 
 ```ts
 import {
@@ -145,7 +145,7 @@ async function runWorker(): Promise<void> {
 }
 ```
 
-**`client.ts`** - send a message and poll `tasks/get` until the task reaches a terminal state:
+**`client.ts`** - send a message and poll `GetTask` until the task reaches a terminal state:
 
 ```ts
 import {
@@ -177,11 +177,11 @@ console.log(task);
 Complete, runnable examples live under [`examples/`](./examples/):
 
 - **[`examples/minimal/`](./examples/minimal/)** - A2A server + client with no LLM. Demonstrates the full task lifecycle, a graceful echo worker with dead-lettering, and `A2AClient` polling. Mirrors the Go ADK's [`examples/minimal/`](https://github.com/inference-gateway/adk/tree/main/examples/minimal).
-- **[`examples/streaming/`](./examples/streaming/)** - A2A server + client over SSE. Boots a server with `capabilities.streaming = true`, registers a custom `message/stream` executor that emits word-by-word `delta` events, and consumes the SSE frames from a plain `fetch`-based client. Mirrors the Go ADK's [`examples/streaming/`](https://github.com/inference-gateway/adk/tree/main/examples/streaming).
+- **[`examples/streaming/`](./examples/streaming/)** - A2A server + client over SSE. Boots a server with `capabilities.streaming = true`, registers a custom `SendStreamingMessage` executor that emits word-by-word `delta` events, and consumes the SSE frames from a plain `fetch`-based client. Mirrors the Go ADK's [`examples/streaming/`](https://github.com/inference-gateway/adk/tree/main/examples/streaming).
 - **[`examples/input-required/`](./examples/input-required/)** - Pause + client-driven resume. The server pauses a task to ask for a missing piece of information (`INPUT_REQUIRED`), and the client detects the pause, sends a follow-up on the same `contextId`, and polls until completion. Mirrors the Go ADK's [`examples/input-required/`](https://github.com/inference-gateway/adk/tree/main/examples/input-required).
 - **[`examples/ai-powered/`](./examples/ai-powered/)** - LLM-backed A2A agent with weather and time tools. Wires `AgentBuilder` + `OpenAICompatibleLLMClient` into `DefaultBackgroundTaskHandler`, dispatches tool calls in a chat-completion loop, and answers natural-language prompts through any provider routed via the Inference Gateway (OpenAI, Anthropic, Groq, DeepSeek, Mistral, Cohere, Cloudflare, Google, Nvidia, Ollama, llama.cpp, ...). Mirrors the Go ADK's [`examples/ai-powered/`](https://github.com/inference-gateway/adk/tree/main/examples/ai-powered).
 - **[`examples/queue-storage/`](./examples/queue-storage/)** - Two variants of the same echo agent showing how to swap storage backends: [`in-memory/`](./examples/queue-storage/in-memory/) uses `InMemoryTaskStorage` (zero ops, no persistence) and [`redis/`](./examples/queue-storage/redis/) uses `RedisTaskStorage.connect()` with a bundled `docker-compose.yml` for local Redis (queue and dead-letter survive restarts, multi-instance fan-out via `BRPOP`). Mirrors the Go ADK's [`examples/queue-storage/`](https://github.com/inference-gateway/adk/tree/main/examples/queue-storage).
-- **[`examples/usage-metadata/`](./examples/usage-metadata/)** - Per-task token usage and execution stats serialized into `task.metadata.usage` / `task.metadata.execution_stats` on completion. Exercises both `DefaultBackgroundTaskHandler` and `DefaultStreamingTaskHandler` with `setEnableUsageMetadata(true)`; the client prints the resulting metadata from both `tasks/get` and the terminal SSE status frame. Mirrors the Go ADK's [`examples/usage-metadata/`](https://github.com/inference-gateway/adk/tree/main/examples/usage-metadata).
+- **[`examples/usage-metadata/`](./examples/usage-metadata/)** - Per-task token usage and execution stats serialized into `task.metadata.usage` / `task.metadata.execution_stats` on completion. Exercises both `DefaultBackgroundTaskHandler` and `DefaultStreamingTaskHandler` with `setEnableUsageMetadata(true)`; the client prints the resulting metadata from both `GetTask` and the terminal SSE status frame. Mirrors the Go ADK's [`examples/usage-metadata/`](https://github.com/inference-gateway/adk/tree/main/examples/usage-metadata).
 - **[`examples/tls-server/`](./examples/tls-server/)** - A2A server + client over HTTPS with a self-signed cert. Boots `A2AServer` with `tls: loadServerTLSConfigFromEnv()`, drives the client over HTTPS via `tls: { caPath }`, and includes a `generate-certs.sh` helper plus Docker / Kubernetes cert-mount recipes. Mirrors the Go ADK's [`examples/tls-server/`](https://github.com/inference-gateway/adk/tree/main/examples/tls-server).
 
 Each example ships its own README with setup instructions.
@@ -191,7 +191,7 @@ Each example ships its own README with setup instructions.
 ### Core Capabilities
 
 - 🤖 **A2A Protocol Compliance** - JSON-RPC 2.0 endpoint, agent-card discovery at `/.well-known/agent-card.json`, and `/health` liveness probe
-- 📬 **Built-in Handlers** - Drop-in `message/send`, `tasks/get`, and `tasks/list` JSON-RPC handlers backed by any `TaskStorage`
+- 📬 **Built-in Handlers** - Drop-in `SendMessage`, `GetTask`, and `ListTasks` JSON-RPC handlers backed by any `TaskStorage`
 - 🔌 **Extensible JSON-RPC** - Register custom methods on the per-server `MethodRegistry`
 - 🔁 **Task Lifecycle** - Strict state machine (`SUBMITTED → WORKING → {INPUT_REQUIRED | COMPLETED | FAILED | CANCELLED}`) with `TaskTransitionError` on invalid transitions
 - 🗄️ **Pluggable Storage** - Small `TaskStorage` interface with `InMemoryTaskStorage` included; queue / active / dead-letter semantics out of the box, plus a `runTaskStorageConformance` test factory (exported from `@inference-gateway/adk/testing`) so any backend can verify itself against the contract
@@ -212,7 +212,7 @@ Each example ships its own README with setup instructions.
 
 ### Status & Roadmap
 
-The TypeScript ADK currently focuses on the core A2A protocol surface: `message/send`, `tasks/get`, `tasks/list`, AgentCard discovery, the task lifecycle state machine, in-memory and Redis-backed storage, the retrying client, CloudEvents, and SSE. Capabilities that exist in the [Go ADK](https://github.com/inference-gateway/adk) but are **not yet implemented** here include: LLM client / multi-provider chat completion, streaming task handlers, additional JSON-RPC methods (`tasks/cancel`, `tasks/resubscribe`, `tasks/pushNotificationConfig/*`, `agent/getAuthenticatedExtendedCard`), file artifacts (filesystem & MinIO), OIDC/OAuth authentication, and push notifications. OpenTelemetry-based observability (traces, logs, and OTLP-push or Prometheus-pull metrics) is available via `createTelemetryProvider` - see [Telemetry & metrics exporters](#telemetry--metrics-exporters). The TS ADK tracks the Go ADK as the long-term feature target - contributions toward parity are welcome.
+The TypeScript ADK currently focuses on the core A2A protocol surface: `SendMessage`, `GetTask`, `ListTasks`, AgentCard discovery, the task lifecycle state machine, in-memory and Redis-backed storage, the retrying client, CloudEvents, and SSE. Capabilities that exist in the [Go ADK](https://github.com/inference-gateway/adk) but are **not yet implemented** here include: LLM client / multi-provider chat completion, streaming task handlers, additional JSON-RPC methods (`CancelTask`, `SubscribeToTask`, the `*TaskPushNotificationConfig(s)` methods, `GetExtendedAgentCard`), file artifacts (filesystem & MinIO), OIDC/OAuth authentication, and push notifications. OpenTelemetry-based observability (traces, logs, and OTLP-push or Prometheus-pull metrics) is available via `createTelemetryProvider` - see [Telemetry & metrics exporters](#telemetry--metrics-exporters). The TS ADK tracks the Go ADK as the long-term feature target - contributions toward parity are welcome.
 
 ## 📖 API Reference
 
@@ -237,9 +237,9 @@ JSON-RPC methods are registered on a per-server `MethodRegistry`. Call `server.r
 
 #### Built-in handlers
 
-- **`createMessageSendHandler({ storage })`** registers as `MESSAGE_SEND_METHOD` (`message/send`). It accepts a JSON-RPC `message/send` request, creates a `SUBMITTED` task, enqueues it on the supplied `TaskStorage`, and returns the wire `Task` immediately. Your worker code dequeues and progresses the task.
-- **`createTaskGetHandler({ storage })`** registers as `TASK_GET_METHOD` (`tasks/get`). It looks up the requested task across active and dead-letter storage and returns whatever it finds.
-- **`createTaskListHandler({ storage })`** registers as `TASK_LIST_METHOD` (`tasks/list`). It returns tasks filtered by optional `status` / `contextId`, paginated with an opaque `pageToken` and a `pageSize` clamped to `maxLimit` (default `100`). The response shape is the A2A `ListTasksResponse` (`{ tasks, pageSize, totalSize, nextPageToken }`); `nextPageToken` is empty on the final page. Pagination is stable under concurrent inserts and deletes because the cursor is keyset-encoded on `(createdAt, id)`.
+- **`createMessageSendHandler({ storage })`** registers as `MESSAGE_SEND_METHOD` (`SendMessage`). It accepts a JSON-RPC `SendMessage` request, creates a `SUBMITTED` task, enqueues it on the supplied `TaskStorage`, and returns the wire `Task` immediately. Your worker code dequeues and progresses the task.
+- **`createTaskGetHandler({ storage })`** registers as `TASK_GET_METHOD` (`GetTask`). It looks up the requested task across active and dead-letter storage and returns whatever it finds.
+- **`createTaskListHandler({ storage })`** registers as `TASK_LIST_METHOD` (`ListTasks`). It returns tasks filtered by optional `status` / `contextId`, paginated with an opaque `pageToken` and a `pageSize` clamped to `maxLimit` (default `100`). The response shape is the A2A `ListTasksResponse` (`{ tasks, pageSize, totalSize, nextPageToken }`); `nextPageToken` is empty on the final page. Pagination is stable under concurrent inserts and deletes because the cursor is keyset-encoded on `(createdAt, id)`.
 
 These handlers are pure adapters between the JSON-RPC surface and a `TaskStorage` - no business logic lives in them.
 
@@ -580,7 +580,7 @@ For everything else - port, host, JSON-RPC path, agent-card cache-control, handl
 
 ## 🔧 Advanced Usage
 
-- **Custom JSON-RPC methods** - call `server.registerMethod(name, handler)` with any `MethodHandler` to extend the server beyond the built-in `message/send`, `tasks/get`, and `tasks/list`. The `MethodContext` passed to handlers carries the JSON-RPC request id and an `AbortSignal` tied to the HTTP connection.
+- **Custom JSON-RPC methods** - call `server.registerMethod(name, handler)` with any `MethodHandler` to extend the server beyond the built-in `SendMessage`, `GetTask`, and `ListTasks`. The `MethodContext` passed to handlers carries the JSON-RPC request id and an `AbortSignal` tied to the HTTP connection.
 - **Custom task handlers** - implement the `TaskHandler` (background) or `StreamableTaskHandler` (streaming) interface to ship arbitrary agent logic. See [Custom task handlers](#custom-task-handlers) below.
 - **Custom storage backends** - implement the `TaskStorage` interface and pass your implementation into `createMessageSendHandler({ storage })`, `createTaskGetHandler({ storage })`, and `createTaskListHandler({ storage })`. Anything that satisfies the interface - Redis, Postgres, S3-backed - drops in.
 - **Tuning client behavior** - `A2AClientConfig` exposes `timeoutMs`, `retry` (a partial `RetryConfig` or `false`), `headers`, `fetch`, `userAgent`, and overrides for `jsonRpcPath` / `agentCardPath` / `healthPath`. Call `withRetry` directly when you want to apply the same retry policy outside the client.

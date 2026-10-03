@@ -1,6 +1,6 @@
 # Artifacts: MinIO / S3
 
-End-to-end example wiring the [`MinioArtifactStorage`](../../src/artifacts/minio-storage.ts) provider into an A2A server. Each `message/send` request is persisted as an object in a MinIO bucket; clients receive a presigned URL (in `direct` mode) or a stable proxy URL backed by the ADK server (in `proxy` mode).
+End-to-end example wiring the [`MinioArtifactStorage`](../../src/artifacts/minio-storage.ts) provider into an A2A server. Each `SendMessage` request is persisted as an object in a MinIO bucket; clients receive a presigned URL (in `direct` mode) or a stable proxy URL backed by the ADK server (in `proxy` mode).
 
 Ships a `docker-compose.yml` that runs a local MinIO and auto-creates the `artifacts` bucket.
 
@@ -20,7 +20,7 @@ Mirrors the Go ADK's [`examples/artifacts-minio/`](https://github.com/inference-
 examples/artifacts-minio/
 ├── README.md
 ├── .env.example         # copy to .env to override defaults
-├── client.ts            # sendMessage + poll tasks/get + download the artifact
+├── client.ts            # sendMessage + poll GetTask + download the artifact
 ├── docker-compose.yml   # MinIO + mc bootstrap (auto-creates the bucket)
 ├── package.json         # workspace package, depends on @inference-gateway/adk + @aws-sdk/client-s3
 ├── server.ts            # createA2AServer + MinioArtifactStorage + worker
@@ -90,12 +90,12 @@ Client (`client.ts`):
 
 ## Expected flow
 
-1. Client sends a `message/send` JSON-RPC request.
+1. Client sends a `SendMessage` JSON-RPC request.
 2. Server creates a `PENDING` task, enqueues it, replies with the wire-format task.
 3. Worker dequeues, calls `artifactService.createFileArtifact(...)`, which `PUT`s the object into `s3://${MINIO_BUCKET}/${artifactId}/${filename}` with `x-amz-meta-uploaded-at` set.
 4. In `direct` mode, the artifact's the part's `url` is a presigned `GET` URL (default lifetime: 5 minutes). In `proxy` mode, it is `${ARTIFACTS_BASE_URL}/${artifactId}/${filename}`, served by the ADK server's `/artifacts` route.
 5. Worker composes the artifact onto `task.artifacts`, replies with the download URL, marks the task `TASK_STATE_COMPLETED`.
-6. Client polls `tasks/get`, extracts the part's `url`, and downloads the bytes.
+6. Client polls `GetTask`, extracts the part's `url`, and downloads the bytes.
 
 ## Where artifacts land
 

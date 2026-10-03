@@ -1,5 +1,6 @@
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
+  A2AMethod,
   AuthenticationInfo,
   DeleteTaskPushNotificationConfigRequest,
   GetTaskPushNotificationConfigRequest,
@@ -12,31 +13,31 @@ import type { MethodHandler } from './method-registry.js';
 
 /**
  * Canonical JSON-RPC method name for the A2A
- * `tasks/pushNotificationConfig/set` operation.
+ * `CreateTaskPushNotificationConfig` operation.
  */
 export const TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD =
-  'tasks/pushNotificationConfig/set';
+  'CreateTaskPushNotificationConfig' satisfies A2AMethod;
 
 /**
  * Canonical JSON-RPC method name for the A2A
- * `tasks/pushNotificationConfig/get` operation.
+ * `GetTaskPushNotificationConfig` operation.
  */
 export const TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD =
-  'tasks/pushNotificationConfig/get';
+  'GetTaskPushNotificationConfig' satisfies A2AMethod;
 
 /**
  * Canonical JSON-RPC method name for the A2A
- * `tasks/pushNotificationConfig/list` operation.
+ * `ListTaskPushNotificationConfigs` operation.
  */
 export const TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD =
-  'tasks/pushNotificationConfig/list';
+  'ListTaskPushNotificationConfigs' satisfies A2AMethod;
 
 /**
  * Canonical JSON-RPC method name for the A2A
- * `tasks/pushNotificationConfig/delete` operation.
+ * `DeleteTaskPushNotificationConfig` operation.
  */
 export const TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD =
-  'tasks/pushNotificationConfig/delete';
+  'DeleteTaskPushNotificationConfig' satisfies A2AMethod;
 
 export interface TaskPushNotificationConfigHandlerOptions {
   /** Storage backend that persists configs via `setPushConfig` / etc. */
@@ -44,7 +45,7 @@ export interface TaskPushNotificationConfigHandlerOptions {
 }
 
 /**
- * Build a handler for the A2A `tasks/pushNotificationConfig/set` JSON-RPC
+ * Build a handler for the A2A `CreateTaskPushNotificationConfig` JSON-RPC
  * method.
  *
  * Persists the inbound `pushNotificationConfig` against `taskId` via
@@ -82,13 +83,13 @@ export function createTaskPushNotificationConfigSetHandler(
 }
 
 /**
- * Build a handler for the A2A `tasks/pushNotificationConfig/get` JSON-RPC
+ * Build a handler for the A2A `GetTaskPushNotificationConfig` JSON-RPC
  * method.
  *
  * Returns the wire-format {@link TaskPushNotificationConfig} for the
  * `(taskId, pushNotificationConfigId)` pair, or `-32602` (Invalid Params) when
  * no config is registered under that key. The "not found" path uses
- * `-32602` to match the convention established by `tasks/get`.
+ * `-32602` to match the convention established by `GetTask`.
  */
 export function createTaskPushNotificationConfigGetHandler(
   options: TaskPushNotificationConfigHandlerOptions
@@ -109,7 +110,7 @@ export function createTaskPushNotificationConfigGetHandler(
 }
 
 /**
- * Build a handler for the A2A `tasks/pushNotificationConfig/list` JSON-RPC
+ * Build a handler for the A2A `ListTaskPushNotificationConfigs` JSON-RPC
  * method.
  *
  * Returns every config registered under `taskId` as an array. An empty array
@@ -133,13 +134,13 @@ export function createTaskPushNotificationConfigListHandler(
 }
 
 /**
- * Build a handler for the A2A `tasks/pushNotificationConfig/delete` JSON-RPC
+ * Build a handler for the A2A `DeleteTaskPushNotificationConfig` JSON-RPC
  * method.
  *
  * Removes the config at `(taskId, pushNotificationConfigId)`. Returns `null`
  * on success (the A2A schema returns `Empty`/`null` for delete). Surfaces
  * `-32602` when no config exists under that key so callers can distinguish a
- * stale id from a successful no-op (matches `tasks/cancel` style).
+ * stale id from a successful no-op (matches `CancelTask` style).
  */
 export function createTaskPushNotificationConfigDeleteHandler(
   options: TaskPushNotificationConfigHandlerOptions

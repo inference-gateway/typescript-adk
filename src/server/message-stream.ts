@@ -9,6 +9,7 @@ import {
 } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
+  A2AMethod,
   Artifact,
   Message,
   SendMessageRequest,
@@ -34,12 +35,12 @@ import type { TaskCancellationRegistry } from './task-cancellation.js';
 import type { TaskEventBus, TaskEventBusRegistry } from './task-event-bus.js';
 
 /**
- * Canonical JSON-RPC method name for the A2A `message/stream` operation.
+ * Canonical JSON-RPC method name for the A2A `SendStreamingMessage` operation.
  *
  * Use this constant rather than a string literal when registering the handler so
  * the spelling stays in lockstep with conformance tests and other consumers.
  */
-export const MESSAGE_STREAM_METHOD = 'message/stream';
+export const MESSAGE_STREAM_METHOD = 'SendStreamingMessage' satisfies A2AMethod;
 
 /**
  * Name of the environment variable that controls how often a periodic
@@ -212,7 +213,7 @@ export interface MessageStreamHandlerOptions {
   /**
    * Shared cancellation registry. When provided, the handler registers the
    * executor's `AbortController` under the task id at startup and removes it
-   * once the executor finishes. The `tasks/cancel` JSON-RPC handler (see
+   * once the executor finishes. The `CancelTask` JSON-RPC handler (see
    * {@link import('./task-cancel.js').createTaskCancelHandler}) uses the same
    * registry to abort in-flight executors.
    */
@@ -220,9 +221,9 @@ export interface MessageStreamHandlerOptions {
   /**
    * Shared per-task event bus registry. When provided, every CloudEvent the
    * handler emits to the SSE writer is also published to the per-task bus so
-   * `tasks/resubscribe` subscribers receive the same stream. The bus is
+   * `SubscribeToTask` subscribers receive the same stream. The bus is
    * registered at startup and closed + removed once the task terminates.
-   * Without a registry, fan-out is unavailable and `tasks/resubscribe` can
+   * Without a registry, fan-out is unavailable and `SubscribeToTask` can
    * only replay the current state from storage.
    */
   readonly eventBusRegistry?: TaskEventBusRegistry;
@@ -266,7 +267,7 @@ export type StreamingMethodHandler = (
 ) => StreamingMethodResult;
 
 /**
- * Build a handler for the A2A `message/stream` JSON-RPC method.
+ * Build a handler for the A2A `SendStreamingMessage` JSON-RPC method.
  *
  * The handler performs synchronous validation up front (so malformed params
  * surface as a regular JSON-RPC `-32602` rather than as a half-opened SSE
@@ -455,7 +456,7 @@ export function createMessageStreamHandler(
         }
         context.signal.removeEventListener('abort', onParentAbort);
         cancellationRegistry?.unregister(taskId);
-        // An external `tasks/cancel` may have already moved the task to the
+        // An external `CancelTask` may have already moved the task to the
         // dead-letter store with the correct terminal state; respect that
         // rather than overwriting it with our stale local `task` reference.
         const persisted = storage.getTask(taskId);
@@ -465,7 +466,7 @@ export function createMessageStreamHandler(
           storage.storeDeadLetter(task);
         }
         // INPUT_REQUIRED tasks intentionally stay in the active store so a
-        // subsequent message/send or message/stream on the same contextId can
+        // subsequent SendMessage or SendStreamingMessage on the same contextId can
         // discover and resume them via findResumableTask().
         writer.close();
         if (eventBus !== undefined) {

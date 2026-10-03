@@ -373,7 +373,7 @@ describe('createTaskCancelHandler', () => {
   });
 });
 
-describe('tasks/cancel JSON-RPC conformance', () => {
+describe('CancelTask JSON-RPC conformance', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {

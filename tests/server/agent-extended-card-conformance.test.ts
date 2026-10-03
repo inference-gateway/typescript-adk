@@ -88,7 +88,7 @@ async function postJSON(
   });
 }
 
-describe('agent/getAuthenticatedExtendedCard conformance', () => {
+describe('GetExtendedAgentCard conformance', () => {
   let close: (() => Promise<void>) | undefined;
   let jwksServer: RunningJWKSServer | undefined;
   let key: TestKey;
