@@ -1,7 +1,20 @@
 // Code generated from A2A schema. DO NOT EDIT.
 //
-// Source: https://github.com/inference-gateway/schemas/blob/v1.0.1/a2a/a2a-schema.json
+// Source: https://github.com/inference-gateway/schemas/blob/v1.1.0/a2a/a2a-schema.json
 // Regenerate with: pnpm generate:types
+
+export type A2AMethod =
+  | 'SendMessage'
+  | 'SendStreamingMessage'
+  | 'GetTask'
+  | 'ListTasks'
+  | 'CancelTask'
+  | 'SubscribeToTask'
+  | 'CreateTaskPushNotificationConfig'
+  | 'GetTaskPushNotificationConfig'
+  | 'ListTaskPushNotificationConfigs'
+  | 'GetExtendedAgentCard'
+  | 'DeleteTaskPushNotificationConfig';
 
 /**
  * Defines optional capabilities supported by an agent.
@@ -484,6 +497,66 @@ export interface ImplicitOAuthFlow {
   scopes?: {
     [k: string]: string | undefined;
   };
+}
+
+/**
+ * A JSON-RPC 2.0 error object; A2A error codes are mapped in spec section 5.4.
+ *  Hand-written by inference-gateway, not part of the official a2a.proto, which does not model
+ *  the JSON-RPC binding.
+ */
+export interface JSONRPCError {
+  /**
+   * The error code, e.g. -32601 for an unknown method.
+   */
+  code: number;
+  data?: Value;
+  /**
+   * A short description of the error.
+   */
+  message: string;
+}
+
+/**
+ * A JSON-RPC 2.0 response reporting a failed A2A method call (A2A spec section 9.5).
+ *  Hand-written by inference-gateway, not part of the official a2a.proto, which does not model
+ *  the JSON-RPC binding.
+ */
+export interface JSONRPCErrorResponse {
+  error: JSONRPCError;
+  id: Value;
+  /**
+   * The JSON-RPC version, always "2.0".
+   */
+  jsonrpc: string;
+}
+
+/**
+ * A JSON-RPC 2.0 request to an A2A agent (A2A spec section 9.3).
+ *  Hand-written by inference-gateway, not part of the official a2a.proto, which does not model
+ *  the JSON-RPC binding.
+ */
+export interface JSONRPCRequest {
+  id?: Value;
+  /**
+   * The JSON-RPC version, always "2.0".
+   */
+  jsonrpc: string;
+  method: A2AMethod;
+  params?: Struct;
+}
+
+/**
+ * A JSON-RPC 2.0 response carrying the result of an A2A method (A2A spec section 9).
+ *  Hand-written by inference-gateway, not part of the official a2a.proto, which does not model
+ *  the JSON-RPC binding.
+ */
+export interface JSONRPCSuccessResponse {
+  id: Value;
+  /**
+   * The JSON-RPC version, always "2.0".
+   */
+  jsonrpc: string;
+  result: Value;
 }
 
 /**
