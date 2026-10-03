@@ -13,7 +13,6 @@ import type {
   A2AMethod,
   Artifact,
   Message,
-  SendMessageRequest,
   StreamResponse,
   Struct,
   TaskArtifactUpdateEvent,
@@ -30,8 +29,6 @@ import {
   type CloudEvent,
 } from './cloudevents.js';
 import {
-  JSONRPC_ERROR_CODES,
-  JSONRPCError,
   createSuccessResponse,
   type JSONRPCId,
   type JSONRPCSuccessResponse,
@@ -39,8 +36,10 @@ import {
 import {
   appendAndResume,
   assertReferencedTaskAcceptsMessage,
+  enrichMessage,
   findResumableTask,
   registerPushConfig,
+  validateMessageSendParams,
 } from './message-send.js';
 import type { MethodContext } from './method-registry.js';
 import { SSEStreamWriter } from './sse.js';
@@ -323,7 +322,7 @@ export function createMessageStreamHandler(
   );
 
   return (params: unknown, context: MethodContext): StreamingMethodResult => {
-    const validated = validateMessageStreamParams(params);
+    const validated = validateMessageSendParams(params);
     assertReferencedTaskAcceptsMessage(storage, validated.message);
 
     let task: ManagedTask;
@@ -899,57 +898,6 @@ function buildErrorMessage(err: unknown, newId: () => string): Message {
     messageId: newId(),
     role: 'ROLE_AGENT',
     parts: [{ text }],
-  };
-}
-
-function validateMessageStreamParams(params: unknown): SendMessageRequest {
-  if (params === null || typeof params !== 'object' || Array.isArray(params)) {
-    throw new JSONRPCError(
-      JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: expected SendMessageRequest object'
-    );
-  }
-  const obj = params as Record<string, unknown>;
-  const rawMessage = obj['message'];
-  if (
-    rawMessage === null ||
-    rawMessage === undefined ||
-    typeof rawMessage !== 'object' ||
-    Array.isArray(rawMessage)
-  ) {
-    throw new JSONRPCError(
-      JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: message is required and must be an object'
-    );
-  }
-  const parts = (rawMessage as Record<string, unknown>)['parts'];
-  if (!Array.isArray(parts) || parts.length === 0) {
-    throw new JSONRPCError(
-      JSONRPC_ERROR_CODES.INVALID_PARAMS,
-      'invalid params: message.parts must be a non-empty array'
-    );
-  }
-  return params as SendMessageRequest;
-}
-
-function enrichMessage(
-  input: Message,
-  newId: () => string,
-  resumeContextId?: string
-): Message {
-  const messageId =
-    typeof input.messageId === 'string' && input.messageId.length > 0
-      ? input.messageId
-      : newId();
-  const contextId =
-    resumeContextId ??
-    (typeof input.contextId === 'string' && input.contextId.length > 0
-      ? input.contextId
-      : newId());
-  return {
-    ...input,
-    messageId,
-    contextId,
   };
 }
 
