@@ -690,8 +690,6 @@ describe('pollTask abort listeners', () => {
 
     const polled = pollTask(storage, running, isTerminal, controller.signal);
 
-    // Only the in-flight sleep listens, no matter how many 50 ms intervals
-    // elapse - the pre-refactor `delay` leaked one listener per poll.
     await sleep(60);
     const afterOne = getEventListeners(controller.signal, 'abort').length;
     await sleep(300);
