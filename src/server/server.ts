@@ -181,7 +181,7 @@ type NodeServer = Server;
  * - `GET /.well-known/agent-card.json` - unauthenticated card discovery
  * - `GET /health` - liveness probe
  * - `POST <jsonRpcPath>` - JSON-RPC 2.0 endpoint dispatched via the
- *   per-instance {@link MethodRegistry}
+ *   per-instance {@link MethodRegistry}; a trailing slash is accepted
  *
  * Deliberately decoupled from the LLM agent - a server with no methods
  * registered still serves discovery and health.
@@ -251,7 +251,7 @@ export class A2AServer {
   }
 
   private buildApp(): Hono {
-    const app = new Hono();
+    const app = new Hono({ strict: false });
 
     if (this.logger !== NOOP_LOGGER) {
       app.use(

@@ -128,6 +128,23 @@ describe('A2AServer with authenticator wired in', () => {
     expect(body.error.code).toBe(AUTHENTICATION_REQUIRED_ERROR_CODE);
   });
 
+  it('rejects a tokenless request to the JSON-RPC path with a trailing slash', async () => {
+    const server = createA2AServer({
+      card: makeCard(),
+      jsonRpcPath: '/a2a',
+      authenticator: new OIDCAuthenticator(buildVerifier()),
+    });
+    const { baseUrl, close: stop } = await startServer(server);
+    close = stop;
+
+    const res = await fetch(`${baseUrl}/a2a/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', method: 'noop', id: 1 }),
+    });
+    expect(res.status).toBe(401);
+  });
+
   it('accepts a valid token and routes to the JSON-RPC method registry', async () => {
     const server = createA2AServer({
       card: makeCard(),

@@ -189,6 +189,28 @@ describe('A2AServer A2A-Version negotiation', () => {
   });
 });
 
+describe('A2AServer JSON-RPC path', () => {
+  it('dispatches POST <jsonRpcPath>/ like POST <jsonRpcPath>', async () => {
+    const server = createA2AServer({ card: makeCard(), jsonRpcPath: '/a2a' });
+    server.registerMethod('Ping', () => 'pong');
+    const { baseUrl, close } = await startServer(server);
+    try {
+      const res = await fetch(`${baseUrl}/a2a/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'Ping' }),
+      });
+      expect(await res.json()).toEqual({
+        jsonrpc: '2.0',
+        id: 1,
+        result: 'pong',
+      });
+    } finally {
+      await close();
+    }
+  });
+});
+
 describe('A2AServer lifecycle', () => {
   let server: A2AServer | undefined;
 
