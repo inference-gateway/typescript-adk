@@ -108,6 +108,34 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Fields whose object values are caller-owned maps, so their keys must survive verbatim. */
+const OPAQUE_PARAM_FIELDS = new Set(['metadata', 'data', 'header', 'params']);
+
+/**
+ * Accept the proto field names the A2A JSON binding allows alongside their
+ * lowerCamelCase form (spec 1.4) by rewriting request param keys to
+ * lowerCamelCase. Mirrors rust-adk's `camelize_keys` and the Go ADK's
+ * `normalizeParams`.
+ */
+export function normalizeParams(params: unknown): unknown {
+  if (Array.isArray(params)) {
+    return params.map(normalizeParams);
+  }
+  if (!isPlainObject(params)) {
+    return params;
+  }
+  return Object.fromEntries(
+    Object.entries(params).map(([key, value]) => [
+      toLowerCamelCase(key),
+      OPAQUE_PARAM_FIELDS.has(key) ? value : normalizeParams(value),
+    ])
+  );
+}
+
+function toLowerCamelCase(key: string): string {
+  return key.replace(/_([^_])/g, (_match, next: string) => next.toUpperCase());
+}
+
 function extractId(reqObj: Record<string, unknown>): {
   hasId: boolean;
   id: JSONRPCId;
@@ -180,7 +208,10 @@ async function dispatchSingle(
   }
 
   try {
-    const result = await handler(paramsRaw, { signal, requestId: responseId });
+    const result = await handler(normalizeParams(paramsRaw), {
+      signal,
+      requestId: responseId,
+    });
     if (isNotification) {
       return null;
     }

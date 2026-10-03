@@ -36,6 +36,7 @@ import {
   JSONRPCError,
   createErrorResponse,
   dispatch,
+  normalizeParams,
   type JSONRPCId,
   type JSONRPCResponse,
 } from './jsonrpc.js';
@@ -440,7 +441,8 @@ export class A2AServer {
       return null;
     }
     const id = extractStreamingId(reqObj);
-    const params = 'params' in reqObj ? reqObj['params'] : undefined;
+    const params =
+      'params' in reqObj ? normalizeParams(reqObj['params']) : undefined;
     try {
       const { readable } = handler(params, { signal, requestId: id });
       return new Response(readable, {
