@@ -299,6 +299,57 @@ describe('dispatch method routing', () => {
   });
 });
 
+describe('dispatch param names', () => {
+  it.each([
+    [
+      'proto names',
+      { page_size: 10, context_id: 'c1' },
+      { pageSize: 10, contextId: 'c1' },
+    ],
+    ['camelCase names', { pageSize: 10 }, { pageSize: 10 }],
+    ['unknown params', { surprise: true }, { surprise: true }],
+    [
+      'nested objects',
+      { message: { message_id: 'm1', task_id: 't1' } },
+      { message: { messageId: 'm1', taskId: 't1' } },
+    ],
+    [
+      'arrays of objects',
+      { message: { parts: [{ media_type: 'text/plain' }] } },
+      { message: { parts: [{ mediaType: 'text/plain' }] } },
+    ],
+    [
+      'caller-owned maps',
+      {
+        metadata: { my_key: 1 },
+        message: { parts: [{ data: { raw_key: true } }] },
+        authentication: { params: { api_key: 'k' } },
+      },
+      {
+        metadata: { my_key: 1 },
+        message: { parts: [{ data: { raw_key: true } }] },
+        authentication: { params: { api_key: 'k' } },
+      },
+    ],
+  ])('normalizes %s to lowerCamelCase', async (_name, params, expected) => {
+    const registry = makeRegistry((r) =>
+      r.register('echoParams', (received) => received)
+    );
+    const body = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'echoParams',
+      params,
+    });
+    const out = (await dispatch(
+      body,
+      registry,
+      neverAbort()
+    )) as JSONRPCResponse;
+    expect(out).toEqual({ jsonrpc: JSONRPC_VERSION, id: 1, result: expected });
+  });
+});
+
 describe('dispatch notification handling', () => {
   it('does not respond to a valid notification', async () => {
     let called = false;
