@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { TASK_STATE } from '../../src/agent/task.js';
+import {
+  TASK_STATE,
+  createTask,
+  transitionTask,
+  type ManagedTask,
+} from '../../src/agent/task.js';
 import {
   A2AServer,
   JSONRPC_ERROR_CODES,
@@ -67,7 +72,7 @@ async function postJSON(baseUrl: string, body: unknown): Promise<Response> {
 }
 
 describe('createMessageSendHandler', () => {
-  it('creates a PENDING task, enqueues it, and returns the wire-format Task', () => {
+  it('creates a PENDING task, enqueues it, and returns the wire-format Task', async () => {
     const storage = new InMemoryTaskStorage();
     const handler = createMessageSendHandler({
       storage,
@@ -75,12 +80,13 @@ describe('createMessageSendHandler', () => {
       now: fixedNow('2026-05-26T12:00:00.000Z'),
     });
 
-    const { task: result } = handler(
+    const { task: result } = (await handler(
       {
+        configuration: { returnImmediately: true },
         message: makeMessage({ contextId: 'ctx-existing', messageId: 'm-1' }),
       },
       { signal: new AbortController().signal }
-    ) as { task: Task };
+    )) as { task: Task };
 
     expect(result.id).toBe('id-1');
     expect(result.contextId).toBe('ctx-existing');
@@ -104,23 +110,26 @@ describe('createMessageSendHandler', () => {
     expect(stored?.contextId).toBe('ctx-existing');
   });
 
-  it('reuses the provided contextId when present on the inbound message', () => {
+  it('reuses the provided contextId when present on the inbound message', async () => {
     const storage = new InMemoryTaskStorage();
     const handler = createMessageSendHandler({
       storage,
       idGenerator: sequentialIdGenerator(),
     });
 
-    const { task: result } = handler(
-      { message: makeMessage({ contextId: 'ctx-from-client' }) },
+    const { task: result } = (await handler(
+      {
+        configuration: { returnImmediately: true },
+        message: makeMessage({ contextId: 'ctx-from-client' }),
+      },
       { signal: new AbortController().signal }
-    ) as { task: Task };
+    )) as { task: Task };
 
     expect(result.contextId).toBe('ctx-from-client');
     expect(result.id).toBe('id-1');
   });
 
-  it('mints a fresh contextId when the inbound message omits one', () => {
+  it('mints a fresh contextId when the inbound message omits one', async () => {
     const storage = new InMemoryTaskStorage();
     const ids = ['task-uuid', 'ctx-uuid'];
     const handler = createMessageSendHandler({
@@ -134,17 +143,17 @@ describe('createMessageSendHandler', () => {
       },
     });
 
-    const { task: result } = handler(
-      { message: makeMessage() },
+    const { task: result } = (await handler(
+      { configuration: { returnImmediately: true }, message: makeMessage() },
       { signal: new AbortController().signal }
-    ) as { task: Task };
+    )) as { task: Task };
 
     expect(result.id).toBe('task-uuid');
     expect(result.contextId).toBe('ctx-uuid');
     expect(result.history?.[0]?.contextId).toBe('ctx-uuid');
   });
 
-  it('mints a messageId when the inbound message omits one', () => {
+  it('mints a messageId when the inbound message omits one', async () => {
     const storage = new InMemoryTaskStorage();
     const ids = ['task-uuid', 'msg-uuid'];
     const handler = createMessageSendHandler({
@@ -160,42 +169,46 @@ describe('createMessageSendHandler', () => {
 
     const message = makeMessage({ contextId: 'ctx-keep' });
     const looseMessage = { ...message, messageId: '' };
-    const { task: result } = handler(
-      { message: looseMessage as unknown as Message },
+    const { task: result } = (await handler(
+      {
+        configuration: { returnImmediately: true },
+        message: looseMessage as unknown as Message,
+      },
       { signal: new AbortController().signal }
-    ) as { task: Task };
+    )) as { task: Task };
 
     expect(result.history?.[0]?.messageId).toBe('msg-uuid');
   });
 
-  it('preserves a non-empty inbound messageId verbatim', () => {
+  it('preserves a non-empty inbound messageId verbatim', async () => {
     const storage = new InMemoryTaskStorage();
     const handler = createMessageSendHandler({
       storage,
       idGenerator: sequentialIdGenerator(),
     });
 
-    const { task: result } = handler(
+    const { task: result } = (await handler(
       {
+        configuration: { returnImmediately: true },
         message: makeMessage({
           messageId: 'client-msg-id',
           contextId: 'ctx-1',
         }),
       },
       { signal: new AbortController().signal }
-    ) as { task: Task };
+    )) as { task: Task };
 
     expect(result.history?.[0]?.messageId).toBe('client-msg-id');
   });
 
-  it('uses crypto.randomUUID by default when no idGenerator is supplied', () => {
+  it('uses crypto.randomUUID by default when no idGenerator is supplied', async () => {
     const storage = new InMemoryTaskStorage();
     const handler = createMessageSendHandler({ storage });
 
-    const { task: result } = handler(
-      { message: makeMessage() },
+    const { task: result } = (await handler(
+      { configuration: { returnImmediately: true }, message: makeMessage() },
       { signal: new AbortController().signal }
-    ) as { task: Task };
+    )) as { task: Task };
 
     // UUID v4 format
     const uuidRegex =
@@ -212,10 +225,10 @@ describe('createMessageSendHandler', () => {
     });
     const ctx = { signal: new AbortController().signal };
 
-    it('throws -32602 when params is null', () => {
-      expect(() => handler(null as unknown, ctx)).toThrow(JSONRPCError);
+    it('throws -32602 when params is null', async () => {
+      await expect(handler(null as unknown, ctx)).rejects.toThrow(JSONRPCError);
       try {
-        handler(null as unknown, ctx);
+        await handler(null as unknown, ctx);
       } catch (err) {
         expect((err as JSONRPCError).code).toBe(
           JSONRPC_ERROR_CODES.INVALID_PARAMS
@@ -223,9 +236,9 @@ describe('createMessageSendHandler', () => {
       }
     });
 
-    it('throws -32602 when params is an array', () => {
+    it('throws -32602 when params is an array', async () => {
       try {
-        handler([] as unknown, ctx);
+        await handler([] as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
@@ -236,9 +249,9 @@ describe('createMessageSendHandler', () => {
       throw new Error('expected JSONRPCError to be thrown');
     });
 
-    it('throws -32602 when params.message is missing', () => {
+    it('throws -32602 when params.message is missing', async () => {
       try {
-        handler({} as unknown, ctx);
+        await handler({} as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
@@ -250,9 +263,9 @@ describe('createMessageSendHandler', () => {
       throw new Error('expected JSONRPCError to be thrown');
     });
 
-    it('throws -32602 when params.message is not an object', () => {
+    it('throws -32602 when params.message is not an object', async () => {
       try {
-        handler({ message: 'string' } as unknown, ctx);
+        await handler({ message: 'string' } as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
@@ -263,9 +276,9 @@ describe('createMessageSendHandler', () => {
       throw new Error('expected JSONRPCError to be thrown');
     });
 
-    it('throws -32602 when message.parts is missing', () => {
+    it('throws -32602 when message.parts is missing', async () => {
       try {
-        handler(
+        await handler(
           { message: { messageId: 'm', role: 'ROLE_USER' } } as unknown,
           ctx
         );
@@ -280,9 +293,9 @@ describe('createMessageSendHandler', () => {
       throw new Error('expected JSONRPCError to be thrown');
     });
 
-    it('throws -32602 when message.parts is an empty array', () => {
+    it('throws -32602 when message.parts is an empty array', async () => {
       try {
-        handler(
+        await handler(
           {
             message: { messageId: 'm', role: 'ROLE_USER', parts: [] },
           } as unknown,
@@ -298,9 +311,9 @@ describe('createMessageSendHandler', () => {
       throw new Error('expected JSONRPCError to be thrown');
     });
 
-    it('throws -32602 when message.parts is not an array', () => {
+    it('throws -32602 when message.parts is not an array', async () => {
       try {
-        handler(
+        await handler(
           {
             message: { messageId: 'm', role: 'ROLE_USER', parts: 'oops' },
           } as unknown,
@@ -316,9 +329,9 @@ describe('createMessageSendHandler', () => {
       throw new Error('expected JSONRPCError to be thrown');
     });
 
-    it('throws -32001 when message.taskId names an unknown task', () => {
+    it('throws -32001 when message.taskId names an unknown task', async () => {
       try {
-        handler({ message: makeMessage({ taskId: 'missing' }) }, ctx);
+        await handler({ message: makeMessage({ taskId: 'missing' }) }, ctx);
       } catch (err) {
         expect((err as JSONRPCError).code).toBe(
           JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR
@@ -328,14 +341,14 @@ describe('createMessageSendHandler', () => {
       throw new Error('expected JSONRPCError to be thrown');
     });
 
-    it('does not enqueue a task when validation fails', () => {
+    it('does not enqueue a task when validation fails', async () => {
       const localStorage = new InMemoryTaskStorage();
       const localHandler = createMessageSendHandler({
         storage: localStorage,
         idGenerator: sequentialIdGenerator(),
       });
       try {
-        localHandler({} as unknown, ctx);
+        await localHandler({} as unknown, ctx);
       } catch {
         // expected
       }
@@ -374,6 +387,7 @@ describe('SendMessage JSON-RPC conformance', () => {
       id: 1,
       method: MESSAGE_SEND_METHOD,
       params: {
+        configuration: { returnImmediately: true },
         message: {
           messageId: 'client-msg',
           role: 'ROLE_USER',
@@ -452,6 +466,7 @@ describe('SendMessage JSON-RPC conformance', () => {
       id: 3,
       method: MESSAGE_SEND_METHOD,
       params: {
+        configuration: { returnImmediately: true },
         message: { messageId: 'm', role: 'ROLE_USER' },
       },
     });
@@ -511,6 +526,7 @@ describe('SendMessage JSON-RPC conformance', () => {
       id: 'req-5',
       method: MESSAGE_SEND_METHOD,
       params: {
+        configuration: { returnImmediately: true },
         message: {
           messageId: 'm',
           role: 'ROLE_USER',
@@ -524,4 +540,134 @@ describe('SendMessage JSON-RPC conformance', () => {
     expect(body.result.task.id).toBe('task-id-x');
     expect(body.result.task.contextId).toBe('ctx-id-y');
   });
+});
+
+describe('createMessageSendHandler task lifecycle', () => {
+  const ctx = { signal: new AbortController().signal };
+
+  function seedTask(
+    storage: InMemoryTaskStorage,
+    state: typeof TASK_STATE.INPUT_REQUIRED | typeof TASK_STATE.COMPLETED
+  ): ManagedTask {
+    const created = createTask({
+      id: 'task-1',
+      contextId: 'ctx-1',
+      messages: [makeMessage()],
+    });
+    storage.createActive(created);
+    const task = transitionTask(
+      transitionTask(created, TASK_STATE.IN_PROGRESS),
+      state
+    );
+    if (state === TASK_STATE.COMPLETED) {
+      storage.storeDeadLetter(task);
+    } else {
+      storage.updateActive(task);
+    }
+    return task;
+  }
+
+  it('waits until a worker settles the task', async () => {
+    const storage = new InMemoryTaskStorage();
+    const handler = createMessageSendHandler({ storage });
+
+    const pending = handler({ message: makeMessage() }, ctx);
+    const queued = await storage.dequeue();
+    storage.storeDeadLetter(
+      transitionTask(
+        transitionTask(queued, TASK_STATE.IN_PROGRESS),
+        TASK_STATE.COMPLETED
+      )
+    );
+
+    const { task } = (await pending) as { task: Task };
+    expect(task.status.state).toBe(TASK_STATE.COMPLETED);
+  });
+
+  it('replies with the responder message and creates no task', async () => {
+    const storage = new InMemoryTaskStorage();
+    const reply: Message = {
+      messageId: 'reply-1',
+      role: 'ROLE_AGENT',
+      parts: [{ text: 'direct' }],
+    };
+    const handler = createMessageSendHandler({
+      storage,
+      respondToMessage: () => reply,
+    });
+
+    expect(await handler({ message: makeMessage() }, ctx)).toEqual({
+      message: reply,
+    });
+    expect(storage.getStats().totalTasks).toBe(0);
+  });
+
+  it('registers a push notification config sent inline', async () => {
+    const storage = new InMemoryTaskStorage();
+    const handler = createMessageSendHandler({ storage });
+
+    const { task } = (await handler(
+      {
+        configuration: {
+          returnImmediately: true,
+          taskPushNotificationConfig: { url: 'https://example.com/hook' },
+        },
+        message: makeMessage(),
+      },
+      ctx
+    )) as { task: Task };
+
+    expect(storage.listPushConfigs(task.id)).toEqual([
+      expect.objectContaining({
+        url: 'https://example.com/hook',
+        taskId: task.id,
+      }),
+    ]);
+  });
+
+  it('resumes the paused task named by taskId', async () => {
+    const storage = new InMemoryTaskStorage();
+    seedTask(storage, TASK_STATE.INPUT_REQUIRED);
+    const handler = createMessageSendHandler({ storage });
+
+    const { task } = (await handler(
+      {
+        configuration: { returnImmediately: true },
+        message: makeMessage({ messageId: 'm-2', taskId: 'task-1' }),
+      },
+      ctx
+    )) as { task: Task };
+
+    expect(task.id).toBe('task-1');
+    expect(task.status.state).toBe(TASK_STATE.IN_PROGRESS);
+  });
+
+  it.each([
+    [
+      'a terminal task',
+      TASK_STATE.COMPLETED,
+      {},
+      JSONRPC_ERROR_CODES.UNSUPPORTED_OPERATION_ERROR,
+    ],
+    [
+      'a different contextId',
+      TASK_STATE.INPUT_REQUIRED,
+      { contextId: 'ctx-other' },
+      JSONRPC_ERROR_CODES.INVALID_PARAMS,
+    ],
+  ] as const)(
+    'rejects a message referencing %s',
+    async (_case, state, overrides, code) => {
+      const storage = new InMemoryTaskStorage();
+      seedTask(storage, state);
+      const handler = createMessageSendHandler({ storage });
+
+      await expect(
+        handler(
+          { message: makeMessage({ taskId: 'task-1', ...overrides }) },
+          ctx
+        )
+      ).rejects.toMatchObject({ code });
+    }
+  );
 });

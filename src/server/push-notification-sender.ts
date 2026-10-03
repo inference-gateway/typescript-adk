@@ -1,9 +1,9 @@
 import pkg from '../../package.json' with { type: 'json' };
 import type {
   AuthenticationInfo,
+  StreamResponse,
   TaskPushNotificationConfig,
   Task,
-  TaskState,
 } from '../types/generated/a2a.js';
 import type { Logger } from './server-builder.js';
 
@@ -55,23 +55,6 @@ export const DEFAULT_PUSH_NOTIFICATION_RETRY_CONFIG: PushNotificationRetryConfig
     initialDelayMs: 500,
     maxDelayMs: 30_000,
   });
-
-/**
- * Wire-format payload posted to each registered webhook URL on a task state
- * transition. Identical field set to the Go ADK's `TaskUpdateNotification`
- * (`adk/server/push_notification_sender.go`).
- *
- * `timestamp` is RFC 3339 (ISO 8601 with a `Z` suffix). The full `task`
- * snapshot is included so receivers do not need a separate `GetTask` to
- * reconstruct context.
- */
-export interface TaskUpdateNotification {
-  readonly type: 'task_update';
-  readonly taskId: string;
-  readonly state: TaskState;
-  readonly timestamp: string;
-  readonly task: Task;
-}
 
 export interface HTTPPushNotificationSenderConfig {
   /**
@@ -154,7 +137,7 @@ export type DeliveryResult =
  */
 export interface PushNotificationSender {
   /**
-   * Post a single `task_update` notification to `config.url`. Resolves on
+   * Post the task as an A2A `StreamResponse` (spec 4.3.3) to `config.url`. Resolves on
    * any 2xx response (after any configured retries) and rejects with a
    * {@link PushNotificationSendError} on permanent failure.
    */
@@ -195,7 +178,7 @@ export class PushNotificationSendError extends Error {
 /**
  * HTTP webhook implementation of {@link PushNotificationSender}.
  *
- * Posts JSON-encoded {@link TaskUpdateNotification} payloads to the URL on
+ * Posts the task as an A2A `StreamResponse` (spec 4.3.3) to the URL on
  * each {@link TaskPushNotificationConfig}, attaches `Authorization: Bearer <token>`
  * when `config.token` is set (and similar via `config.authentication`), and
  * retries transient HTTP failures with exponential backoff. Failed
@@ -235,7 +218,7 @@ export class HTTPPushNotificationSender implements PushNotificationSender {
   }
 
   /**
-   * Post a single `task_update` notification to `config.url`. Returns when
+   * Post the task as an A2A `StreamResponse` (spec 4.3.3) to `config.url`. Returns when
    * the webhook accepts the POST with a 2xx. Throws
    * {@link PushNotificationSendError} after exhausting retries on
    * transient failures, or immediately on a non-retryable failure (non-2xx
@@ -246,13 +229,7 @@ export class HTTPPushNotificationSender implements PushNotificationSender {
     task: Task,
     options: SendTaskUpdateOptions = {}
   ): Promise<void> {
-    const payload: TaskUpdateNotification = {
-      type: 'task_update',
-      taskId: task.id,
-      state: task.status.state,
-      timestamp: new Date().toISOString(),
-      task,
-    };
+    const payload: StreamResponse = { task };
     const body = JSON.stringify(payload);
     const headers = this.buildHeaders(config);
     const maxRetries = this.retryConfig?.maxRetries ?? 0;
@@ -435,7 +412,7 @@ export class HTTPPushNotificationSender implements PushNotificationSender {
     config: TaskPushNotificationConfig
   ): Record<string, string> {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/a2a+json',
       Accept: 'application/json',
       'User-Agent': this.userAgent,
     };

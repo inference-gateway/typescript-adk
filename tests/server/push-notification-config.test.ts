@@ -302,19 +302,11 @@ describe('createTaskPushNotificationConfigDeleteHandler', () => {
     expect(storage.getPushConfig('task-1', 'cfg-1')).toBeUndefined();
   });
 
-  it('throws -32602 with "not found" message for an unknown config', () => {
+  it('returns null for an unknown config, keeping delete idempotent', () => {
     const storage = new InMemoryTaskStorage();
     const handler = createTaskPushNotificationConfigDeleteHandler({ storage });
 
-    try {
-      handler({ taskId: 'task-1', id: 'cfg-1' }, ctx);
-    } catch (err) {
-      expect((err as JSONRPCError).message).toBe(
-        'push notification config not found'
-      );
-      return;
-    }
-    throw new Error('expected JSONRPCError to be thrown');
+    expect(handler({ taskId: 'task-1', id: 'cfg-1' }, ctx)).toBeNull();
   });
 });
 
@@ -434,7 +426,7 @@ describe('push notification config JSON-RPC conformance', () => {
     expect(body.error.message).toBe('push notification config not found');
   });
 
-  it('returns -32602 not-found for delete on an unknown config', async () => {
+  it('returns a null result for delete on an unknown config', async () => {
     const storage = new InMemoryTaskStorage();
     const server = createA2AServer({ card: makeCard(true) });
     server.registerMethod(
@@ -450,10 +442,8 @@ describe('push notification config JSON-RPC conformance', () => {
       method: TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD,
       params: { taskId: 'task-1', id: 'missing' },
     });
-    const body = (await res.json()) as {
-      error: { code: number; message: string };
-    };
-    expect(body.error.code).toBe(JSONRPC_ERROR_CODES.INVALID_PARAMS);
-    expect(body.error.message).toBe('push notification config not found');
+    const body = (await res.json()) as { result: null; error?: unknown };
+    expect(body.error).toBeUndefined();
+    expect(body.result).toBeNull();
   });
 });

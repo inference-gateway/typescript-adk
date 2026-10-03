@@ -37,7 +37,10 @@ export {
   MESSAGE_SEND_METHOD,
   createMessageSendHandler,
 } from './message-send.js';
-export type { MessageSendHandlerOptions } from './message-send.js';
+export type {
+  MessageResponder,
+  MessageSendHandlerOptions,
+} from './message-send.js';
 export {
   DEFAULT_STREAMING_STATUS_UPDATE_INTERVAL_MS,
   MESSAGE_STREAM_METHOD,
@@ -81,7 +84,6 @@ export type {
   PushNotificationRetryConfig,
   PushNotificationSender,
   SendTaskUpdateOptions,
-  TaskUpdateNotification,
 } from './push-notification-sender.js';
 export { TASK_CANCEL_METHOD, createTaskCancelHandler } from './task-cancel.js';
 export type { TaskCancelHandlerOptions } from './task-cancel.js';

@@ -1,0 +1,19 @@
+{
+  "name": "@inference-gateway/adk-example-tck-sut",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A2A TCK system under test for @inference-gateway/adk - implements the TCK scenarios so CI can run the TCK against the TypeScript ADK.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@inference-gateway/adk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^7.0.2"
+  }
+}

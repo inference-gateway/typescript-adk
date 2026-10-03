@@ -10,9 +10,9 @@ import {
   PushNotificationSendError,
   type DeliveryResult,
   type PushNotificationFetchLike,
-  type TaskUpdateNotification,
 } from '../../src/server/index.js';
 import type {
+  StreamResponse,
   TaskPushNotificationConfig,
   Task,
 } from '../../src/types/generated/a2a.js';
@@ -124,7 +124,7 @@ const fastRetry = {
 };
 
 describe('HTTPPushNotificationSender.sendTaskUpdate', () => {
-  it('POSTs the task_update payload to the webhook URL', async () => {
+  it('POSTs the task as a StreamResponse to the webhook URL', async () => {
     const { fetch, calls } = fakeFetch({ status: 200 });
     const sender = new HTTPPushNotificationSender({ fetch, ...noRetry });
     const config: TaskPushNotificationConfig = {
@@ -140,17 +140,13 @@ describe('HTTPPushNotificationSender.sendTaskUpdate', () => {
     expect(call.init.method).toBe('POST');
 
     const headers = call.init.headers as Record<string, string>;
-    expect(headers['Content-Type']).toBe('application/json');
+    expect(headers['Content-Type']).toBe('application/a2a+json');
     expect(headers['Accept']).toBe('application/json');
     expect(headers['User-Agent']).toMatch(/@inference-gateway\/adk\//);
     expect(headers['Authorization']).toBeUndefined();
 
-    const body = JSON.parse(call.init.body as string) as TaskUpdateNotification;
-    expect(body.type).toBe('task_update');
-    expect(body.taskId).toBe('task-123');
-    expect(body.state).toBe('TASK_STATE_COMPLETED');
-    expect(body.task).toEqual(task);
-    expect(Date.parse(body.timestamp)).not.toBeNaN();
+    const body = JSON.parse(call.init.body as string) as StreamResponse;
+    expect(body).toEqual({ task });
   });
 
   it('attaches Authorization: Bearer header when config.token is set', async () => {
@@ -543,10 +539,9 @@ describe('HTTPPushNotificationSender against a real localhost webhook', () => {
     );
     expect(invocations).toBe(1);
     expect(receivedAuth).toBe('Bearer secret');
-    expect(receivedContentType).toContain('application/json');
-    const parsed = JSON.parse(receivedBody) as TaskUpdateNotification;
-    expect(parsed.type).toBe('task_update');
-    expect(parsed.state).toBe('TASK_STATE_WORKING');
+    expect(receivedContentType).toContain('application/a2a+json');
+    const parsed = JSON.parse(receivedBody) as StreamResponse;
+    expect(parsed.task?.status.state).toBe('TASK_STATE_WORKING');
   });
 
   it('retries against a flaky localhost server', async () => {
