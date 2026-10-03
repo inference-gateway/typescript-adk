@@ -4,6 +4,7 @@ import type {
   SecurityScheme,
 } from '../types/generated/a2a.js';
 import type { AuthConfig } from './config.js';
+import { oidcDiscoveryUrl } from './oidc.js';
 
 /**
  * Default key under which {@link decorateAgentCardWithAuth} registers the
@@ -41,7 +42,7 @@ export function decorateAgentCardWithAuth(
     return card;
   }
   const schemeName = options.schemeName ?? DEFAULT_OIDC_SECURITY_SCHEME_NAME;
-  const discoveryUrl = `${stripTrailingSlash(config.issuerUrl)}/.well-known/openid-configuration`;
+  const discoveryUrl = oidcDiscoveryUrl(config.issuerUrl);
 
   const existingSchemes = card.securitySchemes ?? {};
   if (existingSchemes[schemeName] !== undefined) {
@@ -74,8 +75,4 @@ export function decorateAgentCardWithAuth(
     securitySchemes: updatedSchemes,
     securityRequirements: updatedSecurity,
   };
-}
-
-function stripTrailingSlash(url: string): string {
-  return url.endsWith('/') ? url.slice(0, -1) : url;
 }
