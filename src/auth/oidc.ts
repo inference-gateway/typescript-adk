@@ -57,23 +57,28 @@ export class TokenVerificationError extends Error {
   }
 }
 
-/** Trimmed trailing slash; ensures discovery URL composition is stable. */
-function stripTrailingSlash(url: string): string {
-  return url.endsWith('/') ? url.slice(0, -1) : url;
+/**
+ * Compose the OIDC discovery URL for an issuer.
+ *
+ * Per RFC 8414 / OpenID Connect Discovery 1.0, the document lives at
+ * `<issuer>/.well-known/openid-configuration`. This is the single definition
+ * of that rule: the agent card advertises this URL to clients and the
+ * authenticator fetches the same document, so the two must always agree.
+ */
+export function oidcDiscoveryUrl(issuerUrl: string): string {
+  const issuer = issuerUrl.endsWith('/') ? issuerUrl.slice(0, -1) : issuerUrl;
+  return `${issuer}/.well-known/openid-configuration`;
 }
 
 /**
  * Fetch the OIDC provider metadata from the well-known discovery endpoint.
- *
- * Per RFC 8414 / OpenID Connect Discovery 1.0, the document lives at
- * `<issuer>/.well-known/openid-configuration`.
  */
 export async function fetchOIDCProviderMetadata(
   issuerUrl: string,
   options: { fetch?: typeof fetch; signal?: AbortSignal } = {}
 ): Promise<OIDCProviderMetadata> {
   const fetchImpl = options.fetch ?? fetch;
-  const discoveryUrl = `${stripTrailingSlash(issuerUrl)}/.well-known/openid-configuration`;
+  const discoveryUrl = oidcDiscoveryUrl(issuerUrl);
 
   let res: Response;
   try {
