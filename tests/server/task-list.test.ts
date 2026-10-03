@@ -643,7 +643,7 @@ describe('ListTasks JSON-RPC conformance', () => {
     expect(body.error.code).toBe(JSONRPC_ERROR_CODES.INVALID_PARAMS);
   });
 
-  it('returns -32602 when limit is invalid', async () => {
+  it('returns -32602 when pageSize is negative', async () => {
     const storage = new InMemoryTaskStorage();
     const server = createA2AServer({ card: makeCard() });
     server.registerMethod(TASK_LIST_METHOD, createTaskListHandler({ storage }));
@@ -654,7 +654,7 @@ describe('ListTasks JSON-RPC conformance', () => {
       jsonrpc: '2.0',
       id: 5,
       method: TASK_LIST_METHOD,
-      params: { pageSize: 0 },
+      params: { pageSize: -1 },
     });
     const body = (await res.json()) as {
       error: { code: number; message: string };
