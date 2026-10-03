@@ -287,9 +287,11 @@ function assertReferencedTaskAcceptsMessage(
 export {
   appendAndResume,
   assertReferencedTaskAcceptsMessage,
+  enrichMessage,
   findResumableTask,
   pollTask,
   registerPushConfig,
+  validateMessageSendParams,
 };
 
 function validateMessageSendParams(params: unknown): SendMessageRequest {
