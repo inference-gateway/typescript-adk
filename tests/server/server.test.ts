@@ -3,6 +3,7 @@ import {
   A2AServer,
   AGENT_CARD_PATH,
   DEFAULT_AGENT_CARD_CACHE_CONTROL,
+  JSONRPC_ERROR_CODES,
   createA2AServer,
 } from '../../src/server/index.js';
 import type { AgentCard } from '../../src/types/generated/a2a.js';
@@ -153,6 +154,38 @@ describe('A2AServer agent card discovery', () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as AgentCard;
     expect(body).toEqual(card);
+  });
+});
+
+describe('A2AServer A2A-Version negotiation', () => {
+  it.each([
+    ['1.0', undefined],
+    ['', undefined],
+    [undefined, undefined],
+    ['0.3', JSONRPC_ERROR_CODES.VERSION_NOT_SUPPORTED_ERROR],
+    ['2.0', JSONRPC_ERROR_CODES.VERSION_NOT_SUPPORTED_ERROR],
+  ])('A2A-Version %j answers with error code %j', async (version, code) => {
+    const server = createA2AServer({ card: makeCard() });
+    server.registerMethod('Ping', () => 'pong');
+    const { baseUrl, close } = await startServer(server);
+    try {
+      const res = await fetch(`${baseUrl}/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(version !== undefined ? { 'A2A-Version': version } : {}),
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'Ping' }),
+      });
+      const body = (await res.json()) as {
+        id: number;
+        error?: { code: number };
+      };
+      expect(body.id).toBe(7);
+      expect(body.error?.code).toBe(code);
+    } finally {
+      await close();
+    }
   });
 });
 

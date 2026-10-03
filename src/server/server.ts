@@ -21,6 +21,7 @@ import {
   type TelemetryProvider,
 } from '../telemetry/index.js';
 import type { AgentCard } from '../types/generated/a2a.js';
+import { A2A_PROTOCOL_VERSION } from '../types/index.js';
 import {
   GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
   createGetAuthenticatedExtendedCardHandler,
@@ -289,6 +290,17 @@ export class A2AServer {
       const body = await c.req.text();
       const signal = c.req.raw.signal;
 
+      const version = c.req.header('A2A-Version');
+      if (!isSupportedA2AVersion(version)) {
+        return jsonResponse(
+          createErrorResponse(
+            peekRequestId(body),
+            JSONRPC_ERROR_CODES.VERSION_NOT_SUPPORTED_ERROR,
+            `a2a version ${version} is not supported`
+          )
+        );
+      }
+
       const streamingResponse = this.tryDispatchStreaming(body, signal);
       if (streamingResponse !== null) {
         return streamingResponse;
@@ -521,6 +533,27 @@ function extractStreamingId(reqObj: Record<string, unknown>): JSONRPCId {
     return raw;
   }
   return null;
+}
+
+// ponytail: a missing A2A-Version header is accepted so pre-1.0 clients keep
+// working, although spec 3.6 assumes 0.3 for it; reject it once they are gone.
+function isSupportedA2AVersion(version: string | undefined): boolean {
+  return (
+    version === undefined || version === '' || version === A2A_PROTOCOL_VERSION
+  );
+}
+
+function peekRequestId(rawBody: string): JSONRPCId {
+  try {
+    const parsed: unknown = JSON.parse(rawBody);
+    return parsed !== null &&
+      typeof parsed === 'object' &&
+      !Array.isArray(parsed)
+      ? extractStreamingId(parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function jsonResponse(body: JSONRPCResponse): Response {

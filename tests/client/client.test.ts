@@ -10,7 +10,12 @@ import {
   createA2AClient,
   type FetchLike,
 } from '../../src/client/index.js';
-import type { AgentCard, Message, Task } from '../../src/types/index.js';
+import {
+  A2A_PROTOCOL_VERSION,
+  type AgentCard,
+  type Message,
+  type Task,
+} from '../../src/types/index.js';
 
 interface CapturedRequest {
   readonly url: string;
@@ -197,6 +202,18 @@ describe('A2AClient.getAgentCard', () => {
     await client.getAgentCard();
     const headers = new Headers(calls[0]?.init.headers);
     expect(headers.get('user-agent')).toBe('test-ua/9.9');
+  });
+
+  it('sends the A2A-Version header', async () => {
+    const { fetch, calls } = mockFetch({ body: sampleAgentCard() });
+    const client = new A2AClient({
+      baseURL: 'http://agent.test',
+      fetch,
+      retry: false,
+    });
+    await client.getAgentCard();
+    const headers = new Headers(calls[0]?.init.headers);
+    expect(headers.get('a2a-version')).toBe(A2A_PROTOCOL_VERSION);
   });
 
   it('attaches static custom headers', async () => {

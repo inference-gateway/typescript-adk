@@ -9,6 +9,7 @@ import type {
   Struct,
   Task,
 } from '../types/generated/a2a.js';
+import { A2A_PROTOCOL_VERSION } from '../types/index.js';
 import {
   A2AAbortError,
   A2AClientError,
@@ -81,8 +82,9 @@ export interface A2AClientConfig {
    */
   readonly timeoutMs?: number;
   /**
-   * Static headers attached to every outbound request. `Content-Type` and
-   * `User-Agent` are set automatically and may be overridden via this map.
+   * Static headers attached to every outbound request. `Content-Type`,
+   * `User-Agent` and `A2A-Version` are set automatically and may be
+   * overridden via this map.
    */
   readonly headers?: Readonly<Record<string, string>>;
   /**
@@ -366,6 +368,7 @@ export class A2AClient {
   ): Promise<Response> {
     const headers = new Headers();
     headers.set('User-Agent', this.userAgent);
+    headers.set('A2A-Version', A2A_PROTOCOL_VERSION);
     for (const [k, v] of Object.entries(this.headers)) {
       headers.set(k, v);
     }
