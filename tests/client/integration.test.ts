@@ -82,6 +82,7 @@ describe('A2AClient ↔ A2AServer integration', () => {
 
     const client = new A2AClient({ baseURL, retry: false });
     const { task } = await client.sendMessage({
+      configuration: { returnImmediately: true },
       message: {
         messageId: 'm-1',
         role: 'ROLE_USER',
@@ -109,6 +110,7 @@ describe('A2AClient ↔ A2AServer integration', () => {
 
     const client = new A2AClient({ baseURL, retry: false });
     const { task: created } = await client.sendMessage({
+      configuration: { returnImmediately: true },
       message: {
         messageId: 'm-1',
         role: 'ROLE_USER',
@@ -136,6 +138,7 @@ describe('A2AClient ↔ A2AServer integration', () => {
 
     const client = new A2AClient({ baseURL, retry: false });
     const { task: created } = await client.sendMessage({
+      configuration: { returnImmediately: true },
       message: {
         messageId: 'm-only',
         role: 'ROLE_USER',

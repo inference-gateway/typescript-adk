@@ -38,8 +38,9 @@ import {
 } from './jsonrpc.js';
 import {
   appendAndResume,
-  assertReferencedTaskExists,
+  assertReferencedTaskAcceptsMessage,
   findResumableTask,
+  registerPushConfig,
 } from './message-send.js';
 import type { MethodContext } from './method-registry.js';
 import { SSEStreamWriter } from './sse.js';
@@ -323,37 +324,21 @@ export function createMessageStreamHandler(
 
   return (params: unknown, context: MethodContext): StreamingMethodResult => {
     const validated = validateMessageStreamParams(params);
-    assertReferencedTaskExists(storage, validated.message);
-    const inboundContextId =
-      typeof validated.message.contextId === 'string' &&
-      validated.message.contextId.length > 0
-        ? validated.message.contextId
-        : undefined;
+    assertReferencedTaskAcceptsMessage(storage, validated.message);
 
     let task: ManagedTask;
     let enrichedMessage: Message;
     let resumingExistingTask = false;
-    if (inboundContextId !== undefined) {
-      const paused = findResumableTask(storage, inboundContextId);
-      if (paused !== undefined) {
-        enrichedMessage = enrichMessage(
-          validated.message,
-          newId,
-          paused.contextId
-        );
-        task = appendAndResume(paused, enrichedMessage, clock);
-        storage.updateActive(task);
-        resumingExistingTask = true;
-      } else {
-        enrichedMessage = enrichMessage(validated.message, newId);
-        task = createTask({
-          id: newId(),
-          contextId: enrichedMessage.contextId as string,
-          messages: [enrichedMessage],
-          now: clock,
-        });
-        storage.enqueue(task);
-      }
+    const paused = findResumableTask(storage, validated.message);
+    if (paused !== undefined) {
+      enrichedMessage = enrichMessage(
+        validated.message,
+        newId,
+        paused.contextId
+      );
+      task = appendAndResume(paused, enrichedMessage, clock);
+      storage.updateActive(task);
+      resumingExistingTask = true;
     } else {
       enrichedMessage = enrichMessage(validated.message, newId);
       task = createTask({
@@ -365,6 +350,7 @@ export function createMessageStreamHandler(
       storage.enqueue(task);
     }
     const taskId = task.id;
+    registerPushConfig(storage, validated.configuration, taskId);
 
     const executorAbort = new AbortController();
     const onParentAbort = (): void => {
@@ -394,7 +380,9 @@ export function createMessageStreamHandler(
       let periodicTimer: ReturnType<typeof setInterval> | null = null;
       try {
         writer.send(
-          createSuccessResponse(requestId, { task: toWireTask(task) })
+          createSuccessResponse(requestId, {
+            task: toWireTask(task, validated.configuration?.historyLength),
+          })
         );
         if (!resumingExistingTask) {
           task = transitionAndPersist(task, TASK_STATE.IN_PROGRESS, storage, {

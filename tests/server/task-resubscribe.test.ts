@@ -7,7 +7,6 @@ import {
 } from '../../src/agent/task.js';
 import {
   A2AServer,
-  AGENT_EVENT_TYPE,
   JSONRPC_ERROR_CODES,
   JSONRPC_VERSION,
   JSONRPCError,
@@ -24,11 +23,7 @@ import {
 } from '../../src/server/index.js';
 import { InMemoryTaskStorage } from '../../src/storage/index.js';
 import type { AgentCard } from '../../src/types/generated/a2a.js';
-import type {
-  Message,
-  StreamResponse,
-  TaskStatusUpdateEvent,
-} from '../../src/types/index.js';
+import type { Message, StreamResponse } from '../../src/types/index.js';
 
 const decoder = new TextDecoder();
 
@@ -216,95 +211,60 @@ describe('createTaskResubscribeHandler', () => {
     });
   });
 
-  describe('terminal task replay', () => {
-    it('emits the COMPLETED task as the only frame and closes', async () => {
-      const storage = new InMemoryTaskStorage();
-      seedTaskInState(storage, 'task-1', TASK_STATE.COMPLETED);
-
-      const handler = createTaskResubscribeHandler({ storage });
-      const { readable, done } = handler(
-        { id: 'task-1' },
-        { signal: new AbortController().signal }
-      );
-
-      const frames = await collectFrames(readable);
-      await done;
-      expect(frames).toHaveLength(1);
-      expect(frames[0]?.json.result.task?.id).toBe('task-1');
-      expect(stateOf(frames[0])).toBe(TASK_STATE.COMPLETED);
-    });
-
-    for (const terminal of [TASK_STATE.FAILED, TASK_STATE.CANCELLED] as const) {
-      it(`emits the ${terminal} task and closes`, async () => {
+  describe('terminal task', () => {
+    it.each([TASK_STATE.COMPLETED, TASK_STATE.FAILED, TASK_STATE.CANCELLED])(
+      'throws JSONRPCError(-32004) for a %s task',
+      (terminal) => {
         const storage = new InMemoryTaskStorage();
         seedTaskInState(storage, 'task-1', terminal);
-
         const handler = createTaskResubscribeHandler({ storage });
+
+        expect(() =>
+          handler({ id: 'task-1' }, { signal: new AbortController().signal })
+        ).toThrow(
+          expect.objectContaining({
+            code: JSONRPC_ERROR_CODES.UNSUPPORTED_OPERATION_ERROR,
+          })
+        );
+      }
+    );
+  });
+
+  describe('non-terminal task without a live bus', () => {
+    it.each([
+      ['no event bus is registered', false],
+      ['the task bus has already closed', true],
+    ])(
+      'follows the task until it terminates when %s',
+      async (_case, closedBus) => {
+        const storage = new InMemoryTaskStorage();
+        const working = seedTaskInState(
+          storage,
+          'task-1',
+          TASK_STATE.IN_PROGRESS
+        );
+        const registry = new TaskEventBusRegistry();
+        if (closedBus) {
+          registry.getOrCreate('task-1').close();
+        }
+
+        const handler = createTaskResubscribeHandler({
+          storage,
+          eventBusRegistry: registry,
+        });
         const { readable, done } = handler(
           { id: 'task-1' },
           { signal: new AbortController().signal }
         );
+        storage.storeDeadLetter(transitionTask(working, TASK_STATE.COMPLETED));
 
         const frames = await collectFrames(readable);
         await done;
-        expect(frames).toHaveLength(1);
-        expect(kindOf(frames[0])).toBe('task');
-        expect(stateOf(frames[0])).toBe(terminal);
-      });
-    }
-  });
-
-  describe('non-terminal task replay (no live bus)', () => {
-    it('emits the task and closes when no event bus is registered', async () => {
-      const storage = new InMemoryTaskStorage();
-      seedTaskInState(storage, 'task-1', TASK_STATE.IN_PROGRESS);
-
-      const handler = createTaskResubscribeHandler({ storage });
-      const { readable, done } = handler(
-        { id: 'task-1' },
-        { signal: new AbortController().signal }
-      );
-
-      const frames = await collectFrames(readable);
-      await done;
-      expect(frames).toHaveLength(1);
-      expect(kindOf(frames[0])).toBe('task');
-      expect(stateOf(frames[0])).toBe(TASK_STATE.IN_PROGRESS);
-    });
-
-    it('emits the task and closes when the task bus has already closed', async () => {
-      const storage = new InMemoryTaskStorage();
-      seedTaskInState(storage, 'task-1', TASK_STATE.IN_PROGRESS);
-
-      const registry = new TaskEventBusRegistry();
-      const bus = registry.getOrCreate('task-1');
-      bus.publish({
-        specversion: '1.0',
-        id: 'evt-1',
-        source: 'test',
-        type: AGENT_EVENT_TYPE.TASK_STATUS_CHANGED,
-        data: {
-          taskId: 'task-1',
-          contextId: 'ctx-1',
-          status: { state: TASK_STATE.IN_PROGRESS },
-        } satisfies TaskStatusUpdateEvent,
-      });
-      bus.close();
-
-      const handler = createTaskResubscribeHandler({
-        storage,
-        eventBusRegistry: registry,
-      });
-      const { readable, done } = handler(
-        { id: 'task-1' },
-        { signal: new AbortController().signal }
-      );
-
-      const frames = await collectFrames(readable);
-      await done;
-      expect(frames).toHaveLength(1);
-      expect(kindOf(frames[0])).toBe('task');
-    });
+        expect(frames.map(kindOf)).toEqual(['task', 'statusUpdate']);
+        expect(stateOf(frames[0])).toBe(TASK_STATE.IN_PROGRESS);
+        expect(stateOf(frames[1])).toBe(TASK_STATE.COMPLETED);
+      }
+    );
   });
 });
 
@@ -587,19 +547,14 @@ describe('SubscribeToTask end-to-end via A2AServer', () => {
     expect(registry.has('task-1')).toBe(false);
   });
 
-  it('emits the task and closes when the task is already terminal', async () => {
+  it('returns a JSON-RPC -32004 error (no SSE stream) when the task is already terminal', async () => {
     const storage = new InMemoryTaskStorage();
-    const registry = new TaskEventBusRegistry();
     seedTaskInState(storage, 'task-done', TASK_STATE.COMPLETED);
 
     const server = createA2AServer({ card: makeCard() });
     server.registerStreamingMethod(
       TASK_RESUBSCRIBE_METHOD,
-      createTaskResubscribeHandler({
-        storage,
-        eventBusRegistry: registry,
-        heartbeatMs: 0,
-      })
+      createTaskResubscribeHandler({ storage })
     );
     close = () => server.close();
     const baseUrl = await start(server);
@@ -616,12 +571,11 @@ describe('SubscribeToTask end-to-end via A2AServer', () => {
     });
 
     expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toMatch(/^text\/event-stream/);
-
-    const frames = await readFrames(res);
-    expect(frames).toHaveLength(1);
-    expect(kindOf(frames[0])).toBe('task');
-    expect(stateOf(frames[0])).toBe(TASK_STATE.COMPLETED);
+    expect(res.headers.get('content-type')).toMatch(/application\/json/);
+    const body = (await res.json()) as { error: { code: number } };
+    expect(body.error.code).toBe(
+      JSONRPC_ERROR_CODES.UNSUPPORTED_OPERATION_ERROR
+    );
   });
 });
 

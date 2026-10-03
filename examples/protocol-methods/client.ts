@@ -247,7 +247,10 @@ try {
     role: 'ROLE_USER',
     parts: [{ text: PROMPT }],
   };
-  const { task } = await client.sendMessage({ message });
+  const { task } = await client.sendMessage({
+    message,
+    configuration: { returnImmediately: true },
+  });
   if (task === undefined) throw new Error('SendMessage returned no task');
   createdTask = task;
   assert(typeof createdTask.id === 'string', 'task.id is a string');
@@ -383,6 +386,7 @@ try {
   };
   const { task: cancelTask } = await client.sendMessage({
     message: cancelMessage,
+    configuration: { returnImmediately: true },
   });
   if (cancelTask === undefined) throw new Error('SendMessage returned no task');
   assert(

@@ -80,6 +80,24 @@ describe('A2AServer agent card discovery', () => {
     );
   });
 
+  it('sends ETag and Last-Modified and answers a matching If-None-Match with 304', async () => {
+    const server = createA2AServer({ card: makeCard() });
+    const { baseUrl, close: stop } = await startServer(server);
+    close = stop;
+
+    const first = await fetch(`${baseUrl}${AGENT_CARD_PATH}`);
+    await first.text();
+    const etag = first.headers.get('etag');
+    expect(etag).toBeTruthy();
+    expect(first.headers.get('last-modified')).toBeTruthy();
+
+    const revalidated = await fetch(`${baseUrl}${AGENT_CARD_PATH}`, {
+      headers: { 'If-None-Match': etag ?? '' },
+    });
+    await revalidated.text();
+    expect(revalidated.status).toBe(304);
+  });
+
   it('allows the Cache-Control header to be overridden via config', async () => {
     const override = 'public, max-age=300';
     const server = createA2AServer({

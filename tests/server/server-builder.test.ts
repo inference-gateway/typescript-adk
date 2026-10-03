@@ -314,6 +314,7 @@ describe('A2AServerBuilder.build success paths', () => {
         id: 'req-1',
         method: MESSAGE_SEND_METHOD,
         params: {
+          configuration: { returnImmediately: true },
           message: {
             messageId: 'm-1',
             role: 'ROLE_USER',

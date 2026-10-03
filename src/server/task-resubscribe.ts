@@ -1,8 +1,9 @@
-import { isTerminal, toWireTask } from '../agent/task.js';
+import { isTerminal, toWireTask, type ManagedTask } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
   A2AMethod,
   SubscribeToTaskRequest,
+  TaskStatusUpdateEvent,
 } from '../types/generated/a2a.js';
 import type { CloudEvent } from './cloudevents.js';
 import {
@@ -15,6 +16,7 @@ import {
   type StreamingMethodHandler,
   type StreamingMethodResult,
 } from './message-stream.js';
+import { pollTask } from './message-send.js';
 import type { MethodContext } from './method-registry.js';
 import { SSEStreamWriter } from './sse.js';
 import type { TaskEventBusRegistry } from './task-event-bus.js';
@@ -95,6 +97,12 @@ export function createTaskResubscribeHandler(
         'task not found'
       );
     }
+    if (isTerminal(task.state)) {
+      throw new JSONRPCError(
+        JSONRPC_ERROR_CODES.UNSUPPORTED_OPERATION_ERROR,
+        'cannot subscribe to a task in a terminal state'
+      );
+    }
 
     const requestId = context.requestId ?? null;
     const writer = new SSEStreamWriter({
@@ -112,7 +120,14 @@ export function createTaskResubscribeHandler(
         writer.send(
           createSuccessResponse(requestId, { task: toWireTask(task) })
         );
-        if (bus === undefined || bus.closed || isTerminal(task.state)) {
+        if (bus === undefined || bus.closed) {
+          await pollTask(storage, task, isTerminal, context.signal, (latest) =>
+            writer.send(
+              createSuccessResponse(requestId, {
+                statusUpdate: statusUpdateOf(latest),
+              })
+            )
+          );
           return;
         }
         await new Promise<void>((resolve) => {
@@ -140,6 +155,14 @@ export function createTaskResubscribeHandler(
     })();
 
     return { readable: writer.readable, done };
+  };
+}
+
+function statusUpdateOf(task: ManagedTask): TaskStatusUpdateEvent {
+  return {
+    taskId: task.id,
+    contextId: task.contextId,
+    status: toWireTask(task).status,
   };
 }
 

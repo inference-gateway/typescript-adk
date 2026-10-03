@@ -148,7 +148,7 @@ function assistantToolCalls(toolCalls: readonly ToolCall[]): CompletionResult {
 }
 
 describe('SendMessage resume flow (background)', () => {
-  it('resumes an INPUT_REQUIRED task when a new message arrives with the same contextId', () => {
+  it('resumes an INPUT_REQUIRED task when a new message arrives with the same contextId', async () => {
     const storage = new InMemoryTaskStorage();
 
     // Seed an existing paused task in storage.
@@ -181,8 +181,9 @@ describe('SendMessage resume flow (background)', () => {
       storage,
       idGenerator: sequentialIdGenerator(),
     });
-    const { task: result } = handler(
+    const { task: result } = (await handler(
       {
+        configuration: { returnImmediately: true },
         message: {
           messageId: 'm-3',
           role: 'ROLE_USER',
@@ -191,7 +192,7 @@ describe('SendMessage resume flow (background)', () => {
         },
       },
       { signal: new AbortController().signal }
-    ) as { task: Task };
+    )) as { task: Task };
 
     expect(result.id).toBe('task-1');
     expect(result.contextId).toBe('ctx-resume');
@@ -206,15 +207,16 @@ describe('SendMessage resume flow (background)', () => {
     expect(stored?.messages).toHaveLength(3);
   });
 
-  it('falls back to creating a fresh task when no paused task exists for the contextId', () => {
+  it('falls back to creating a fresh task when no paused task exists for the contextId', async () => {
     const storage = new InMemoryTaskStorage();
     const handler = createMessageSendHandler({
       storage,
       idGenerator: sequentialIdGenerator(),
     });
 
-    const { task: result } = handler(
+    const { task: result } = (await handler(
       {
+        configuration: { returnImmediately: true },
         message: {
           messageId: 'm-1',
           role: 'ROLE_USER',
@@ -223,14 +225,14 @@ describe('SendMessage resume flow (background)', () => {
         },
       },
       { signal: new AbortController().signal }
-    ) as { task: Task };
+    )) as { task: Task };
 
     expect(result.id).toBe('id-1');
     expect(result.contextId).toBe('ctx-fresh');
     expect(result.status.state).toBe(TASK_STATE.PENDING);
   });
 
-  it('ignores paused tasks on a different contextId', () => {
+  it('ignores paused tasks on a different contextId', async () => {
     const storage = new InMemoryTaskStorage();
     const other = createTask({ id: 'other', contextId: 'ctx-other' });
     const otherPaused = transitionTask(
@@ -243,8 +245,9 @@ describe('SendMessage resume flow (background)', () => {
       storage,
       idGenerator: sequentialIdGenerator(),
     });
-    const { task: result } = handler(
+    const { task: result } = (await handler(
       {
+        configuration: { returnImmediately: true },
         message: {
           messageId: 'm-x',
           role: 'ROLE_USER',
@@ -253,13 +256,13 @@ describe('SendMessage resume flow (background)', () => {
         },
       },
       { signal: new AbortController().signal }
-    ) as { task: Task };
+    )) as { task: Task };
 
     expect(result.id).toBe('id-1');
     expect(result.id).not.toBe('other');
   });
 
-  it('does not resume a COMPLETED task that happens to share the contextId', () => {
+  it('does not resume a COMPLETED task that happens to share the contextId', async () => {
     const storage = new InMemoryTaskStorage();
     const completed = transitionTask(
       transitionTask(
@@ -275,8 +278,9 @@ describe('SendMessage resume flow (background)', () => {
       storage,
       idGenerator: sequentialIdGenerator(),
     });
-    const { task: result } = handler(
+    const { task: result } = (await handler(
       {
+        configuration: { returnImmediately: true },
         message: {
           messageId: 'm-1',
           role: 'ROLE_USER',
@@ -285,7 +289,7 @@ describe('SendMessage resume flow (background)', () => {
         },
       },
       { signal: new AbortController().signal }
-    ) as { task: Task };
+    )) as { task: Task };
 
     expect(result.id).toBe('id-1');
     expect(result.status.state).toBe(TASK_STATE.PENDING);
@@ -405,6 +409,7 @@ describe('SendMessage JSON-RPC pause + resume', () => {
       id: 1,
       method: MESSAGE_SEND_METHOD,
       params: {
+        configuration: { returnImmediately: true },
         message: {
           messageId: 'u-1',
           role: 'ROLE_USER',
@@ -433,6 +438,7 @@ describe('SendMessage JSON-RPC pause + resume', () => {
       id: 2,
       method: MESSAGE_SEND_METHOD,
       params: {
+        configuration: { returnImmediately: true },
         message: {
           messageId: 'u-2',
           role: 'ROLE_USER',

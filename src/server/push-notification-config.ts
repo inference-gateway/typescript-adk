@@ -158,10 +158,9 @@ export function createTaskPushNotificationConfigListHandler(
  * Build a handler for the A2A `DeleteTaskPushNotificationConfig` JSON-RPC
  * method.
  *
- * Removes the config at `(taskId, pushNotificationConfigId)`. Returns `null`
- * on success (the A2A schema returns `Empty`/`null` for delete). Surfaces
- * `-32602` when no config exists under that key so callers can distinguish a
- * stale id from a successful no-op (matches `CancelTask` style).
+ * Removes the config at `(taskId, pushNotificationConfigId)` and returns
+ * `null` (the A2A schema returns `Empty`/`null` for delete). Deleting a config
+ * that is already gone also succeeds, keeping delete idempotent (spec 3.1.10).
  */
 export function createTaskPushNotificationConfigDeleteHandler(
   options: TaskPushNotificationConfigHandlerOptions
@@ -170,13 +169,7 @@ export function createTaskPushNotificationConfigDeleteHandler(
 
   return (params: unknown): null => {
     const validated = validateDeleteParams(params);
-    const removed = storage.deletePushConfig(validated.taskId, validated.id);
-    if (!removed) {
-      throw new JSONRPCError(
-        JSONRPC_ERROR_CODES.INVALID_PARAMS,
-        'push notification config not found'
-      );
-    }
+    storage.deletePushConfig(validated.taskId, validated.id);
     return null;
   };
 }

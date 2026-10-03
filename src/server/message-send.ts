@@ -1,19 +1,23 @@
 import {
   TASK_STATE,
   createTask,
+  isPaused,
+  isTerminal,
   transitionTask,
   toWireTask,
   type ManagedTask,
+  type ManagedTaskState,
 } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
   A2AMethod,
   Message,
+  SendMessageConfiguration,
   SendMessageRequest,
   SendMessageResponse,
 } from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
-import type { MethodHandler } from './method-registry.js';
+import type { MethodContext, MethodHandler } from './method-registry.js';
 
 /**
  * Canonical JSON-RPC method name for the A2A `SendMessage` operation.
@@ -22,6 +26,18 @@ import type { MethodHandler } from './method-registry.js';
  * spelling stays in lockstep with conformance tests and other consumers.
  */
 export const MESSAGE_SEND_METHOD = 'SendMessage' satisfies A2AMethod;
+
+const TASK_POLL_INTERVAL_MS = 50;
+
+/**
+ * Answers a message directly. Returning a message makes `SendMessage` reply
+ * with it and create no task; returning `undefined` continues with the task
+ * flow.
+ */
+export type MessageResponder = (
+  message: Message,
+  signal: AbortSignal
+) => Promise<Message | undefined> | Message | undefined;
 
 export interface MessageSendHandlerOptions {
   /** Storage backend used to persist and enqueue the created task. */
@@ -35,15 +51,18 @@ export interface MessageSendHandlerOptions {
   readonly idGenerator?: () => string;
   /** Clock injection point; defaults to `() => new Date()`. */
   readonly now?: () => Date;
+  /** Optional direct-reply hook; see {@link MessageResponder}. */
+  readonly respondToMessage?: MessageResponder;
 }
 
 /**
  * Build a handler for the A2A `SendMessage` JSON-RPC method.
  *
- * The handler is synchronous from the caller's perspective: it creates a
- * `PENDING` task, persists and enqueues it, then returns it as a
- * `SendMessageResponse` (`{ task }`, spec 9.4.1) without waiting for any
- * background worker to pick it up.
+ * The handler creates a `PENDING` task (or resumes the paused task the
+ * message continues), persists and enqueues it, then waits until a worker
+ * moves it to a terminal or interrupted state before returning it as a
+ * `SendMessageResponse` (`{ task }`, spec 3.2.2). With
+ * `configuration.returnImmediately` it returns the enqueued task right away.
  *
  * Validation failures surface as JSON-RPC `-32602` (Invalid Params) via
  * {@link JSONRPCError} so the dispatcher emits a structured error envelope.
@@ -58,67 +77,155 @@ export function createMessageSendHandler(
   const newId = options.idGenerator ?? (() => crypto.randomUUID());
   const clock = options.now ?? defaultNow;
 
-  return (params: unknown): SendMessageResponse => {
+  return async (
+    params: unknown,
+    context: MethodContext
+  ): Promise<SendMessageResponse> => {
     const validated = validateMessageSendParams(params);
-    assertReferencedTaskExists(storage, validated.message);
-    const inboundContextId =
-      typeof validated.message.contextId === 'string' &&
-      validated.message.contextId.length > 0
-        ? validated.message.contextId
-        : undefined;
-
-    if (inboundContextId !== undefined) {
-      const paused = findResumableTask(storage, inboundContextId);
-      if (paused !== undefined) {
-        const enrichedMessage = enrichMessage(
-          validated.message,
-          newId,
-          paused.contextId
-        );
-        const resumed = appendAndResume(paused, enrichedMessage, clock);
-        storage.enqueue(resumed);
-        return { task: toWireTask(resumed) };
-      }
+    const reply = await options.respondToMessage?.(
+      validated.message,
+      context.signal
+    );
+    if (reply !== undefined) {
+      return { message: reply };
     }
+    assertReferencedTaskAcceptsMessage(storage, validated.message);
 
-    const taskId = newId();
-    const enrichedMessage = enrichMessage(validated.message, newId);
-
-    const task = createTask({
-      id: taskId,
-      contextId: enrichedMessage.contextId as string,
-      messages: [enrichedMessage],
-      now: clock,
-    });
-
+    const config = validated.configuration;
+    const task = startTask(storage, validated.message, newId, clock);
+    registerPushConfig(storage, config, task.id);
     storage.enqueue(task);
 
-    return { task: toWireTask(task) };
+    const settled =
+      config?.returnImmediately === true
+        ? task
+        : await pollTask(
+            storage,
+            task,
+            isTerminalOrInterrupted,
+            context.signal
+          );
+    return { task: toWireTask(settled, config?.historyLength) };
   };
 }
 
 /**
- * Locate an active task in `INPUT_REQUIRED` state on the given `contextId`,
- * or `undefined` when no such task exists. When more than one paused task
- * matches (a malformed state on the caller's side - the framework only ever
- * pauses one task per context at a time), the most recently updated one wins
- * so a stray older paused task can't permanently block resume.
+ * Resume the paused task the message continues, or create a new `PENDING`
+ * task for it. The caller persists the result.
+ */
+function startTask(
+  storage: TaskStorage,
+  message: Message,
+  newId: () => string,
+  clock: () => Date
+): ManagedTask {
+  const paused = findResumableTask(storage, message);
+  if (paused !== undefined) {
+    return appendAndResume(
+      paused,
+      enrichMessage(message, newId, paused.contextId),
+      clock
+    );
+  }
+  const taskId = newId();
+  const enrichedMessage = enrichMessage(message, newId);
+  return createTask({
+    id: taskId,
+    contextId: enrichedMessage.contextId as string,
+    messages: [enrichedMessage],
+    now: clock,
+  });
+}
+
+/**
+ * Store the push notification config sent inline in the message
+ * configuration, if any, for the task (spec 3.2.2).
+ */
+function registerPushConfig(
+  storage: TaskStorage,
+  config: SendMessageConfiguration | undefined,
+  taskId: string
+): void {
+  if (config?.taskPushNotificationConfig !== undefined) {
+    storage.setPushConfig(taskId, {
+      ...config.taskPushNotificationConfig,
+      taskId,
+    });
+  }
+}
+
+/** True once a blocking `SendMessage` may return (spec 3.2.2). */
+function isTerminalOrInterrupted(state: ManagedTaskState): boolean {
+  return isTerminal(state) || isPaused(state);
+}
+
+/**
+ * Re-read the task from storage until `done` holds for its state or `signal`
+ * aborts, calling `onChange` on every state change, and return the latest
+ * snapshot.
+ * ponytail: polling works with every storage backend and remote workers;
+ * replace with storage change notifications if the polling load shows up.
+ */
+async function pollTask(
+  storage: TaskStorage,
+  task: ManagedTask,
+  done: (state: ManagedTaskState) => boolean,
+  signal: AbortSignal,
+  onChange?: (task: ManagedTask) => void
+): Promise<ManagedTask> {
+  let latest = task;
+  while (!done(latest.state) && !signal.aborted) {
+    await delay(TASK_POLL_INTERVAL_MS, signal);
+    const current = storage.getTask(latest.id);
+    if (current !== undefined && current.state !== latest.state) {
+      latest = current;
+      onChange?.(latest);
+    }
+  }
+  return latest;
+}
+
+function delay(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer);
+        resolve();
+      },
+      { once: true }
+    );
+  });
+}
+
+/**
+ * Locate the paused (`INPUT_REQUIRED`) task a message continues: the task it
+ * names by `taskId`, otherwise the most recently updated paused task on its
+ * `contextId`. Returns `undefined` when there is none.
  */
 function findResumableTask(
   storage: TaskStorage,
-  contextId: string
+  message: Message
 ): ManagedTask | undefined {
+  if (message.taskId !== undefined) {
+    const task = storage.getTask(message.taskId);
+    return task !== undefined && isPaused(task.state) ? task : undefined;
+  }
+  const contextId =
+    typeof message.contextId === 'string' && message.contextId.length > 0
+      ? message.contextId
+      : undefined;
+  if (contextId === undefined) {
+    return undefined;
+  }
   const matches = storage.listTasks({
     contextId,
     state: TASK_STATE.INPUT_REQUIRED,
   });
-  if (matches.length === 0) {
-    return undefined;
-  }
-  let best = matches[0] as ManagedTask;
-  for (let i = 1; i < matches.length; i++) {
-    const candidate = matches[i] as ManagedTask;
-    if (candidate.updatedAt > best.updatedAt) {
+  let best: ManagedTask | undefined;
+  for (const candidate of matches) {
+    if (best === undefined || candidate.updatedAt > best.updatedAt) {
       best = candidate;
     }
   }
@@ -144,23 +251,46 @@ function appendAndResume(
 }
 
 /**
- * Reject a message that names a `taskId` the storage does not know with
- * TaskNotFound (`-32001`), instead of silently starting a new task.
+ * Reject a message whose `taskId` the storage does not know (TaskNotFound,
+ * `-32001`), names a terminal task (UnsupportedOperation, `-32004`, spec
+ * 3.1.1), or belongs to a different `contextId` (InvalidParams, `-32602`).
  */
-function assertReferencedTaskExists(
+function assertReferencedTaskAcceptsMessage(
   storage: TaskStorage,
   message: Message
 ): void {
-  const { taskId } = message;
-  if (taskId !== undefined && storage.getTask(taskId) === undefined) {
+  const { taskId, contextId } = message;
+  if (taskId === undefined) {
+    return;
+  }
+  const task = storage.getTask(taskId);
+  if (task === undefined) {
     throw new JSONRPCError(
       JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR,
       'task not found'
     );
   }
+  if (isTerminal(task.state)) {
+    throw new JSONRPCError(
+      JSONRPC_ERROR_CODES.UNSUPPORTED_OPERATION_ERROR,
+      'task is in a terminal state and cannot accept messages'
+    );
+  }
+  if (contextId !== undefined && contextId !== task.contextId) {
+    throw new JSONRPCError(
+      JSONRPC_ERROR_CODES.INVALID_PARAMS,
+      'invalid params: message contextId does not match the task'
+    );
+  }
 }
 
-export { appendAndResume, assertReferencedTaskExists, findResumableTask };
+export {
+  appendAndResume,
+  assertReferencedTaskAcceptsMessage,
+  findResumableTask,
+  pollTask,
+  registerPushConfig,
+};
 
 function validateMessageSendParams(params: unknown): SendMessageRequest {
   if (params === null || typeof params !== 'object' || Array.isArray(params)) {

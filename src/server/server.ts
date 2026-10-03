@@ -1,5 +1,6 @@
 import { createAdaptorServer } from '@hono/node-server';
 import { Hono } from 'hono';
+import { etag } from 'hono/etag';
 import type { Server } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
@@ -264,12 +265,14 @@ export class A2AServer {
       );
     }
 
-    app.get(AGENT_CARD_PATH, () => {
+    const cardLastModified = new Date().toUTCString();
+    app.get(AGENT_CARD_PATH, etag(), () => {
       return new Response(JSON.stringify(this.card), {
         status: 200,
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
           'Cache-Control': this.cacheControl,
+          'Last-Modified': cardLastModified,
         },
       });
     });
