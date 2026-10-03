@@ -49,6 +49,11 @@ export interface SSEStreamOptions {
    * Default is the literal `heartbeat`. Newlines are not permitted.
    */
   readonly heartbeatComment?: string;
+  /**
+   * Maps each emitted CloudEvent to the payload written as its `data:` frame;
+   * return `undefined` to skip the event. Defaults to the CloudEvent itself.
+   */
+  readonly frame?: (event: CloudEvent) => unknown;
 }
 
 const HEARTBEAT_COMMENT_DEFAULT = 'heartbeat';
@@ -107,6 +112,7 @@ export class SSEStreamWriter {
   private onAbort: (() => void) | undefined;
   private readonly heartbeatMs: number;
   private readonly heartbeatComment: string;
+  private readonly frame: (event: CloudEvent) => unknown;
 
   constructor(options: SSEStreamOptions = {}) {
     this.heartbeatMs = options.heartbeatMs ?? DEFAULT_SSE_HEARTBEAT_MS;
@@ -126,6 +132,7 @@ export class SSEStreamWriter {
       throw new TypeError('heartbeatComment must not contain newlines');
     }
     this.heartbeatComment = heartbeatComment;
+    this.frame = options.frame ?? ((event) => event);
 
     this.signal = options.signal;
 
@@ -158,7 +165,7 @@ export class SSEStreamWriter {
       return undefined;
     }
     const event = createCloudEvent(input);
-    this.writeFrame(`data: ${JSON.stringify(event)}\n\n`);
+    this.send(this.frame(event));
     return event;
   }
 
@@ -179,7 +186,18 @@ export class SSEStreamWriter {
         'emitCloudEvent expected a CloudEvents v1.0 envelope (specversion "1.0" with id/source/type)'
       );
     }
-    this.writeFrame(`data: ${JSON.stringify(event)}\n\n`);
+    this.send(this.frame(event));
+  }
+
+  /**
+   * Write `data` as a single `data: <json>\n\n` frame. No-op when `data` is
+   * `undefined` or the stream is already closed.
+   */
+  send(data: unknown): void {
+    if (this.isClosed || data === undefined) {
+      return;
+    }
+    this.writeFrame(`data: ${JSON.stringify(data)}\n\n`);
   }
 
   /**

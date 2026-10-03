@@ -1,5 +1,4 @@
 import {
-  AGENT_EVENT_TYPE,
   A2AClientError,
   JSONRPC_VERSION,
   MESSAGE_STREAM_METHOD,
@@ -8,9 +7,9 @@ import {
   createA2AClient,
   isTerminal,
   type AgentCard,
-  type CloudEvent,
   type ManagedTaskState,
   type Message,
+  type StreamResponse,
   type Task,
   type TaskPushNotificationConfig,
   type TaskStatusUpdateEvent,
@@ -120,7 +119,7 @@ async function jsonRpcCall<T>(
 
 async function* readSSEEvents(
   body: ReadableStream<Uint8Array>
-): AsyncIterable<CloudEvent> {
+): AsyncIterable<StreamResponse> {
   const decoder = new TextDecoder();
   const reader = body.getReader();
   let buffer = '';
@@ -137,7 +136,7 @@ async function* readSSEEvents(
         if (!raw.startsWith('data: ')) continue;
         const payload = raw.slice('data: '.length);
         try {
-          yield JSON.parse(payload) as CloudEvent;
+          yield (JSON.parse(payload) as { result: StreamResponse }).result;
         } catch (err) {
           console.error(
             `  [warn] failed to parse SSE frame: ${(err as Error).message}`
@@ -537,20 +536,16 @@ try {
   let terminalEvent: TaskStatusUpdateEvent | null = null;
 
   for await (const event of readSSEEvents(response.body)) {
-    if (event.type === AGENT_EVENT_TYPE.DELTA) {
+    const data = event.statusUpdate;
+    const delta = data?.status.message;
+    if (data?.status.state === TASK_STATE.IN_PROGRESS && delta !== undefined) {
       deltaCount += 1;
-      const msg = event.data as Message;
-      for (const part of msg.parts) {
+      for (const part of delta.parts) {
         if (typeof part.text === 'string') {
           process.stdout.write(part.text);
         }
       }
-    } else if (event.type === AGENT_EVENT_TYPE.TASK_STATUS_CHANGED) {
-      const data = event.data as TaskStatusUpdateEvent;
-      // Capture as terminal on first sight of either signal: the wire `final`
-      // flag, or a terminal state. The server emits both together at end of
-      // stream; treating either as terminal makes the walkthrough robust to
-      // periodic IN_PROGRESS updates that may interleave with deltas.
+    } else if (data !== undefined) {
       if (TERMINAL_STATES.has(data.status.state)) {
         if (terminalEvent === null) {
           terminalEvent = data;
@@ -615,11 +610,11 @@ if (streamTaskId !== null) {
 
     let resubEvents = 0;
     for await (const event of readSSEEvents(response.body)) {
-      if (event.type === AGENT_EVENT_TYPE.TASK_STATUS_CHANGED) {
+      const task = event.task;
+      if (task !== undefined) {
         resubEvents += 1;
-        const data = event.data as TaskStatusUpdateEvent;
         console.log(
-          `  [resubscribe] task=${data.taskId} state=${data.status.state}`
+          `  [resubscribe] task=${task.id} state=${task.status.state}`
         );
       }
     }

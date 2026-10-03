@@ -1,12 +1,16 @@
+import type { JSONRPCId } from './jsonrpc.js';
+
 /**
  * Context passed to every JSON-RPC method handler.
  *
  * `signal` aborts when the originating HTTP request is cancelled by the
  * client or when the server is shutting down. Long-running handlers should
  * propagate it to downstream calls so cancellation actually unwinds.
+ * `requestId` is the JSON-RPC `id` of the request being handled.
  */
 export interface MethodContext {
   readonly signal: AbortSignal;
+  readonly requestId?: JSONRPCId;
 }
 
 /**

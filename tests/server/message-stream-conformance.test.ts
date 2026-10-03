@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { TASK_STATE } from '../../src/agent/task.js';
 import {
   A2AServer,
-  AGENT_EVENT_TYPE,
   JSONRPC_ERROR_CODES,
   JSONRPC_VERSION,
   MESSAGE_STREAM_METHOD,
@@ -14,7 +13,7 @@ import {
 } from '../../src/server/index.js';
 import { InMemoryTaskStorage } from '../../src/storage/index.js';
 import type { AgentCard } from '../../src/types/generated/a2a.js';
-import type { TaskStatusUpdateEvent } from '../../src/types/index.js';
+import type { StreamResponse } from '../../src/types/index.js';
 
 const decoder = new TextDecoder();
 
@@ -52,7 +51,7 @@ async function start(server: A2AServer): Promise<string> {
 
 interface Frame {
   readonly raw: string;
-  readonly json: { type: string; data: unknown; id?: string };
+  readonly json: { jsonrpc: string; id: unknown; result: StreamResponse };
 }
 
 async function readFrames(
@@ -85,11 +84,7 @@ async function readFrames(
         if (raw.startsWith('data: ')) {
           frames.push({
             raw,
-            json: JSON.parse(raw.slice('data: '.length)) as {
-              type: string;
-              data: unknown;
-              id?: string;
-            },
+            json: JSON.parse(raw.slice('data: '.length)) as Frame['json'],
           });
         }
       }
@@ -116,7 +111,7 @@ describe('SendStreamingMessage JSON-RPC conformance', () => {
     }
   });
 
-  it('responds with text/event-stream and emits WORKING → DELTA × N → COMPLETED in order', async () => {
+  it('responds with text/event-stream and emits TASK → WORKING → DELTA × N → COMPLETED in order', async () => {
     const storage = new InMemoryTaskStorage();
     const executor: StreamingTaskExecutor = async function* () {
       yield {
@@ -184,35 +179,24 @@ describe('SendStreamingMessage JSON-RPC conformance', () => {
     expect(res.headers.get('content-type')).toMatch(/^text\/event-stream/);
 
     const frames = await readFrames(res);
-    const types = frames.map((f) => f.json.type);
+    const results = frames.map((f) => f.json.result);
 
-    expect(types).toEqual([
-      AGENT_EVENT_TYPE.TASK_STATUS_CHANGED, // WORKING
-      AGENT_EVENT_TYPE.DELTA,
-      AGENT_EVENT_TYPE.DELTA,
-      AGENT_EVENT_TYPE.DELTA,
-      AGENT_EVENT_TYPE.TASK_STATUS_CHANGED, // COMPLETED (final)
+    expect(results[0]?.task?.id).toBe('id-1');
+    expect(results.slice(1).map((r) => r.statusUpdate?.status.state)).toEqual([
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.COMPLETED,
     ]);
-
-    const first = frames[0]?.json.data as TaskStatusUpdateEvent;
-    expect(first.taskId).toBe('id-1');
-    expect(first.contextId).toBe('ctx-1');
-    expect(first.status.state).toBe(TASK_STATE.IN_PROGRESS);
-    expect(first.status.state).not.toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
-
-    const last = frames[frames.length - 1]?.json.data as TaskStatusUpdateEvent;
-    expect(last.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(last.status.state).toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
+    expect(results[1]?.statusUpdate?.taskId).toBe('id-1');
+    expect(results[1]?.statusUpdate?.contextId).toBe('ctx-1');
 
     const stored = storage.getTask('id-1');
     expect(stored?.state).toBe(TASK_STATE.COMPLETED);
   });
 
-  it('wraps each frame in a CloudEvents v1.0 envelope', async () => {
+  it('wraps each frame in a JSON-RPC response carrying the request id', async () => {
     const storage = new InMemoryTaskStorage();
     const executor: StreamingTaskExecutor = async function* () {
       yield {
@@ -258,14 +242,11 @@ describe('SendStreamingMessage JSON-RPC conformance', () => {
     });
 
     const frames = await readFrames(res);
+    expect(frames.length).toBeGreaterThan(0);
     for (const frame of frames) {
-      const envelope = frame.json as unknown as Record<string, unknown>;
-      expect(envelope['specversion']).toBe('1.0');
-      expect(typeof envelope['id']).toBe('string');
-      expect(typeof envelope['source']).toBe('string');
-      expect(typeof envelope['type']).toBe('string');
-      expect(envelope['datacontenttype']).toBe('application/json');
-      expect(envelope['subject']).toBe('id-1');
+      expect(frame.json.jsonrpc).toBe(JSONRPC_VERSION);
+      expect(frame.json.id).toBe(1);
+      expect(frame.json.result).toBeTypeOf('object');
     }
   });
 

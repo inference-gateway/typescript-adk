@@ -180,7 +180,7 @@ async function dispatchSingle(
   }
 
   try {
-    const result = await handler(paramsRaw, { signal });
+    const result = await handler(paramsRaw, { signal, requestId: responseId });
     if (isNotification) {
       return null;
     }

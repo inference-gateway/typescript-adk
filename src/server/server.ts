@@ -442,7 +442,7 @@ export class A2AServer {
     const id = extractStreamingId(reqObj);
     const params = 'params' in reqObj ? reqObj['params'] : undefined;
     try {
-      const { readable } = handler(params, { signal });
+      const { readable } = handler(params, { signal, requestId: id });
       return new Response(readable, {
         status: 200,
         headers: { ...SSE_HEADERS },

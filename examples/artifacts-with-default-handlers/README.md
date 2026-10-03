@@ -91,7 +91,7 @@ Client (`client.ts`):
 `SendStreamingMessage` path (default streaming stub):
 
 1. Client opens an SSE connection via `SendStreamingMessage`.
-2. Server runs the builder-installed streaming default — emits a single `task.status.changed(state=COMPLETED, final=true)` CloudEvent and closes.
+2. Server runs the builder-installed streaming default — emits the task, a working status update and a completed status update, then closes.
 3. Client reads frames until EOF.
 
 ## Where artifacts land

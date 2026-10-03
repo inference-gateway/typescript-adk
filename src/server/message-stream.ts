@@ -2,6 +2,7 @@ import {
   TASK_STATE,
   createTask,
   isTerminal,
+  toWireTask,
   transitionTask,
   type ManagedTask,
   type ManagedTaskState,
@@ -13,6 +14,7 @@ import type {
   Artifact,
   Message,
   SendMessageRequest,
+  StreamResponse,
   Struct,
   TaskArtifactUpdateEvent,
   TaskStatus,
@@ -27,7 +29,13 @@ import {
   type AgentToolResultEventData,
   type CloudEvent,
 } from './cloudevents.js';
-import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
+import {
+  JSONRPC_ERROR_CODES,
+  JSONRPCError,
+  createSuccessResponse,
+  type JSONRPCId,
+  type JSONRPCSuccessResponse,
+} from './jsonrpc.js';
 import {
   appendAndResume,
   assertReferencedTaskExists,
@@ -67,10 +75,10 @@ export const DEFAULT_STREAMING_STATUS_UPDATE_INTERVAL_MS = 1000;
  * Single event yielded by a {@link StreamingTaskExecutor}.
  *
  * The handler interprets the discriminated `type` field:
- *  - `delta`: emit an `adk.agent.delta` SSE frame carrying the partial message.
+ *  - `delta`: emit a working status update carrying the partial message.
  *    Does not change task state.
  *  - `statusChanged`: transition the task to the requested state, persist it,
- *    and emit an `adk.agent.task.status.changed` SSE frame. Terminal states
+ *    and emit a status update. Terminal states
  *    (`COMPLETED`/`FAILED`/`CANCELLED`) end the stream. When `metadata` is
  *    supplied the keys are shallow-merged into `task.metadata` before the
  *    transition is persisted - this is the path used by
@@ -80,20 +88,23 @@ export const DEFAULT_STREAMING_STATUS_UPDATE_INTERVAL_MS = 1000;
  *    and end the stream. Equivalent to `{ type: 'statusChanged', state:
  *    INPUT_REQUIRED, message }`, kept separate for ergonomics since this is a
  *    common case in tool-use loops.
- *  - `inputRequiredNotice`: emit an `adk.agent.input.required` SSE frame
+ *  - `inputRequiredNotice`: publish an `adk.agent.input.required` event
  *    carrying the prompt message. Does not change task state - typically
  *    followed by an `inputRequired` event from the same executor that performs
  *    the actual transition.
- *  - `iterationCompleted`: emit an `adk.agent.iteration.completed` SSE frame
+ *  - `iterationCompleted`: publish an `adk.agent.iteration.completed` event
  *    marking the end of one LLM iteration in an agentic loop. Carries the
  *    assistant message returned by the iteration when present.
- *  - `toolStarted` / `toolCompleted` / `toolFailed` / `toolResult`: emit the
- *    corresponding `adk.agent.tool.*` SSE frames around a tool dispatch. None
+ *  - `toolStarted` / `toolCompleted` / `toolFailed` / `toolResult`: publish
+ *    the corresponding `adk.agent.tool.*` events around a tool dispatch. None
  *    of these change task state.
- *  - `rawCloudEvent`: forward a pre-built CloudEvents envelope to the SSE
- *    stream verbatim. Does not change task state. Used by the
+ *  - `rawCloudEvent`: forward a pre-built CloudEvents envelope as if the
+ *    handler had emitted it. Does not change task state. Used by the
  *    {@link import('./task-handler.js').StreamableTaskHandler} adapter so
  *    handlers that yield raw CloudEvents can plug into this pipeline.
+ *
+ * Only status, artifact and delta events have a `StreamResponse` form and
+ * reach the SSE stream; the ADK-only events are not sent to clients.
  */
 export type StreamingTaskEvent =
   | { readonly type: 'delta'; readonly message: Message }
@@ -278,20 +289,20 @@ export type StreamingMethodHandler = (
  * stream), then opens an SSE response and drives the user-supplied
  * {@link StreamingTaskExecutor} through the task lifecycle.
  *
- * Event sequence emitted on the stream (all wrapped in CloudEvents v1.0
- * envelopes; see {@link createCloudEvent}):
+ * Every SSE event is a JSON-RPC response whose `result` is a
+ * `StreamResponse` (spec 9.4.2), in this order:
  *
- *   1. `adk.agent.task.status.changed` - state=`TASK_STATE_WORKING`, marking
- *      the transition from `PENDING`.
- *   2. Zero or more `adk.agent.delta` frames - partial assistant messages, in
- *      the order the executor yields them.
- *   3. Optional periodic `adk.agent.task.status.changed` frames - re-emitted
- *      every {@link MessageStreamHandlerOptions.statusUpdateIntervalMs}
- *      milliseconds while the task is `IN_PROGRESS`, with `final: false`.
- *   4. Optional `adk.agent.task.status.changed` for `INPUT_REQUIRED` -
- *      `final: false`, stream ends.
- *   5. Terminal `adk.agent.task.status.changed` - `final: true`, state is
- *      `COMPLETED` / `FAILED` / `CANCELLED`. Stream then closes.
+ *   1. `task` - the task as created (or resumed).
+ *   2. `statusUpdate` - state=`TASK_STATE_WORKING`, marking the transition
+ *      from `PENDING`.
+ *   3. Zero or more `statusUpdate`s carrying partial assistant messages, in
+ *      the order the executor yields them, and `artifactUpdate`s.
+ *   4. Optional periodic `statusUpdate`s - re-emitted every
+ *      {@link MessageStreamHandlerOptions.statusUpdateIntervalMs}
+ *      milliseconds while the task is `IN_PROGRESS`.
+ *   5. Optional `statusUpdate` for `INPUT_REQUIRED`, stream ends.
+ *   6. Terminal `statusUpdate` - state is `COMPLETED` / `FAILED` /
+ *      `CANCELLED`. Stream then closes.
  *
  * Cancellation: when the request's `AbortSignal` aborts (client disconnect or
  * server shutdown), the executor's signal aborts in turn, the task is
@@ -366,8 +377,10 @@ export function createMessageStreamHandler(
     }
     cancellationRegistry?.register(taskId, executorAbort);
 
+    const requestId = context.requestId ?? null;
     const writer = new SSEStreamWriter({
       signal: context.signal,
+      frame: streamResponseFrame(requestId, task),
       ...(options.heartbeatMs !== undefined
         ? { heartbeatMs: options.heartbeatMs }
         : {}),
@@ -380,6 +393,9 @@ export function createMessageStreamHandler(
     const done = (async (): Promise<void> => {
       let periodicTimer: ReturnType<typeof setInterval> | null = null;
       try {
+        writer.send(
+          createSuccessResponse(requestId, { task: toWireTask(task) })
+        );
         if (!resumingExistingTask) {
           task = transitionAndPersist(task, TASK_STATE.IN_PROGRESS, storage, {
             now: clock,
@@ -483,6 +499,49 @@ export function createMessageStreamHandler(
 
     return { readable: writer.readable, done };
   };
+}
+
+/**
+ * Map a task's CloudEvents to SSE frames: JSON-RPC responses whose `result`
+ * is a `StreamResponse` (spec 9.4.2). Deltas become working status updates;
+ * ADK-only events (tool calls, iterations, input-required notices) have no
+ * `StreamResponse` form and are not sent.
+ */
+export function streamResponseFrame(
+  requestId: JSONRPCId,
+  task: { readonly id: string; readonly contextId: string }
+): (event: CloudEvent) => JSONRPCSuccessResponse | undefined {
+  return (event) => {
+    const result = toStreamResponse(event, task);
+    return result === undefined
+      ? undefined
+      : createSuccessResponse(requestId, result);
+  };
+}
+
+function toStreamResponse(
+  event: CloudEvent,
+  task: { readonly id: string; readonly contextId: string }
+): StreamResponse | undefined {
+  switch (event.type) {
+    case AGENT_EVENT_TYPE.TASK_STATUS_CHANGED:
+      return { statusUpdate: event.data as TaskStatusUpdateEvent };
+    case AGENT_EVENT_TYPE.TASK_ARTIFACT_UPDATED:
+      return { artifactUpdate: event.data as TaskArtifactUpdateEvent };
+    case AGENT_EVENT_TYPE.DELTA:
+      return {
+        statusUpdate: {
+          taskId: task.id,
+          contextId: task.contextId,
+          status: {
+            state: TASK_STATE.IN_PROGRESS,
+            message: event.data as Message,
+          },
+        },
+      };
+    default:
+      return undefined;
+  }
 }
 
 interface EmitOptions {

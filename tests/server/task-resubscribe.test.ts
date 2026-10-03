@@ -24,7 +24,11 @@ import {
 } from '../../src/server/index.js';
 import { InMemoryTaskStorage } from '../../src/storage/index.js';
 import type { AgentCard } from '../../src/types/generated/a2a.js';
-import type { Message, TaskStatusUpdateEvent } from '../../src/types/index.js';
+import type {
+  Message,
+  StreamResponse,
+  TaskStatusUpdateEvent,
+} from '../../src/types/index.js';
 
 const decoder = new TextDecoder();
 
@@ -105,7 +109,16 @@ async function start(server: A2AServer): Promise<string> {
 
 interface Frame {
   readonly raw: string;
-  readonly json: { type: string; data: unknown; id?: string };
+  readonly json: { jsonrpc: string; id: unknown; result: StreamResponse };
+}
+
+function kindOf(frame: Frame | undefined): string | undefined {
+  return Object.keys(frame?.json.result ?? {})[0];
+}
+
+function stateOf(frame: Frame | undefined): string | undefined {
+  const result = frame?.json.result;
+  return result?.task?.status.state ?? result?.statusUpdate?.status.state;
 }
 
 async function readFrames(
@@ -135,11 +148,7 @@ async function readFrames(
         if (raw.startsWith('data: ')) {
           frames.push({
             raw,
-            json: JSON.parse(raw.slice('data: '.length)) as {
-              type: string;
-              data: unknown;
-              id?: string;
-            },
+            json: JSON.parse(raw.slice('data: '.length)) as Frame['json'],
           });
         }
       }
@@ -208,7 +217,7 @@ describe('createTaskResubscribeHandler', () => {
   });
 
   describe('terminal task replay', () => {
-    it('emits a single final status frame for a COMPLETED task and closes', async () => {
+    it('emits the COMPLETED task as the only frame and closes', async () => {
       const storage = new InMemoryTaskStorage();
       seedTaskInState(storage, 'task-1', TASK_STATE.COMPLETED);
 
@@ -221,17 +230,12 @@ describe('createTaskResubscribeHandler', () => {
       const frames = await collectFrames(readable);
       await done;
       expect(frames).toHaveLength(1);
-      expect(frames[0]?.json.type).toBe(AGENT_EVENT_TYPE.TASK_STATUS_CHANGED);
-      const data = frames[0]?.json.data as TaskStatusUpdateEvent;
-      expect(data.taskId).toBe('task-1');
-      expect(data.status.state).toBe(TASK_STATE.COMPLETED);
-      expect(data.status.state).toMatch(
-        /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-      );
+      expect(frames[0]?.json.result.task?.id).toBe('task-1');
+      expect(stateOf(frames[0])).toBe(TASK_STATE.COMPLETED);
     });
 
     for (const terminal of [TASK_STATE.FAILED, TASK_STATE.CANCELLED] as const) {
-      it(`emits final=true for a ${terminal} task`, async () => {
+      it(`emits the ${terminal} task and closes`, async () => {
         const storage = new InMemoryTaskStorage();
         seedTaskInState(storage, 'task-1', terminal);
 
@@ -244,17 +248,14 @@ describe('createTaskResubscribeHandler', () => {
         const frames = await collectFrames(readable);
         await done;
         expect(frames).toHaveLength(1);
-        const data = frames[0]?.json.data as TaskStatusUpdateEvent;
-        expect(data.status.state).toBe(terminal);
-        expect(data.status.state).toMatch(
-          /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-        );
+        expect(kindOf(frames[0])).toBe('task');
+        expect(stateOf(frames[0])).toBe(terminal);
       });
     }
   });
 
   describe('non-terminal task replay (no live bus)', () => {
-    it('emits a single non-final status frame and closes when no event bus is registered', async () => {
+    it('emits the task and closes when no event bus is registered', async () => {
       const storage = new InMemoryTaskStorage();
       seedTaskInState(storage, 'task-1', TASK_STATE.IN_PROGRESS);
 
@@ -267,14 +268,11 @@ describe('createTaskResubscribeHandler', () => {
       const frames = await collectFrames(readable);
       await done;
       expect(frames).toHaveLength(1);
-      const data = frames[0]?.json.data as TaskStatusUpdateEvent;
-      expect(data.status.state).toBe(TASK_STATE.IN_PROGRESS);
-      expect(data.status.state).not.toMatch(
-        /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-      );
+      expect(kindOf(frames[0])).toBe('task');
+      expect(stateOf(frames[0])).toBe(TASK_STATE.IN_PROGRESS);
     });
 
-    it('uses the bus replay buffer when present even if no listeners are live', async () => {
+    it('emits the task and closes when the task bus has already closed', async () => {
       const storage = new InMemoryTaskStorage();
       seedTaskInState(storage, 'task-1', TASK_STATE.IN_PROGRESS);
 
@@ -305,7 +303,7 @@ describe('createTaskResubscribeHandler', () => {
       const frames = await collectFrames(readable);
       await done;
       expect(frames).toHaveLength(1);
-      expect(frames[0]?.json.id).toBe('evt-1');
+      expect(kindOf(frames[0])).toBe('task');
     });
   });
 });
@@ -354,7 +352,7 @@ describe('SubscribeToTask end-to-end via A2AServer', () => {
     expect(body.error.message).toBe('task not found');
   });
 
-  it('replays the bus last status, forwards live events, then closes when the producer ends (replay-then-live)', async () => {
+  it('starts with the task, forwards live events, then closes when the producer ends', async () => {
     const storage = new InMemoryTaskStorage();
     const registry = new TaskEventBusRegistry();
 
@@ -458,39 +456,26 @@ describe('SubscribeToTask end-to-end via A2AServer', () => {
       readFrames(resubRes),
     ]);
 
-    const producerTypes = producerFrames.map((f) => f.json.type);
-    expect(producerTypes).toEqual([
-      AGENT_EVENT_TYPE.TASK_STATUS_CHANGED,
-      AGENT_EVENT_TYPE.DELTA,
-      AGENT_EVENT_TYPE.DELTA,
-      AGENT_EVENT_TYPE.TASK_STATUS_CHANGED,
+    expect(producerFrames.map(stateOf)).toEqual([
+      TASK_STATE.PENDING,
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.COMPLETED,
     ]);
+    expect(producerFrames.every((f) => f.json.id === 1)).toBe(true);
 
-    // The resubscriber must see:
-    //  - the replay frame (initial WORKING status)
-    //  - both deltas
-    //  - the final COMPLETED status
-    const resubTypes = resubFrames.map((f) => f.json.type);
-    expect(resubTypes[0]).toBe(AGENT_EVENT_TYPE.TASK_STATUS_CHANGED);
-    expect(resubTypes[resubTypes.length - 1]).toBe(
-      AGENT_EVENT_TYPE.TASK_STATUS_CHANGED
+    const deltaIds = (frames: Frame[]): (string | undefined)[] =>
+      frames
+        .map((f) => f.json.result.statusUpdate?.status.message?.messageId)
+        .filter((id) => id?.startsWith('d-'));
+    expect(kindOf(resubFrames[0])).toBe('task');
+    expect(stateOf(resubFrames[0])).toBe(TASK_STATE.IN_PROGRESS);
+    expect(deltaIds(resubFrames)).toEqual(['d-1', 'd-2']);
+    expect(stateOf(resubFrames[resubFrames.length - 1])).toBe(
+      TASK_STATE.COMPLETED
     );
-    expect(resubTypes.filter((t) => t === AGENT_EVENT_TYPE.DELTA)).toHaveLength(
-      2
-    );
-
-    const initial = resubFrames[0]?.json.data as TaskStatusUpdateEvent;
-    expect(initial.status.state).toBe(TASK_STATE.IN_PROGRESS);
-    expect(initial.status.state).not.toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
-
-    const final = resubFrames[resubFrames.length - 1]?.json
-      .data as TaskStatusUpdateEvent;
-    expect(final.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(final.status.state).toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
+    expect(resubFrames.every((f) => f.json.id === 2)).toBe(true);
   });
 
   it('fans out the same stream to multiple concurrent resubscribers', async () => {
@@ -588,29 +573,13 @@ describe('SubscribeToTask end-to-end via A2AServer', () => {
       readFrames(subB),
     ]);
 
-    expect(framesA.map((f) => f.json.type)).toEqual(
-      framesB.map((f) => f.json.type)
-    );
+    expect(framesA.map(stateOf)).toEqual(framesB.map(stateOf));
 
-    // Both must see at least: initial replay status, the shared delta, final
-    // status.
+    // Both must see at least: the task, the shared delta, final status.
     expect(framesA.length).toBeGreaterThanOrEqual(3);
-    expect(framesA[framesA.length - 1]?.json.type).toBe(
-      AGENT_EVENT_TYPE.TASK_STATUS_CHANGED
-    );
-
-    const lastA = framesA[framesA.length - 1]?.json
-      .data as TaskStatusUpdateEvent;
-    const lastB = framesB[framesB.length - 1]?.json
-      .data as TaskStatusUpdateEvent;
-    expect(lastA.status.state).toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
-    expect(lastB.status.state).toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
-    expect(lastA.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(lastB.status.state).toBe(TASK_STATE.COMPLETED);
+    expect(kindOf(framesA[0])).toBe('task');
+    expect(stateOf(framesA[framesA.length - 1])).toBe(TASK_STATE.COMPLETED);
+    expect(stateOf(framesB[framesB.length - 1])).toBe(TASK_STATE.COMPLETED);
 
     // After the producing stream ends, the bus should be removed from the
     // registry.
@@ -618,7 +587,7 @@ describe('SubscribeToTask end-to-end via A2AServer', () => {
     expect(registry.has('task-1')).toBe(false);
   });
 
-  it('emits a single final status frame and closes when the task is already terminal', async () => {
+  it('emits the task and closes when the task is already terminal', async () => {
     const storage = new InMemoryTaskStorage();
     const registry = new TaskEventBusRegistry();
     seedTaskInState(storage, 'task-done', TASK_STATE.COMPLETED);
@@ -651,11 +620,8 @@ describe('SubscribeToTask end-to-end via A2AServer', () => {
 
     const frames = await readFrames(res);
     expect(frames).toHaveLength(1);
-    const data = frames[0]?.json.data as TaskStatusUpdateEvent;
-    expect(data.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(data.status.state).toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
+    expect(kindOf(frames[0])).toBe('task');
+    expect(stateOf(frames[0])).toBe(TASK_STATE.COMPLETED);
   });
 });
 
@@ -682,11 +648,7 @@ async function collectFrames(
         if (raw.startsWith('data: ')) {
           frames.push({
             raw,
-            json: JSON.parse(raw.slice('data: '.length)) as {
-              type: string;
-              data: unknown;
-              id?: string;
-            },
+            json: JSON.parse(raw.slice('data: '.length)) as Frame['json'],
           });
         }
       }

@@ -1,10 +1,9 @@
 import {
-  AGENT_EVENT_TYPE,
   JSONRPC_VERSION,
   MESSAGE_STREAM_METHOD,
   TASK_STATE,
-  type CloudEvent,
   type Message,
+  type StreamResponse,
   type TaskStatusUpdateEvent,
 } from '@inference-gateway/adk';
 
@@ -60,36 +59,33 @@ let deltaCount = 0;
 let finalStatus: TaskStatusUpdateEvent | null = null;
 
 for await (const event of readSSEEvents(response.body)) {
-  switch (event.type) {
-    case AGENT_EVENT_TYPE.TASK_STATUS_CHANGED: {
-      const data = event.data as TaskStatusUpdateEvent;
-      if (data.status.state === TASK_STATE.IN_PROGRESS) {
-        console.log(`[task ${data.taskId}] status=IN_PROGRESS`);
-        console.log('---');
-      } else if (
-        /TASK_STATE_(COMPLETED|FAILED|CANCELED|REJECTED)$/.test(
-          data.status.state
-        )
-      ) {
-        console.log('\n---');
-        console.log(`[task ${data.taskId}] status=${data.status.state}`);
-        finalStatus = data;
+  if (event.task !== undefined) {
+    console.log(`[task ${event.task.id}] status=${event.task.status.state}`);
+    continue;
+  }
+  const data = event.statusUpdate;
+  if (data === undefined) {
+    console.log(`[other event] ${Object.keys(event).join(', ')}`);
+    continue;
+  }
+  const delta = data.status.message;
+  if (data.status.state === TASK_STATE.IN_PROGRESS && delta !== undefined) {
+    deltaCount += 1;
+    for (const part of delta.parts) {
+      if (typeof part.text === 'string') {
+        process.stdout.write(part.text);
+        accumulated.push(part.text);
       }
-      break;
     }
-    case AGENT_EVENT_TYPE.DELTA: {
-      const message = event.data as Message;
-      deltaCount += 1;
-      for (const part of message.parts) {
-        if (typeof part.text === 'string') {
-          process.stdout.write(part.text);
-          accumulated.push(part.text);
-        }
-      }
-      break;
-    }
-    default:
-      console.log(`[unknown event] type=${event.type}`);
+  } else if (data.status.state === TASK_STATE.IN_PROGRESS) {
+    console.log(`[task ${data.taskId}] status=IN_PROGRESS`);
+    console.log('---');
+  } else if (
+    /TASK_STATE_(COMPLETED|FAILED|CANCELED|REJECTED)$/.test(data.status.state)
+  ) {
+    console.log('\n---');
+    console.log(`[task ${data.taskId}] status=${data.status.state}`);
+    finalStatus = data;
   }
 }
 
@@ -101,7 +97,7 @@ if (finalStatus !== null) {
 
 async function* readSSEEvents(
   body: ReadableStream<Uint8Array>
-): AsyncIterable<CloudEvent> {
+): AsyncIterable<StreamResponse> {
   const decoder = new TextDecoder();
   const reader = body.getReader();
   let buffer = '';
@@ -118,7 +114,7 @@ async function* readSSEEvents(
         if (!raw.startsWith('data: ')) continue;
         const payload = raw.slice('data: '.length);
         try {
-          yield JSON.parse(payload) as CloudEvent;
+          yield (JSON.parse(payload) as { result: StreamResponse }).result;
         } catch (err) {
           console.error(`failed to parse SSE frame: ${(err as Error).message}`);
         }

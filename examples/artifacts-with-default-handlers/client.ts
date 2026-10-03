@@ -1,14 +1,13 @@
 import {
-  AGENT_EVENT_TYPE,
   JSONRPC_VERSION,
   MESSAGE_STREAM_METHOD,
   TASK_STATE,
   createA2AClient,
   isTerminal,
   type Artifact,
-  type CloudEvent,
   type ManagedTaskState,
   type Message,
+  type StreamResponse,
   type Task,
 } from '@inference-gateway/adk';
 
@@ -80,7 +79,7 @@ if (response.body === null) {
 let frameCount = 0;
 for await (const event of readSSEEvents(response.body)) {
   frameCount += 1;
-  console.log(`[frame ${frameCount}] type=${event.type}`);
+  console.log(`[frame ${frameCount}] ${Object.keys(event).join(', ')}`);
 }
 console.log(`stream complete: ${frameCount} frame(s)`);
 
@@ -113,7 +112,7 @@ async function pollUntilTerminal(taskId: string): Promise<Task> {
 
 async function* readSSEEvents(
   body: ReadableStream<Uint8Array>
-): AsyncIterable<CloudEvent> {
+): AsyncIterable<StreamResponse> {
   const decoder = new TextDecoder();
   const reader = body.getReader();
   let buffer = '';
@@ -130,7 +129,7 @@ async function* readSSEEvents(
         if (!raw.startsWith('data: ')) continue;
         const payload = raw.slice('data: '.length);
         try {
-          yield JSON.parse(payload) as CloudEvent;
+          yield (JSON.parse(payload) as { result: StreamResponse }).result;
         } catch (err) {
           console.error(`failed to parse SSE frame: ${(err as Error).message}`);
         }
@@ -144,5 +143,3 @@ async function* readSSEEvents(
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-
-void AGENT_EVENT_TYPE;

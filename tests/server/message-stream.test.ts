@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TASK_STATE, type ManagedTask } from '../../src/agent/task.js';
 import {
-  AGENT_EVENT_TYPE,
   DEFAULT_STREAMING_STATUS_UPDATE_INTERVAL_MS,
   JSONRPC_ERROR_CODES,
   JSONRPCError,
@@ -14,7 +13,7 @@ import {
   type StreamingTaskExecutor,
 } from '../../src/server/index.js';
 import { InMemoryTaskStorage } from '../../src/storage/index.js';
-import type { Message, TaskStatusUpdateEvent } from '../../src/types/index.js';
+import type { Message, StreamResponse } from '../../src/types/index.js';
 
 const decoder = new TextDecoder();
 
@@ -41,7 +40,11 @@ function fixedNow(iso: string): () => Date {
 
 interface Frame {
   readonly raw: string;
-  readonly json: Record<string, unknown>;
+  readonly result: StreamResponse;
+}
+
+function statusOf(frame: Frame | undefined): string | undefined {
+  return frame?.result.statusUpdate?.status.state;
 }
 
 async function drainFrames(
@@ -67,13 +70,12 @@ async function drainFrames(
         if (!raw.startsWith('data: ')) {
           continue;
         }
-        frames.push({
-          raw,
-          json: JSON.parse(raw.slice('data: '.length)) as Record<
-            string,
-            unknown
-          >,
-        });
+        const envelope = JSON.parse(raw.slice('data: '.length)) as {
+          jsonrpc: string;
+          result: StreamResponse;
+        };
+        expect(envelope.jsonrpc).toBe('2.0');
+        frames.push({ raw, result: envelope.result });
       }
     }
   } finally {
@@ -151,7 +153,7 @@ describe('createMessageStreamHandler', () => {
     });
   });
 
-  it('opens a stream, emits WORKING then COMPLETED, and stores the task in dead-letter', async () => {
+  it('opens a stream with the task, emits WORKING then COMPLETED, and stores the task in dead-letter', async () => {
     const storage = new InMemoryTaskStorage();
     const handler = createMessageStreamHandler({
       storage,
@@ -171,33 +173,21 @@ describe('createMessageStreamHandler', () => {
     const frames = await drainFrames(result.readable);
     await result.done;
 
-    expect(frames).toHaveLength(2);
-    const first = frames[0]?.json as {
-      type: string;
-      data: TaskStatusUpdateEvent;
-    };
-    const second = frames[1]?.json as {
-      type: string;
-      data: TaskStatusUpdateEvent;
-    };
-    expect(first.type).toBe(AGENT_EVENT_TYPE.TASK_STATUS_CHANGED);
-    expect(first.data.taskId).toBe('id-1');
-    expect(first.data.contextId).toBe('ctx-existing');
-    expect(first.data.status.state).toBe(TASK_STATE.IN_PROGRESS);
-    expect(first.data.status.state).not.toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
-    expect(second.data.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(second.data.status.state).toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
+    expect(frames).toHaveLength(3);
+    expect(frames[0]?.result.task?.id).toBe('id-1');
+    expect(frames[0]?.result.task?.status.state).toBe(TASK_STATE.PENDING);
+    const working = frames[1]?.result.statusUpdate;
+    expect(working?.taskId).toBe('id-1');
+    expect(working?.contextId).toBe('ctx-existing');
+    expect(working?.status.state).toBe(TASK_STATE.IN_PROGRESS);
+    expect(statusOf(frames[2])).toBe(TASK_STATE.COMPLETED);
 
     const stored = storage.getTask('id-1');
     expect(stored).toBeDefined();
     expect(stored?.state).toBe(TASK_STATE.COMPLETED);
   });
 
-  it('emits adk.agent.delta frames in order between WORKING and the terminal status', async () => {
+  it('emits deltas as working status updates in order between WORKING and the terminal status', async () => {
     const storage = new InMemoryTaskStorage();
     const executor: StreamingTaskExecutor = async function* () {
       yield {
@@ -242,28 +232,18 @@ describe('createMessageStreamHandler', () => {
     const frames = await drainFrames(result.readable);
     await result.done;
 
-    const types = frames.map((f) => f.json['type']);
-    expect(types).toEqual([
-      AGENT_EVENT_TYPE.TASK_STATUS_CHANGED,
-      AGENT_EVENT_TYPE.DELTA,
-      AGENT_EVENT_TYPE.DELTA,
-      AGENT_EVENT_TYPE.DELTA,
-      AGENT_EVENT_TYPE.TASK_STATUS_CHANGED,
+    expect(frames.map(statusOf)).toEqual([
+      undefined,
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.COMPLETED,
     ]);
-
     const deltaMessageIds = frames
-      .filter((f) => f.json['type'] === AGENT_EVENT_TYPE.DELTA)
-      .map((f) => (f.json['data'] as { messageId: string }).messageId);
+      .slice(2, 5)
+      .map((f) => f.result.statusUpdate?.status.message?.messageId);
     expect(deltaMessageIds).toEqual(['d-1', 'd-2', 'd-3']);
-
-    const lastFrame = frames[frames.length - 1];
-    const finalStatus = lastFrame?.json as {
-      data: TaskStatusUpdateEvent;
-    };
-    expect(finalStatus.data.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(finalStatus.data.status.state).toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
   });
 
   it('transitions the task and emits a status frame when the executor yields statusChanged', async () => {
@@ -304,16 +284,11 @@ describe('createMessageStreamHandler', () => {
     const frames = await drainFrames(result.readable);
     await result.done;
 
-    const types = frames.map((f) => f.json['type']);
-    expect(types).toEqual([
-      AGENT_EVENT_TYPE.TASK_STATUS_CHANGED, // WORKING
-      AGENT_EVENT_TYPE.TASK_STATUS_CHANGED, // COMPLETED (final)
+    expect(frames.map(statusOf)).toEqual([
+      undefined,
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.COMPLETED,
     ]);
-    const last = frames[1]?.json as { data: TaskStatusUpdateEvent };
-    expect(last.data.status.state).toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
-    expect(last.data.status.state).toBe(TASK_STATE.COMPLETED);
   });
 
   it('handles inputRequired by transitioning to INPUT_REQUIRED with final=false and ending the stream', async () => {
@@ -345,11 +320,7 @@ describe('createMessageStreamHandler', () => {
     const frames = await drainFrames(result.readable);
     await result.done;
 
-    const inputFrame = frames[1]?.json as { data: TaskStatusUpdateEvent };
-    expect(inputFrame.data.status.state).toBe(TASK_STATE.INPUT_REQUIRED);
-    expect(inputFrame.data.status.state).not.toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
+    expect(statusOf(frames[2])).toBe(TASK_STATE.INPUT_REQUIRED);
 
     const stored = storage.getTask('id-1') as ManagedTask;
     expect(stored.state).toBe(TASK_STATE.INPUT_REQUIRED);
@@ -478,14 +449,9 @@ describe('createMessageStreamHandler', () => {
     const frames = await drainFrames(result.readable);
     await result.done;
 
-    const last = frames[frames.length - 1]?.json as {
-      data: TaskStatusUpdateEvent;
-    };
-    expect(last.data.status.state).toBe(TASK_STATE.FAILED);
-    expect(last.data.status.state).toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
-    const failureMessage = last.data.status.message;
+    const last = frames[frames.length - 1]?.result.statusUpdate;
+    expect(last?.status.state).toBe(TASK_STATE.FAILED);
+    const failureMessage = last?.status.message;
     expect(failureMessage?.parts[0]).toMatchObject({ text: 'boom' });
   });
 
@@ -549,16 +515,13 @@ describe('createMessageStreamHandler', () => {
         const raw = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 2);
         if (raw.startsWith('data: ')) {
-          seen.push({
-            raw,
-            json: JSON.parse(raw.slice('data: '.length)) as Record<
-              string,
-              unknown
-            >,
-          });
+          const envelope = JSON.parse(raw.slice('data: '.length)) as {
+            result: StreamResponse;
+          };
+          seen.push({ raw, result: envelope.result });
         }
       }
-      if (seen.length >= 2) {
+      if (seen.length >= 3) {
         controller.abort();
       }
     }
@@ -640,18 +603,15 @@ describe('createMessageStreamHandler', () => {
         }
       };
 
-      // Initial WORKING + at least 3 periodic re-emits (≈ 90 ms of timer firings).
-      await readUntil(4);
-      expect(seen.length).toBeGreaterThanOrEqual(4);
-      for (const raw of seen) {
+      // Task + initial WORKING + at least 3 periodic re-emits (≈ 90 ms of timer firings).
+      await readUntil(5);
+      expect(seen.length).toBeGreaterThanOrEqual(5);
+      for (const raw of seen.slice(1)) {
         const payload = JSON.parse(raw.slice('data: '.length)) as {
-          type: string;
-          data: TaskStatusUpdateEvent;
+          result: StreamResponse;
         };
-        expect(payload.type).toBe(AGENT_EVENT_TYPE.TASK_STATUS_CHANGED);
-        expect(payload.data.status.state).toBe(TASK_STATE.IN_PROGRESS);
-        expect(payload.data.status.state).not.toMatch(
-          /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
+        expect(payload.result.statusUpdate?.status.state).toBe(
+          TASK_STATE.IN_PROGRESS
         );
       }
 
@@ -700,22 +660,24 @@ describe('createMessageStreamHandler', () => {
       let buffer = '';
       const frames: string[] = [];
 
-      // Read the initial WORKING frame.
-      const first = await reader.read();
-      expect(first.done).toBe(false);
-      buffer += decoder.decode(first.value as Uint8Array, { stream: true });
-      while (true) {
-        const idx = buffer.indexOf('\n\n');
-        if (idx < 0) {
-          break;
-        }
-        const raw = buffer.slice(0, idx);
-        buffer = buffer.slice(idx + 2);
-        if (raw.startsWith('data: ')) {
-          frames.push(raw);
+      // Read the task and the initial WORKING frame.
+      while (frames.length < 2) {
+        const next = await reader.read();
+        expect(next.done).toBe(false);
+        buffer += decoder.decode(next.value as Uint8Array, { stream: true });
+        while (true) {
+          const idx = buffer.indexOf('\n\n');
+          if (idx < 0) {
+            break;
+          }
+          const raw = buffer.slice(0, idx);
+          buffer = buffer.slice(idx + 2);
+          if (raw.startsWith('data: ')) {
+            frames.push(raw);
+          }
         }
       }
-      expect(frames.length).toBe(1);
+      expect(frames.length).toBe(2);
 
       // Wait 250 ms of real time and race a read against it. With periodic
       // updates disabled, the read should not resolve - the timeout wins.

@@ -1,6 +1,6 @@
 # Streaming A2A Example (no LLM)
 
-End-to-end example of `SendStreamingMessage` over Server-Sent Events using `@inference-gateway/adk`: a server with a custom streaming handler that emits word-by-word `delta` events plus a final `task.status.changed` (state `COMPLETED`), and a client that consumes the SSE stream and prints each event as it arrives.
+End-to-end example of `SendStreamingMessage` over Server-Sent Events using `@inference-gateway/adk`: a server with a custom streaming handler that emits word-by-word `delta` events plus a final `COMPLETED` status update, and a client that consumes the SSE stream and prints each event as it arrives.
 
 Mirrors the Go ADK's [`examples/streaming/`](https://github.com/inference-gateway/adk/tree/main/examples/streaming).
 
@@ -9,7 +9,7 @@ Mirrors the Go ADK's [`examples/streaming/`](https://github.com/inference-gatewa
 - Boot an `A2AServer` with `capabilities.streaming = true` in its `AgentCard`.
 - Register the `SendStreamingMessage` JSON-RPC method via `createMessageStreamHandler`.
 - Provide a `StreamingTaskExecutor` (an `async function*`) that yields `delta` events for each word and a final `statusChanged` event carrying the full assembled message.
-- Drive it all from a plain `fetch`-based client that decodes the SSE frames and CloudEvents v1.0 envelopes inline - no third-party HTTP code, no LLM. Deltas are pure mock output, simulated with a small sleep between words.
+- Drive it all from a plain `fetch`-based client that decodes the SSE frames and their JSON-RPC `StreamResponse` envelopes inline - no third-party HTTP code, no LLM. Deltas are pure mock output, simulated with a small sleep between words.
 
 ## Layout
 
@@ -79,11 +79,12 @@ Client (abbreviated - UUIDs and timestamps will differ, and the response text st
 
 ```text
 POST http://127.0.0.1:8080/  SendStreamingMessage  "Please write a short paragraph and stream it to me word by word."
-[task …] status=IN_PROGRESS final=false
+[task …] status=TASK_STATE_SUBMITTED
+[task …] status=IN_PROGRESS
 ---
 This is a mock streaming response. Each word appears with a small delay to simulate real-time token streaming without any LLM dependency.
 ---
-[task …] status=TASK_STATE_COMPLETED final=true
+[task …] status=TASK_STATE_COMPLETED
 stream complete: 22 delta event(s)
 assembled text: "This is a mock streaming response. Each word appears with a small delay to simulate real-time token streaming without any LLM dependency."
 final status: {
@@ -107,13 +108,13 @@ final status: {
 
 ## How the streaming executor works
 
-`SendStreamingMessage` is fundamentally different from `SendMessage`: the handler does not return a single JSON-RPC envelope, it opens an SSE stream and emits CloudEvents v1.0 frames until the task reaches a terminal state. The lifecycle implemented by `createMessageStreamHandler` is:
+`SendStreamingMessage` is fundamentally different from `SendMessage`: the handler does not return a single JSON-RPC envelope, it opens an SSE stream whose events are JSON-RPC responses carrying an A2A `StreamResponse` (spec 9.4.2) until the task reaches a terminal state. The lifecycle implemented by `createMessageStreamHandler` is:
 
 1. Validate params and create a `PENDING` task; enqueue it in `InMemoryTaskStorage`.
-2. Transition the task to `IN_PROGRESS` and emit a `adk.agent.task.status.changed` frame (`final: false`).
+2. Emit the task, transition it to `IN_PROGRESS` and emit a `statusUpdate` frame.
 3. Iterate the user-supplied executor. For each event:
-   - `delta` → emit a `adk.agent.delta` frame carrying the partial message; no state change.
-   - `statusChanged` → transition the task and emit `adk.agent.task.status.changed`. A terminal state ends the stream.
+   - `delta` → emit a `TASK_STATE_WORKING` `statusUpdate` carrying the partial message; no state change.
+   - `statusChanged` → transition the task and emit a `statusUpdate`. A terminal state ends the stream.
 4. If the executor exhausts without yielding a terminal status, the handler transitions the task to `COMPLETED` and emits a final status frame automatically.
 5. If the request is cancelled (client disconnect, server shutdown), the executor's `signal` aborts, the task transitions to `CANCELLED`, and a final status frame is emitted before the stream closes.
 6. Any error thrown by the executor transitions the task to `FAILED` and embeds the error message in the final status frame.
@@ -127,5 +128,5 @@ In this example the executor (`mockStreamingExecutor` in `server.ts`) walks a ha
 1. `POST <SERVER_URL>/` with a JSON-RPC envelope (`method: "SendStreamingMessage"`).
 2. Confirm the response is `Content-Type: text/event-stream`.
 3. Read the body as a Web `ReadableStream<Uint8Array>`, decode UTF-8, and split on `\n\n` to recover individual SSE frames.
-4. For every `data: …` frame, parse the payload as a CloudEvents v1.0 envelope and dispatch on its `type` attribute (`adk.agent.delta`, `adk.agent.task.status.changed`).
+4. For every `data: …` frame, parse the payload as a JSON-RPC response and dispatch on its `result` (`task` or `statusUpdate`); a working status update with a `message` is a delta.
 5. For each delta frame, write the text parts straight to `stdout` so the response appears progressively. For the terminal status frame, log the final task summary.

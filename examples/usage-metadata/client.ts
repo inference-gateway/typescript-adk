@@ -1,13 +1,12 @@
 import {
-  AGENT_EVENT_TYPE,
   JSONRPC_VERSION,
   MESSAGE_STREAM_METHOD,
   TASK_STATE,
   createA2AClient,
   isTerminal,
-  type CloudEvent,
   type ManagedTaskState,
   type Message,
+  type StreamResponse,
   type Task,
   type TaskStatusUpdateEvent,
 } from '@inference-gateway/adk';
@@ -93,8 +92,13 @@ let finalStatus: TaskStatusUpdateEvent | null = null;
 let streamTaskId: string | undefined;
 
 for await (const event of readSSEEvents(response.body)) {
-  if (event.type === AGENT_EVENT_TYPE.TASK_STATUS_CHANGED) {
-    const data = event.data as TaskStatusUpdateEvent;
+  const data = event.statusUpdate;
+  const isDelta =
+    data?.status.state === TASK_STATE.IN_PROGRESS &&
+    data.status.message !== undefined;
+  if (data === undefined) {
+    console.log(`[event] ${Object.keys(event).join(', ')}`);
+  } else if (!isDelta) {
     streamTaskId = data.taskId;
     console.log(
       `[status] state=${data.status.state}${data.metadata !== undefined ? '  metadata=yes' : ''}`
@@ -104,10 +108,6 @@ for await (const event of readSSEEvents(response.body)) {
     ) {
       finalStatus = data;
     }
-  } else if (event.type === AGENT_EVENT_TYPE.DELTA) {
-    // skip noisy per-delta logging
-  } else {
-    console.log(`[event] ${event.type}`);
   }
 }
 
@@ -144,7 +144,7 @@ async function pollUntilTerminal(taskId: string): Promise<Task> {
 
 async function* readSSEEvents(
   body: ReadableStream<Uint8Array>
-): AsyncIterable<CloudEvent> {
+): AsyncIterable<StreamResponse> {
   const decoder = new TextDecoder();
   const reader = body.getReader();
   let buffer = '';
@@ -161,7 +161,7 @@ async function* readSSEEvents(
         if (!raw.startsWith('data: ')) continue;
         const payload = raw.slice('data: '.length);
         try {
-          yield JSON.parse(payload) as CloudEvent;
+          yield (JSON.parse(payload) as { result: StreamResponse }).result;
         } catch (err) {
           console.error(`failed to parse SSE frame: ${(err as Error).message}`);
         }

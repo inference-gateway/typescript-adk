@@ -1,13 +1,12 @@
 import {
-  AGENT_EVENT_TYPE,
   JSONRPC_VERSION,
   MESSAGE_STREAM_METHOD,
   TASK_STATE,
   createA2AClient,
   isTerminal,
-  type CloudEvent,
   type ManagedTaskState,
   type Message,
+  type StreamResponse,
   type Task,
   type TaskStatusUpdateEvent,
 } from '@inference-gateway/adk';
@@ -85,10 +84,10 @@ let finalStatus: TaskStatusUpdateEvent | null = null;
 
 for await (const event of readSSEEvents(response.body)) {
   frameCount += 1;
-  if (event.type === AGENT_EVENT_TYPE.TASK_STATUS_CHANGED) {
-    const data = event.data as TaskStatusUpdateEvent;
+  const data = event.statusUpdate;
+  if (data !== undefined) {
     console.log(
-      `[frame ${frameCount}] task.status.changed state=${data.status.state}`
+      `[frame ${frameCount}] statusUpdate state=${data.status.state}`
     );
     if (
       /TASK_STATE_(COMPLETED|FAILED|CANCELED|REJECTED)$/.test(data.status.state)
@@ -96,7 +95,7 @@ for await (const event of readSSEEvents(response.body)) {
       finalStatus = data;
     }
   } else {
-    console.log(`[frame ${frameCount}] type=${event.type}`);
+    console.log(`[frame ${frameCount}] ${Object.keys(event).join(', ')}`);
   }
 }
 
@@ -125,7 +124,7 @@ async function pollUntilTerminal(taskId: string): Promise<Task> {
 
 async function* readSSEEvents(
   body: ReadableStream<Uint8Array>
-): AsyncIterable<CloudEvent> {
+): AsyncIterable<StreamResponse> {
   const decoder = new TextDecoder();
   const reader = body.getReader();
   let buffer = '';
@@ -142,7 +141,7 @@ async function* readSSEEvents(
         if (!raw.startsWith('data: ')) continue;
         const payload = raw.slice('data: '.length);
         try {
-          yield JSON.parse(payload) as CloudEvent;
+          yield (JSON.parse(payload) as { result: StreamResponse }).result;
         } catch (err) {
           console.error(`failed to parse SSE frame: ${(err as Error).message}`);
         }
