@@ -1,3 +1,5 @@
+import { parseEnvBool } from '../internal/env.js';
+
 /**
  * Telemetry configuration. Mirrors `OpenTelemetryConfig` in the Go ADK
  * (`server/otel/otel.go`).
@@ -127,23 +129,6 @@ export const OTEL_EXPORTER_PROMETHEUS_HOST_ENV =
 export const OTEL_EXPORTER_PROMETHEUS_PORT_ENV =
   'OTEL_EXPORTER_PROMETHEUS_PORT';
 
-const TRUTHY = new Set(['1', 'true', 'yes', 'on']);
-const FALSY = new Set(['', '0', 'false', 'no', 'off']);
-
-function parseBool(raw: string | undefined): boolean {
-  if (raw === undefined) {
-    return false;
-  }
-  const v = raw.trim().toLowerCase();
-  if (TRUTHY.has(v)) {
-    return true;
-  }
-  if (FALSY.has(v)) {
-    return false;
-  }
-  return false;
-}
-
 /**
  * Default `service.name` when neither the config nor the env supplies one.
  */
@@ -225,7 +210,7 @@ export function loadTelemetryConfigFromEnv(
   env: Readonly<Record<string, string | undefined>> = process.env
 ): TelemetryConfig {
   return {
-    enable: parseBool(env[TELEMETRY_ENABLED_ENV]),
+    enable: parseEnvBool(env[TELEMETRY_ENABLED_ENV]),
     serviceName: env[OTEL_SERVICE_NAME_ENV] ?? DEFAULT_SERVICE_NAME,
     serviceVersion: env[OTEL_SERVICE_VERSION_ENV] ?? DEFAULT_SERVICE_VERSION,
     metricsExporter: parseMetricsExporter(env[OTEL_METRICS_EXPORTER_ENV]),

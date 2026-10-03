@@ -1,3 +1,5 @@
+import { parseEnvBool } from '../internal/env.js';
+
 /**
  * Configuration for the Prometheus metrics endpoint. Mirrors the Go ADK's
  * `PrometheusConfig` in `adk/server/otel/otel.go` - a separate HTTP server
@@ -104,19 +106,6 @@ export const DEFAULT_METRICS_WRITE_TIMEOUT_MS = 10_000;
 /** Default idle (keep-alive) timeout (60 seconds). */
 export const DEFAULT_METRICS_IDLE_TIMEOUT_MS = 60_000;
 
-const TRUTHY = new Set(['1', 'true', 'yes', 'on']);
-const FALSY = new Set(['', '0', 'false', 'no', 'off']);
-
-function parseBool(raw: string | undefined): boolean | undefined {
-  if (raw === undefined) {
-    return undefined;
-  }
-  const v = raw.trim().toLowerCase();
-  if (TRUTHY.has(v)) return true;
-  if (FALSY.has(v)) return false;
-  return false;
-}
-
 function parsePositiveInt(
   raw: string | undefined,
   fallback: number,
@@ -140,8 +129,12 @@ function parsePositiveInt(
 export function loadMetricsConfigFromEnv(
   env: Readonly<Record<string, string | undefined>> = process.env
 ): MetricsConfig {
-  const metricsEnable = parseBool(env[METRICS_ENABLED_ENV]);
-  const telemetryEnable = parseBool(env[TELEMETRY_ENABLED_ENV]);
+  const metricsRaw = env[METRICS_ENABLED_ENV];
+  const telemetryRaw = env[TELEMETRY_ENABLED_ENV];
+  const metricsEnable =
+    metricsRaw === undefined ? undefined : parseEnvBool(metricsRaw);
+  const telemetryEnable =
+    telemetryRaw === undefined ? undefined : parseEnvBool(telemetryRaw);
   const enable = metricsEnable ?? telemetryEnable ?? false;
 
   return {

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { Agent, request as httpsRequest } from 'node:https';
 import type { RequestOptions as HttpsRequestOptions } from 'node:https';
 import { URL } from 'node:url';
+import { parseEnvBool } from '../internal/env.js';
 import { TLSConfigError } from './errors.js';
 
 /**
@@ -77,7 +78,7 @@ export function loadClientTLSConfigFromEnv(
     (typeof keyPath === 'string' && keyPath.length > 0) ||
     (typeof caPath === 'string' && caPath.length > 0) ||
     (typeof passphrase === 'string' && passphrase.length > 0) ||
-    isTruthy(insecure) ||
+    parseEnvBool(insecure) ||
     (typeof servername === 'string' && servername.length > 0);
 
   if (!hasAny) {
@@ -97,7 +98,7 @@ export function loadClientTLSConfigFromEnv(
   if (typeof passphrase === 'string' && passphrase.length > 0) {
     config['passphrase'] = passphrase;
   }
-  if (isTruthy(insecure)) {
+  if (parseEnvBool(insecure)) {
     config['insecureSkipVerify'] = true;
   }
   if (typeof servername === 'string' && servername.length > 0) {
@@ -272,12 +273,6 @@ function readPem(path: string, field: string): Buffer {
       err
     );
   }
-}
-
-function isTruthy(value: string | undefined): boolean {
-  if (typeof value !== 'string') return false;
-  const v = value.toLowerCase().trim();
-  return v === 'true' || v === '1' || v === 'yes' || v === 'on';
 }
 
 function normalizeHeaders(

@@ -1,3 +1,5 @@
+import { parseEnvBool } from '../internal/env.js';
+
 /**
  * Authentication configuration. Mirrors `AuthConfig` in the Go ADK
  * (`server/config/config.go`).
@@ -14,23 +16,6 @@ export interface AuthConfig {
   readonly clientSecret: string;
 }
 
-const TRUTHY = new Set(['1', 'true', 'yes', 'on']);
-const FALSY = new Set(['', '0', 'false', 'no', 'off']);
-
-function parseBool(raw: string | undefined): boolean {
-  if (raw === undefined) {
-    return false;
-  }
-  const v = raw.trim().toLowerCase();
-  if (TRUTHY.has(v)) {
-    return true;
-  }
-  if (FALSY.has(v)) {
-    return false;
-  }
-  return false;
-}
-
 /**
  * Read auth configuration from an environment-shaped map (defaults to
  * `process.env`). Recognised keys:
@@ -44,7 +29,7 @@ export function loadAuthConfigFromEnv(
   env: Readonly<Record<string, string | undefined>> = process.env
 ): AuthConfig {
   return {
-    enable: parseBool(env['AUTH_ENABLED']),
+    enable: parseEnvBool(env['AUTH_ENABLED']),
     issuerUrl: env['AUTH_ISSUER_URL'] ?? '',
     clientId: env['AUTH_CLIENT_ID'] ?? '',
     clientSecret: env['AUTH_CLIENT_SECRET'] ?? '',
