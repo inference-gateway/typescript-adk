@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import pkg from '../../package.json' with { type: 'json' };
 import type {
   AuthenticationInfo,
@@ -293,7 +294,9 @@ export class HTTPPushNotificationSender implements PushNotificationSender {
 
       if (attempt < maxRetries) {
         const delay = computeBackoffDelay(attempt, this.retryConfig);
-        await sleep(delay, options.signal);
+        await sleep(delay, undefined, { signal: options.signal }).catch(() => {
+          throw signalReasonAsError(options.signal!);
+        });
       }
     }
 
@@ -490,28 +493,6 @@ function composeSignals(
   if (defined.length === 0) return undefined;
   if (defined.length === 1) return defined[0];
   return AbortSignal.any(defined);
-}
-
-function sleep(ms: number, signal: AbortSignal | undefined): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted === true) {
-      reject(signalReasonAsError(signal));
-      return;
-    }
-    const timer = setTimeout(() => {
-      if (signal !== undefined) {
-        signal.removeEventListener('abort', onAbort);
-      }
-      resolve();
-    }, ms);
-    const onAbort = (): void => {
-      clearTimeout(timer);
-      reject(signalReasonAsError(signal!));
-    };
-    if (signal !== undefined) {
-      signal.addEventListener('abort', onAbort, { once: true });
-    }
-  });
 }
 
 function signalReasonAsError(signal: AbortSignal): Error {

@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import {
   InferenceGatewayClient,
   type ChatCompletionStreamCallbacks,
@@ -152,10 +153,6 @@ function normalizeProvider(value: Provider | string): Provider {
   const v =
     typeof value === 'string' ? (value.toLowerCase() as Provider) : value;
   return v;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 }
 
 /**

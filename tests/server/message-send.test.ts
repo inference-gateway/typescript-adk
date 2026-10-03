@@ -1,10 +1,14 @@
+import { getEventListeners } from 'node:events';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   TASK_STATE,
   createTask,
+  isTerminal,
   transitionTask,
   type ManagedTask,
 } from '../../src/agent/task.js';
+import { pollTask } from '../../src/server/message-send.js';
 import {
   A2AServer,
   JSONRPC_ERROR_CODES,
@@ -670,4 +674,33 @@ describe('createMessageSendHandler task lifecycle', () => {
       ).rejects.toMatchObject({ code });
     }
   );
+});
+
+describe('pollTask abort listeners', () => {
+  it('does not accumulate abort listeners across poll intervals', async () => {
+    const storage = new InMemoryTaskStorage();
+    const created = createTask({
+      id: 'poll-1',
+      contextId: 'ctx-poll',
+      messages: [makeMessage()],
+    });
+    const running = transitionTask(created, TASK_STATE.IN_PROGRESS);
+    storage.createActive(running);
+    const controller = new AbortController();
+
+    const polled = pollTask(storage, running, isTerminal, controller.signal);
+
+    // Only the in-flight sleep listens, no matter how many 50 ms intervals
+    // elapse - the pre-refactor `delay` leaked one listener per poll.
+    await sleep(60);
+    const afterOne = getEventListeners(controller.signal, 'abort').length;
+    await sleep(300);
+    expect(getEventListeners(controller.signal, 'abort').length).toBe(afterOne);
+    expect(afterOne).toBeLessThanOrEqual(1);
+
+    storage.updateActive(transitionTask(running, TASK_STATE.COMPLETED));
+    const latest = await polled;
+    expect(latest.state).toBe(TASK_STATE.COMPLETED);
+    expect(getEventListeners(controller.signal, 'abort').length).toBe(0);
+  });
 });

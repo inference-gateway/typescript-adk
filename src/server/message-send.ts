@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import {
   TASK_STATE,
   createTask,
@@ -175,7 +176,10 @@ async function pollTask(
 ): Promise<ManagedTask> {
   let latest = task;
   while (!done(latest.state) && !signal.aborted) {
-    await delay(TASK_POLL_INTERVAL_MS, signal);
+    // Abort only ends the wait; the loop condition re-checks `signal.aborted`.
+    await sleep(TASK_POLL_INTERVAL_MS, undefined, { signal }).catch(
+      () => undefined
+    );
     const current = storage.getTask(latest.id);
     if (current !== undefined && current.state !== latest.state) {
       latest = current;
@@ -183,20 +187,6 @@ async function pollTask(
     }
   }
   return latest;
-}
-
-function delay(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true }
-    );
-  });
 }
 
 /**
