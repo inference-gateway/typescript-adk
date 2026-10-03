@@ -1,3 +1,5 @@
+import { parseEnvBool } from '../internal/env.js';
+
 /**
  * MCP client configuration. Mirrors the Go ADK's optional MCP client
  * (`inference-gateway/adk` PR #251, `docs/mcp.md`) so an agent behaves the same
@@ -49,12 +51,6 @@ export const DEFAULT_MCP_CALL_TIMEOUT_MS = 30_000;
 export const DEFAULT_MCP_MAX_RETRIES = 0;
 export const DEFAULT_MCP_RETRY_INTERVAL_MS = 2_000;
 export const DEFAULT_MCP_RETRY_MAX_INTERVAL_MS = 30_000;
-
-const TRUTHY = new Set(['1', 'true', 'yes', 'on']);
-
-function parseBool(raw: string | undefined): boolean {
-  return raw !== undefined && TRUTHY.has(raw.trim().toLowerCase());
-}
 
 const DURATION_UNIT_MS: Readonly<Record<string, number>> = {
   ms: 1,
@@ -140,7 +136,7 @@ export function loadMCPConfigFromEnv(
 ): MCPConfig {
   const endpointRaw = env[MCP_ENDPOINT_ENV];
   return {
-    enable: parseBool(env[MCP_ENABLED_ENV]),
+    enable: parseEnvBool(env[MCP_ENABLED_ENV]),
     servers: parseServers(env[MCP_SERVERS_ENV]),
     endpoint:
       endpointRaw !== undefined && endpointRaw.length > 0

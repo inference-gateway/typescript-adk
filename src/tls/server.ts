@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { ServerOptions as HttpsServerOptions } from 'node:https';
 import type { SecureVersion } from 'node:tls';
+import { parseEnvBool } from '../internal/env.js';
 import { TLSConfigError } from './errors.js';
 
 /**
@@ -128,7 +129,7 @@ export function buildServerTLSOptions(
 export function loadServerTLSConfigFromEnv(
   env: NodeJS.ProcessEnv = process.env
 ): ServerTLSConfig | undefined {
-  if (!isTruthyEnv(env[TLS_ENABLED_ENV])) {
+  if (!parseEnvBool(env[TLS_ENABLED_ENV])) {
     return undefined;
   }
 
@@ -156,7 +157,7 @@ export function loadServerTLSConfigFromEnv(
   if (typeof passphrase === 'string' && passphrase.length > 0) {
     config['passphrase'] = passphrase;
   }
-  if (isTruthyEnv(env[TLS_CLIENT_AUTH_ENV])) {
+  if (parseEnvBool(env[TLS_CLIENT_AUTH_ENV])) {
     config['requestCert'] = true;
     config['rejectUnauthorized'] = true;
   }
@@ -173,10 +174,4 @@ function readPem(path: string, field: string): Buffer {
       err
     );
   }
-}
-
-function isTruthyEnv(value: string | undefined): boolean {
-  if (typeof value !== 'string') return false;
-  const v = value.toLowerCase().trim();
-  return v === 'true' || v === '1' || v === 'yes' || v === 'on';
 }
