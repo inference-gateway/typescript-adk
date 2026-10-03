@@ -6,6 +6,7 @@ import {
   A2AServer,
   A2AServerBuilder,
   A2AServerBuilderError,
+  JSONRPC_ERROR_CODES,
   MESSAGE_SEND_METHOD,
   MESSAGE_STREAM_METHOD,
   NOOP_LOGGER,
@@ -237,23 +238,42 @@ describe('A2AServerBuilder.build success paths', () => {
     expect(server.hasMethod(MESSAGE_STREAM_METHOD)).toBe(true);
   });
 
-  it('does not register push notification methods when capability is absent', () => {
+  it('answers -32003 on push notification methods when capability is absent', async () => {
     const server = new A2AServerBuilder({})
       .withAgentCard(backgroundCard())
       .withBackgroundTaskHandler(noopBackgroundHandler)
       .build();
-    expect(server.hasMethod(TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD)).toBe(
-      false
-    );
-    expect(server.hasMethod(TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD)).toBe(
-      false
-    );
-    expect(server.hasMethod(TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD)).toBe(
-      false
-    );
-    expect(server.hasMethod(TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD)).toBe(
-      false
-    );
+    await server.listen(0, '127.0.0.1');
+    const port = server.address()?.port ?? 0;
+
+    for (const method of [
+      TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD,
+      TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD,
+      TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD,
+      TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD,
+    ]) {
+      expect(server.hasMethod(method)).toBe(true);
+      const res = await fetch(`http://127.0.0.1:${port}/`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'req-1',
+          method,
+          params: { taskId: 'task-1', id: 'cfg-1' },
+        }),
+      });
+      const body = (await res.json()) as {
+        error: { code: number; data: { reason: string }[] };
+      };
+      expect(body.error.code).toBe(
+        JSONRPC_ERROR_CODES.PUSH_NOTIFICATION_NOT_SUPPORTED_ERROR
+      );
+      expect(body.error.data[0]?.reason).toBe(
+        'PUSH_NOTIFICATION_NOT_SUPPORTED'
+      );
+    }
+    await server.close();
   });
 
   it('registers all four push notification methods when capability is enabled', () => {
