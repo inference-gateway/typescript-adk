@@ -59,6 +59,7 @@ export {
   TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD,
   TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD,
   TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD,
+  createPushNotificationNotSupportedHandler,
   createTaskPushNotificationConfigDeleteHandler,
   createTaskPushNotificationConfigGetHandler,
   createTaskPushNotificationConfigListHandler,

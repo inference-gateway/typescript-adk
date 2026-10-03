@@ -39,6 +39,27 @@ export const TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD =
 export const TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD =
   'DeleteTaskPushNotificationConfig' satisfies A2AMethod;
 
+/**
+ * Build the handler to register for every push notification config method when
+ * the card sets `capabilities.pushNotifications` to anything but `true`.
+ *
+ * The methods exist in the A2A surface regardless, so leaving them
+ * unregistered would surface `-32601` (Method Not Found) where the spec
+ * requires `-32003` (`PushNotificationNotSupportedError`, section 5.4) - the
+ * method is known, the agent just does not support it.
+ */
+export function createPushNotificationNotSupportedHandler(): MethodHandler<
+  unknown,
+  never
+> {
+  return (): never => {
+    throw new JSONRPCError(
+      JSONRPC_ERROR_CODES.PUSH_NOTIFICATION_NOT_SUPPORTED_ERROR,
+      'push notifications are not supported by this agent'
+    );
+  };
+}
+
 export interface TaskPushNotificationConfigHandlerOptions {
   /** Storage backend that persists configs via `setPushConfig` / etc. */
   readonly storage: TaskStorage;

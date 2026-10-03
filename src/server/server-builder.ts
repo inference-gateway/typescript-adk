@@ -43,6 +43,7 @@ import {
   TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD,
   TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD,
   TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD,
+  createPushNotificationNotSupportedHandler,
   createTaskPushNotificationConfigDeleteHandler,
   createTaskPushNotificationConfigGetHandler,
   createTaskPushNotificationConfigListHandler,
@@ -558,6 +559,16 @@ export class A2AServerBuilder<
         TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD,
         createTaskPushNotificationConfigDeleteHandler({ storage })
       );
+    } else {
+      const notSupported = createPushNotificationNotSupportedHandler();
+      for (const method of [
+        TASK_PUSH_NOTIFICATION_CONFIG_SET_METHOD,
+        TASK_PUSH_NOTIFICATION_CONFIG_GET_METHOD,
+        TASK_PUSH_NOTIFICATION_CONFIG_LIST_METHOD,
+        TASK_PUSH_NOTIFICATION_CONFIG_DELETE_METHOD,
+      ]) {
+        server.registerMethod(method, notSupported);
+      }
     }
 
     return server;
