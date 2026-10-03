@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.18.0](https://github.com/inference-gateway/typescript-adk/compare/v0.17.0...v0.18.0) (2026-10-03)
+
+### ✨ Features
+
+* rename a2a json-rpc methods to the v1.0.1 names ([#240](https://github.com/inference-gateway/typescript-adk/issues/240)) ([4903ea3](https://github.com/inference-gateway/typescript-adk/commit/4903ea3da4d7e30c464027a934718369226d7359)), closes [#238](https://github.com/inference-gateway/typescript-adk/issues/238)
+
+### 🔧 Miscellaneous
+
+* **deps:** bump claude-code 2.1.283 -> 2.1.285 ([#237](https://github.com/inference-gateway/typescript-adk/issues/237)) ([5cbbe8f](https://github.com/inference-gateway/typescript-adk/commit/5cbbe8f2642137dae257ef4840029df546c7a677))
+
 ## [0.17.0](https://github.com/inference-gateway/typescript-adk/compare/v0.16.2...v0.17.0) (2026-10-01)
 
 ### ✨ Features
