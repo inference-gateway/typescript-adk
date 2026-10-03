@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.1](https://github.com/inference-gateway/typescript-adk/compare/v0.19.0...v0.19.1) (2026-10-03)
+
+### 🐛 Bug Fixes
+
+* **artifacts:** cap artifacts, not files, in cleanupOldest ([#260](https://github.com/inference-gateway/typescript-adk/issues/260)) ([a12d6c7](https://github.com/inference-gateway/typescript-adk/commit/a12d6c708e40ea17617d7728c87ff63454a3dc24))
+
 ## [0.19.0](https://github.com/inference-gateway/typescript-adk/compare/v0.18.1...v0.19.0) (2026-10-03)
 
 ### ✨ Features
