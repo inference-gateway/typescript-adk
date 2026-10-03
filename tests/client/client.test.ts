@@ -10,7 +10,12 @@ import {
   createA2AClient,
   type FetchLike,
 } from '../../src/client/index.js';
-import type { AgentCard, Message, Task } from '../../src/types/index.js';
+import {
+  A2A_PROTOCOL_VERSION,
+  type AgentCard,
+  type Message,
+  type Task,
+} from '../../src/types/index.js';
 
 interface CapturedRequest {
   readonly url: string;
@@ -199,6 +204,18 @@ describe('A2AClient.getAgentCard', () => {
     expect(headers.get('user-agent')).toBe('test-ua/9.9');
   });
 
+  it('sends the A2A-Version header', async () => {
+    const { fetch, calls } = mockFetch({ body: sampleAgentCard() });
+    const client = new A2AClient({
+      baseURL: 'http://agent.test',
+      fetch,
+      retry: false,
+    });
+    await client.getAgentCard();
+    const headers = new Headers(calls[0]?.init.headers);
+    expect(headers.get('a2a-version')).toBe(A2A_PROTOCOL_VERSION);
+  });
+
   it('attaches static custom headers', async () => {
     const { fetch, calls } = mockFetch({ body: sampleAgentCard() });
     const client = new A2AClient({
@@ -243,7 +260,7 @@ describe('A2AClient.sendMessage', () => {
   it('POSTs a JSON-RPC envelope to the configured path and returns result', async () => {
     const task = sampleTask();
     const { fetch, calls } = mockFetch({
-      body: { jsonrpc: '2.0', id: 1, result: task },
+      body: { jsonrpc: '2.0', id: 1, result: { task } },
     });
     const client = new A2AClient({
       baseURL: 'http://agent.test',
@@ -253,7 +270,7 @@ describe('A2AClient.sendMessage', () => {
 
     const result = await client.sendMessage({ message: sampleMessage() });
 
-    expect(result).toEqual(task);
+    expect(result).toEqual({ task });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toBe('http://agent.test/');
     expect(calls[0]?.init.method).toBe('POST');

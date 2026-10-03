@@ -21,14 +21,27 @@ export const JSONRPC_ERROR_CODES = {
   METHOD_NOT_FOUND: -32601,
   INVALID_PARAMS: -32602,
   INTERNAL_ERROR: -32603,
+  TASK_NOT_FOUND_ERROR: -32001,
+  TASK_NOT_CANCELABLE_ERROR: -32002,
   UNSUPPORTED_OPERATION_ERROR: -32004,
   AUTHENTICATED_EXTENDED_CARD_NOT_CONFIGURED_ERROR: -32007,
+  VERSION_NOT_SUPPORTED_ERROR: -32009,
 } as const;
 
 export type JSONRPCErrorCode =
   (typeof JSONRPC_ERROR_CODES)[keyof typeof JSONRPC_ERROR_CODES];
 
 export type JSONRPCResponse = JSONRPCSuccessResponse | JSONRPCErrorResponse;
+
+/** ErrorInfo reasons of the A2A error codes (spec sections 5.4 and 9.5). */
+const A2A_ERROR_REASONS: Readonly<Record<number, string>> = {
+  [JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR]: 'TASK_NOT_FOUND',
+  [JSONRPC_ERROR_CODES.TASK_NOT_CANCELABLE_ERROR]: 'TASK_NOT_CANCELABLE',
+  [JSONRPC_ERROR_CODES.UNSUPPORTED_OPERATION_ERROR]: 'UNSUPPORTED_OPERATION',
+  [JSONRPC_ERROR_CODES.AUTHENTICATED_EXTENDED_CARD_NOT_CONFIGURED_ERROR]:
+    'EXTENDED_AGENT_CARD_NOT_CONFIGURED',
+  [JSONRPC_ERROR_CODES.VERSION_NOT_SUPPORTED_ERROR]: 'VERSION_NOT_SUPPORTED',
+};
 
 /**
  * Thrown by a method handler to surface a structured JSON-RPC error to the
@@ -58,11 +71,15 @@ export function createSuccessResponse(
   };
 }
 
+/**
+ * Build a JSON-RPC error response. A2A error codes without explicit `data`
+ * carry a `google.rpc.ErrorInfo` detail array in `error.data` (spec 9.5).
+ */
 export function createErrorResponse(
   id: JSONRPCId,
   code: number,
   message: string,
-  data?: unknown
+  data: unknown = a2aErrorDetails(code)
 ): JSONRPCErrorResponse {
   const error: JSONRPCErrorObject =
     data === undefined ? { code, message } : { code, message, data };
@@ -71,6 +88,20 @@ export function createErrorResponse(
     id,
     error,
   };
+}
+
+function a2aErrorDetails(code: number): unknown[] | undefined {
+  const reason = A2A_ERROR_REASONS[code];
+  if (reason === undefined) {
+    return undefined;
+  }
+  return [
+    {
+      '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+      reason,
+      domain: 'a2a-protocol.org',
+    },
+  ];
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -149,7 +180,7 @@ async function dispatchSingle(
   }
 
   try {
-    const result = await handler(paramsRaw, { signal });
+    const result = await handler(paramsRaw, { signal, requestId: responseId });
     if (isNotification) {
       return null;
     }

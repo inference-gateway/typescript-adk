@@ -23,7 +23,8 @@ const initial: Message = {
 };
 
 console.log(`POST ${SERVER_URL}/  SendMessage  "${PROMPT}"`);
-const created = await client.sendMessage({ message: initial });
+const { task: created } = await client.sendMessage({ message: initial });
+if (created === undefined) throw new Error('SendMessage returned no task');
 console.log(`created task id=${created.id} state=${created.status.state}`);
 
 const paused = await pollUntilStop(created.id);
@@ -48,7 +49,10 @@ if (paused.status.state === TASK_STATE.INPUT_REQUIRED) {
   console.log(
     `POST ${SERVER_URL}/  SendMessage  "${FOLLOW_UP}" (resume, contextId=${contextId})`
   );
-  const resumed = await client.sendMessage({ message: resumeMessage });
+  const { task: resumed } = await client.sendMessage({
+    message: resumeMessage,
+  });
+  if (resumed === undefined) throw new Error('SendMessage returned no task');
   console.log(`resumed task id=${resumed.id} state=${resumed.status.state}`);
 
   const final = await pollUntilTerminal(resumed.id);

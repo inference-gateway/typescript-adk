@@ -1,21 +1,22 @@
-import { isTerminal } from '../agent/task.js';
+import { isTerminal, toWireTask } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
   A2AMethod,
   SubscribeToTaskRequest,
-  TaskStatus,
-  TaskStatusUpdateEvent,
 } from '../types/generated/a2a.js';
+import type { CloudEvent } from './cloudevents.js';
 import {
-  AGENT_EVENT_TYPE,
-  type AgentEventType,
-  type CloudEvent,
-} from './cloudevents.js';
-import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
-import type { StreamingMethodHandler } from './message-stream.js';
+  JSONRPC_ERROR_CODES,
+  JSONRPCError,
+  createSuccessResponse,
+} from './jsonrpc.js';
+import {
+  streamResponseFrame,
+  type StreamingMethodHandler,
+  type StreamingMethodResult,
+} from './message-stream.js';
 import type { MethodContext } from './method-registry.js';
 import { SSEStreamWriter } from './sse.js';
-import type { StreamingMethodResult } from './message-stream.js';
 import type { TaskEventBusRegistry } from './task-event-bus.js';
 
 /**
@@ -45,9 +46,8 @@ export interface TaskResubscribeHandlerOptions {
    */
   readonly heartbeatMs?: number;
   /**
-   * Override the `source` attribute of synthesized status CloudEvents (the
-   * replay frame emitted when no live bus event is available). Defaults to
-   * the value baked into {@link createCloudEvent} (`'adk/agent'`).
+   * @deprecated No effect: the first frame is now the task itself, not a
+   * synthesized status CloudEvent.
    */
   readonly eventSource?: string;
 }
@@ -56,30 +56,26 @@ export interface TaskResubscribeHandlerOptions {
  * Build a handler for the A2A `SubscribeToTask` JSON-RPC method.
  *
  * Behaviour:
- *  - Synchronous validation: `taskId` must be a non-empty string and the
- *    task must exist in storage. Failures throw {@link JSONRPCError}
- *    (`-32602`) which the server converts to a regular JSON-RPC error
- *    response without ever opening the SSE stream.
- *  - Replay-then-live: the handler opens an SSE response and emits the most
- *    recent `task.status.changed` CloudEvent as the first frame - taken from
- *    the per-task bus's replay buffer when available, otherwise synthesized
- *    from the task's persisted state. When the task is still running, the
- *    handler attaches to the bus and forwards every subsequent CloudEvent
- *    verbatim until the bus closes (typically when the producing
+ *  - Synchronous validation: `taskId` must be a non-empty string (`-32602`)
+ *    and the task must exist in storage (`-32001` TaskNotFound). Failures
+ *    throw {@link JSONRPCError}, which the server converts to a regular
+ *    JSON-RPC error response without ever opening the SSE stream.
+ *  - Task-then-live: the handler opens an SSE response whose first event is
+ *    the task's current state (spec 3.1.6). When the task is still running,
+ *    the handler attaches to the bus and forwards every subsequent event as
+ *    a `StreamResponse` until the bus closes (typically when the producing
  *    `SendStreamingMessage` invocation reaches a terminal state).
  *  - Fan-out: multiple concurrent `SubscribeToTask` callers for the same
  *    task each receive their own independent SSE stream, all driven by the
  *    same per-task bus. Each subscriber sees the same sequence of frames
  *    from the moment it subscribes.
  *  - Terminal task: when the task is already in a terminal state by the
- *    time `SubscribeToTask` is called, the handler emits a single
- *    `task.status.changed` frame with `final: true` (reflecting the
- *    persisted state) and closes the stream immediately.
+ *    time `SubscribeToTask` is called, the handler emits the task and closes
+ *    the stream immediately.
  *
  * Mirrors the Go ADK's `HandleTaskResubscribe`
- * (`adk/server/task_handler.go`), adapted for the TS ADK's CloudEvents-based
- * SSE wire format - we do not emit a `[DONE]` sentinel, the SSE stream simply
- * closes after the terminal status frame.
+ * (`adk/server/task_handler.go`). There is no `[DONE]` sentinel; the SSE
+ * stream simply closes after the last event.
  *
  * Register on an {@link import('./server.js').A2AServer} via
  * `server.registerStreamingMethod(TASK_RESUBSCRIBE_METHOD,
@@ -95,110 +91,55 @@ export function createTaskResubscribeHandler(
     const task = storage.getTask(validated.id);
     if (task === undefined) {
       throw new JSONRPCError(
-        JSONRPC_ERROR_CODES.INVALID_PARAMS,
+        JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR,
         'task not found'
       );
     }
 
+    const requestId = context.requestId ?? null;
     const writer = new SSEStreamWriter({
       signal: context.signal,
+      frame: streamResponseFrame(requestId, task),
       ...(options.heartbeatMs !== undefined
         ? { heartbeatMs: options.heartbeatMs }
         : {}),
     });
 
     const bus = eventBusRegistry?.get(task.id);
-    const taskIsTerminal = isTerminal(task.state);
 
     const done = (async (): Promise<void> => {
       try {
-        if (bus !== undefined && !bus.closed && !taskIsTerminal) {
-          // Live producer is still running. Subscribe first so we don't miss
-          // any event published between the replay frame and the subscribe()
-          // call; then emit the replay frame.
-          const completion = new Promise<void>((resolve) => {
-            const subscription = bus.subscribe(
-              (event) => writer.emitCloudEvent(event),
-              () => {
-                subscription.unsubscribe();
-                resolve();
-              }
-            );
-            const lastStatus = subscription.lastStatus;
-            if (lastStatus !== undefined) {
-              writer.emitCloudEvent(lastStatus);
-            } else {
-              // Bus exists but hasn't published a status yet - the producer
-              // is between task creation and the first WORKING transition.
-              // Synthesize the current state so the subscriber still sees a
-              // first frame immediately.
-              writer.emit(
-                buildStatusEvent(task.id, task.contextId, task.status, {
-                  source: options.eventSource,
-                })
-              );
-            }
-            if (context.signal.aborted) {
-              subscription.unsubscribe();
-              resolve();
-              return;
-            }
-            const onAbort = (): void => {
-              subscription.unsubscribe();
-              resolve();
-            };
-            context.signal.addEventListener('abort', onAbort, { once: true });
-          });
-          await completion;
+        writer.send(
+          createSuccessResponse(requestId, { task: toWireTask(task) })
+        );
+        if (bus === undefined || bus.closed || isTerminal(task.state)) {
           return;
         }
-
-        // No live producer (terminal task, or bus already closed). Emit the
-        // current persisted state as the replay frame and close.
-        const lastStatus = bus?.lastStatus;
-        if (lastStatus !== undefined) {
-          writer.emitCloudEvent(lastStatus);
-        } else {
-          writer.emit(
-            buildStatusEvent(task.id, task.contextId, task.status, {
-              source: options.eventSource,
-            })
+        await new Promise<void>((resolve) => {
+          const subscription = bus.subscribe(
+            (event) => writer.emitCloudEvent(event),
+            () => {
+              subscription.unsubscribe();
+              resolve();
+            }
           );
-        }
+          if (context.signal.aborted) {
+            subscription.unsubscribe();
+            resolve();
+            return;
+          }
+          const onAbort = (): void => {
+            subscription.unsubscribe();
+            resolve();
+          };
+          context.signal.addEventListener('abort', onAbort, { once: true });
+        });
       } finally {
         writer.close();
       }
     })();
 
     return { readable: writer.readable, done };
-  };
-}
-
-interface BuildStatusEventOptions {
-  readonly source: string | undefined;
-}
-
-function buildStatusEvent(
-  taskId: string,
-  contextId: string,
-  status: TaskStatus,
-  options: BuildStatusEventOptions
-): {
-  readonly type: AgentEventType;
-  readonly data: TaskStatusUpdateEvent;
-  readonly subject: string;
-  readonly source?: string;
-} {
-  const data: TaskStatusUpdateEvent = {
-    taskId,
-    contextId,
-    status,
-  };
-  return {
-    type: AGENT_EVENT_TYPE.TASK_STATUS_CHANGED satisfies AgentEventType,
-    data,
-    subject: taskId,
-    ...(options.source !== undefined ? { source: options.source } : {}),
   };
 }
 

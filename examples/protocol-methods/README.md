@@ -206,19 +206,21 @@ Creates a new task from a user message. The server enqueues it as `PENDING` and 
 
 ```json
 {
-  "id": "<task-uuid>",
-  "contextId": "<context-uuid>",
-  "status": {
-    "state": "TASK_STATE_SUBMITTED",
-    "timestamp": "..."
-  },
-  "history": [
-    {
-      "messageId": "<uuid>",
-      "role": "ROLE_USER",
-      "parts": [{ "text": "Hello, protocol-methods agent!" }]
-    }
-  ]
+  "task": {
+    "id": "<task-uuid>",
+    "contextId": "<context-uuid>",
+    "status": {
+      "state": "TASK_STATE_SUBMITTED",
+      "timestamp": "..."
+    },
+    "history": [
+      {
+        "messageId": "<uuid>",
+        "role": "ROLE_USER",
+        "parts": [{ "text": "Hello, protocol-methods agent!" }]
+      }
+    ]
+  }
 }
 ```
 
@@ -537,33 +539,31 @@ Invokes the `SendStreamingMessage` method, which returns a Server-Sent Events st
 }
 ```
 
-**SSE response (each frame is a CloudEvent):**
+**SSE response (each frame is a JSON-RPC response carrying a `StreamResponse`):**
 
 ```
-data: {"type":"adk.agent.task.status.changed","data":{"taskId":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_WORKING","timestamp":"..."}},"subject":"<uuid>"}
+data: {"jsonrpc":"2.0","id":"<uuid>","result":{"task":{"id":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_SUBMITTED","timestamp":"..."},"history":[...]}}}
 
-data: {"type":"adk.agent.delta","data":{"messageId":"<uuid>","contextId":"<uuid>","taskId":"<uuid>","role":"ROLE_AGENT","parts":[{"text":"Hello"}]}}
+data: {"jsonrpc":"2.0","id":"<uuid>","result":{"statusUpdate":{"taskId":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_WORKING","timestamp":"..."}}}}
 
-data: {"type":"adk.agent.delta","data":{"messageId":"<uuid>","contextId":"<uuid>","taskId":"<uuid>","role":"ROLE_AGENT","parts":[{"text":" from"}]}}
+data: {"jsonrpc":"2.0","id":"<uuid>","result":{"statusUpdate":{"taskId":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_WORKING","message":{"messageId":"<uuid>","role":"ROLE_AGENT","parts":[{"text":"Hello"}]}}}}}
 
 ...
 
-data: {"type":"adk.agent.delta","data":{"messageId":"<uuid>","contextId":"<uuid>","taskId":"<uuid>","role":"ROLE_AGENT","parts":[{"text":" deltas."}]}}
-
-data: {"type":"adk.agent.task.status.changed","data":{"taskId":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_COMPLETED","timestamp":"...","message":{"messageId":"<uuid>","contextId":"<uuid>","taskId":"<uuid>","role":"ROLE_AGENT","parts":[{"text":"Hello from the protocol-methods agent. This is a streaming response with word-by-word deltas."}]}}},"subject":"<uuid>"}
+data: {"jsonrpc":"2.0","id":"<uuid>","result":{"statusUpdate":{"taskId":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_COMPLETED","timestamp":"...","message":{"messageId":"<uuid>","role":"ROLE_AGENT","parts":[{"text":"Hello from the protocol-methods agent. This is a streaming response with word-by-word deltas."}]}}}}}
 ```
 
 **Client assertions:**
 
 - HTTP 200 with `Content-Type: text/event-stream`
-- At least one `delta` event received
-- Terminal `task.status.changed` event received with `state: COMPLETED`
+- At least one delta (a `TASK_STATE_WORKING` status update with a message) received
+- Terminal status update received with `state: COMPLETED`
 
 ---
 
 ### 13. `SubscribeToTask` (SSE resubscribe)
 
-Allows a client to re-subscribe to a completed (or in-progress) task's event stream. The server replays the current status as the first frame and closes the stream immediately for terminal tasks.
+Allows a client to re-subscribe to a completed (or in-progress) task's event stream. The first frame is the task itself; the server closes the stream immediately for terminal tasks.
 
 **JSON-RPC request (POST with SSE Accept header):**
 
@@ -579,13 +579,13 @@ Allows a client to re-subscribe to a completed (or in-progress) task's event str
 **SSE response:**
 
 ```
-data: {"type":"adk.agent.task.status.changed","data":{"taskId":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_COMPLETED","timestamp":"..."}},"subject":"<uuid>"}
+data: {"jsonrpc":"2.0","id":"<uuid>","result":{"task":{"id":"<uuid>","contextId":"<uuid>","status":{"state":"TASK_STATE_COMPLETED","timestamp":"..."}}}}
 ```
 
 **Client assertions:**
 
 - HTTP 200 with `Content-Type: text/event-stream`
-- At least one `task.status.changed` event received
+- The task is received
 
 ---
 
@@ -611,8 +611,15 @@ Calling `GetTask` with a task id that doesn't exist returns a JSON-RPC error res
   "jsonrpc": "2.0",
   "id": "<uuid>",
   "error": {
-    "code": -32602,
-    "message": "task not found"
+    "code": -32001,
+    "message": "task not found",
+    "data": [
+      {
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        "reason": "TASK_NOT_FOUND",
+        "domain": "a2a-protocol.org"
+      }
+    ]
   }
 }
 ```

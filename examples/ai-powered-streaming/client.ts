@@ -1,14 +1,9 @@
 import {
-  AGENT_EVENT_TYPE,
   JSONRPC_VERSION,
   MESSAGE_STREAM_METHOD,
   TASK_STATE,
-  type AgentIterationCompletedEventData,
-  type AgentToolEventData,
-  type AgentToolFailedEventData,
-  type AgentToolResultEventData,
-  type CloudEvent,
   type Message,
+  type StreamResponse,
   type TaskStatusUpdateEvent,
 } from '@inference-gateway/adk';
 
@@ -61,87 +56,42 @@ if (response.body === null) {
 
 const accumulated: string[] = [];
 let deltaCount = 0;
-let iterationCount = 0;
-let toolCallCount = 0;
 let finalStatus: TaskStatusUpdateEvent | null = null;
 
 for await (const event of readSSEEvents(response.body)) {
-  switch (event.type) {
-    case AGENT_EVENT_TYPE.TASK_STATUS_CHANGED: {
-      const data = event.data as TaskStatusUpdateEvent;
-      if (data.status.state === TASK_STATE.IN_PROGRESS) {
-        if (finalStatus === null && deltaCount === 0) {
-          console.log(`[task ${data.taskId}] status=IN_PROGRESS`);
-          console.log('---');
-        }
-      } else if (
-        /TASK_STATE_(COMPLETED|FAILED|CANCELED|REJECTED)$/.test(
-          data.status.state
-        )
-      ) {
-        console.log('\n---');
-        console.log(`[task ${data.taskId}] status=${data.status.state}`);
-        finalStatus = data;
+  if (event.task !== undefined) {
+    console.log(`[task ${event.task.id}] status=${event.task.status.state}`);
+    console.log('---');
+    continue;
+  }
+  const data = event.statusUpdate;
+  if (data === undefined) {
+    console.log(`[other event] ${Object.keys(event).join(', ')}`);
+    continue;
+  }
+  const message = data.status.message;
+  if (data.status.state === TASK_STATE.IN_PROGRESS && message !== undefined) {
+    deltaCount += 1;
+    for (const part of message.parts) {
+      if (typeof part.text === 'string') {
+        process.stdout.write(part.text);
+        accumulated.push(part.text);
       }
-      break;
     }
-    case AGENT_EVENT_TYPE.DELTA: {
-      const message = event.data as Message;
-      deltaCount += 1;
-      for (const part of message.parts) {
-        if (typeof part.text === 'string') {
-          process.stdout.write(part.text);
-          accumulated.push(part.text);
-        }
-      }
-      break;
-    }
-    case AGENT_EVENT_TYPE.ITERATION_COMPLETED: {
-      const data = event.data as AgentIterationCompletedEventData;
-      iterationCount = data.iteration;
-      break;
-    }
-    case AGENT_EVENT_TYPE.TOOL_STARTED: {
-      const data = event.data as AgentToolEventData;
-      toolCallCount += 1;
-      process.stdout.write(
-        `\n[tool ${data.toolName} started] args=${data.arguments ?? '{}'}\n`
-      );
-      break;
-    }
-    case AGENT_EVENT_TYPE.TOOL_COMPLETED: {
-      const data = event.data as AgentToolEventData;
-      process.stdout.write(`[tool ${data.toolName} completed]\n`);
-      break;
-    }
-    case AGENT_EVENT_TYPE.TOOL_FAILED: {
-      const data = event.data as AgentToolFailedEventData;
-      process.stdout.write(
-        `[tool ${data.toolName} failed] error=${data.error}\n`
-      );
-      break;
-    }
-    case AGENT_EVENT_TYPE.TOOL_RESULT: {
-      const data = event.data as AgentToolResultEventData;
-      process.stdout.write(
-        `[tool ${data.toolName} -> ${data.isError ? 'error' : 'ok'}] ${data.result}\n`
-      );
-      break;
-    }
-    case AGENT_EVENT_TYPE.INPUT_REQUIRED: {
-      const message = event.data as Message;
-      const prompt = extractText(message);
-      process.stdout.write(`\n[input required] ${prompt}\n`);
-      break;
-    }
-    default:
-      console.log(`[unknown event] type=${event.type}`);
+  } else if (data.status.state === TASK_STATE.INPUT_REQUIRED) {
+    const prompt = message !== undefined ? extractText(message) : '';
+    process.stdout.write(`\n[input required] ${prompt}\n`);
+    finalStatus = data;
+  } else if (
+    /TASK_STATE_(COMPLETED|FAILED|CANCELED|REJECTED)$/.test(data.status.state)
+  ) {
+    console.log('\n---');
+    console.log(`[task ${data.taskId}] status=${data.status.state}`);
+    finalStatus = data;
   }
 }
 
-console.log(
-  `stream complete: ${deltaCount} delta event(s), ${iterationCount} iteration(s), ${toolCallCount} tool call(s)`
-);
+console.log(`stream complete: ${deltaCount} delta event(s)`);
 console.log(`assembled text: ${JSON.stringify(accumulated.join(''))}`);
 if (finalStatus !== null) {
   console.log(`final status: ${JSON.stringify(finalStatus, null, 2)}`);
@@ -149,7 +99,7 @@ if (finalStatus !== null) {
 
 async function* readSSEEvents(
   body: ReadableStream<Uint8Array>
-): AsyncIterable<CloudEvent> {
+): AsyncIterable<StreamResponse> {
   const decoder = new TextDecoder();
   const reader = body.getReader();
   let buffer = '';
@@ -166,7 +116,7 @@ async function* readSSEEvents(
         if (!raw.startsWith('data: ')) continue;
         const payload = raw.slice('data: '.length);
         try {
-          yield JSON.parse(payload) as CloudEvent;
+          yield (JSON.parse(payload) as { result: StreamResponse }).result;
         } catch (err) {
           console.error(`failed to parse SSE frame: ${(err as Error).message}`);
         }

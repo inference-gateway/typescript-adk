@@ -23,7 +23,8 @@ const sendMessage: Message = {
   parts: [{ text: PROMPT }],
 };
 console.log(`POST ${SERVER_URL}/  SendMessage  "${PROMPT}"`);
-const created = await client.sendMessage({ message: sendMessage });
+const { task: created } = await client.sendMessage({ message: sendMessage });
+if (created === undefined) throw new Error('SendMessage returned no task');
 console.log(`created task id=${created.id} state=${created.status.state}`);
 
 const completed = await pollUntilTerminal(created.id);

@@ -15,25 +15,25 @@ Mirrors the Go ADK's [`examples/default-handlers/`](https://github.com/inference
 
 `withDefaultTaskHandlers()` installs two **deliberately minimal** stub handlers, useful as the lowest-friction scaffold while you wire the rest of an agent together:
 
-| Path                   | Default handler behavior                                                                                                                                                                                                                     |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SendMessage`          | Transitions the task `TASK_STATE_SUBMITTED -> TASK_STATE_WORKING -> TASK_STATE_COMPLETED`. No agent reply is produced.                                                                                                                       |
-| `SendStreamingMessage` | The framework emits an initial `task.status.changed (state=TASK_STATE_WORKING, final=false)`; the stub executor yields exactly one `task.status.changed (state=TASK_STATE_COMPLETED, final=true)`. No `delta` / iteration frames in between. |
+| Path                   | Default handler behavior                                                                                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SendMessage`          | Transitions the task `TASK_STATE_SUBMITTED -> TASK_STATE_WORKING -> TASK_STATE_COMPLETED`. No agent reply is produced.                                                                      |
+| `SendStreamingMessage` | The framework emits the task and a `statusUpdate (state=TASK_STATE_WORKING)`; the stub executor yields exactly one `statusUpdate (state=TASK_STATE_COMPLETED)`. No delta frames in between. |
 
 These stubs are intentionally _free of LLM logic_. They demonstrate the protocol-level state machine without pulling in an LLM or toolbox.
 
 For richer LLM-driven defaults, see:
 
 - [`examples/ai-powered/`](../ai-powered/) - uses the `DefaultBackgroundTaskHandler` **class** directly (registered via `withBackgroundTaskHandler`) with an LLM client and toolbox.
-- [`examples/ai-powered-streaming/`](../ai-powered-streaming/) - uses the `DefaultStreamingTaskHandler` **class** directly with streaming SSE frames including word-by-word `delta` events, `tool.*` lifecycle events, and `iteration.completed` events.
+- [`examples/ai-powered-streaming/`](../ai-powered-streaming/) - uses the `DefaultStreamingTaskHandler` **class** directly with streaming SSE frames including word-by-word deltas.
 
 ## `SendMessage` vs `SendStreamingMessage` - side by side
 
 |                      | `SendMessage` (background)                                                                    | `SendStreamingMessage` (streaming)                                                   |
 | -------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Response shape       | Single JSON-RPC envelope. Task starts `TASK_STATE_SUBMITTED`.                                 | `text/event-stream` (SSE) of CloudEvents v1.0 frames.                                |
+| Response shape       | Single JSON-RPC envelope. Task starts `TASK_STATE_SUBMITTED`.                                 | `text/event-stream` (SSE) of A2A `StreamResponse` frames.                            |
 | How the handler runs | A worker dequeues from `InMemoryTaskStorage` and runs the registered `BackgroundTaskHandler`. | The streaming executor runs **inline** in the request handler - no queue, no worker. |
-| How the client reads | Poll `GetTask` until terminal.                                                                | Read SSE frames until the `final: true` status update.                               |
+| How the client reads | Poll `GetTask` until terminal.                                                                | Read SSE frames until the terminal status update.                                    |
 | Cancellation         | `CancelTask` JSON-RPC method.                                                                 | Either `CancelTask`, or close the SSE stream (the executor's `signal` aborts).       |
 | Best for             | Long-running jobs, batch processing, follow-up via `GetTask` or `SubscribeToTask`.            | Token-by-token UX, real-time progress, tool-call visibility.                         |
 
@@ -116,11 +116,12 @@ final task:
 
 === SendStreamingMessage (streaming path) ===
 POST http://127.0.0.1:8080/  SendStreamingMessage  "Hello via SendStreamingMessage - please walk this task to COMPLETED."
-[frame 1] task.status.changed state=TASK_STATE_WORKING final=false
-stream complete: 1 frame(s)
+[frame 1] task
+[frame 2] statusUpdate state=TASK_STATE_WORKING
+stream complete: 2 frame(s)
 ```
 
-The streaming default stub yields a single terminal event, so the executor finishes within the same microtask the initial `TASK_STATE_WORKING` frame is enqueued in. Depending on the Node/HTTP buffering, the terminal `TASK_STATE_COMPLETED final=true` frame may be coalesced with the stream close and not surface to the client. The unit tests for `createMessageStreamHandler` read the writer's `ReadableStream` directly (no HTTP round-trip) and observe both frames; see `tests/server/message-stream.test.ts:263`. For a realistic streaming flow with deltas that flush across the wire one at a time, see [`examples/streaming/`](../streaming/).
+The streaming default stub yields a single terminal event, so the executor finishes within the same microtask the initial `TASK_STATE_WORKING` frame is enqueued in. Depending on the Node/HTTP buffering, the terminal `TASK_STATE_COMPLETED` frame may be coalesced with the stream close and not surface to the client. The unit tests for `createMessageStreamHandler` read the writer's `ReadableStream` directly (no HTTP round-trip) and observe every frame; see `tests/server/message-stream.test.ts`. For a realistic streaming flow with deltas that flush across the wire one at a time, see [`examples/streaming/`](../streaming/).
 
 ## How `SendMessage` is wired
 
@@ -141,7 +142,7 @@ The worker dequeues from the same `InMemoryTaskStorage` that the builder was con
 
 ## How `SendStreamingMessage` is wired
 
-`createMessageStreamHandler` (registered by the builder when a streaming handler is configured) runs the streaming executor **inline** as part of the HTTP request. There is no queue and no worker - the executor's events become SSE frames as they are yielded. For the default streaming stub, that means a single `task.status.changed(COMPLETED)` frame and the stream closes.
+`createMessageStreamHandler` (registered by the builder when a streaming handler is configured) runs the streaming executor **inline** as part of the HTTP request. There is no queue and no worker - the executor's events become SSE frames as they are yielded. For the default streaming stub, that means the task, a `TASK_STATE_WORKING` and a `TASK_STATE_COMPLETED` status update, and the stream closes.
 
 ## Why register `GetTask` manually?
 

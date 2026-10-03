@@ -8,10 +8,10 @@ Mirrors the Go ADK's [`examples/ai-powered-streaming/`](https://github.com/infer
 
 - Boot an `A2AServer` with `capabilities.streaming = true` in its `AgentCard`.
 - Register the `SendStreamingMessage` JSON-RPC method via `createMessageStreamHandler`, with the executor supplied by `DefaultStreamingTaskHandler.asHandler()`.
-- Drive the chat-completion loop with `DefaultStreamingTaskHandler`, which iterates LLM calls, dispatches tool calls, and yields one `StreamingTaskEvent` per lifecycle step. The streaming pipeline translates each event into a CloudEvents v1.0 frame and flushes it to the client immediately.
+- Drive the chat-completion loop with `DefaultStreamingTaskHandler`, which iterates LLM calls, dispatches tool calls, and yields one `StreamingTaskEvent` per lifecycle step. The streaming pipeline translates each A2A-visible event into an A2A `StreamResponse` frame and flushes it to the client immediately.
 - Provide two tools via `DefaultToolBox` + `createTool(...)` (`get_weather`, `get_current_time`). The reserved `input_required` tool is registered automatically.
 - Plug a tiny adapter between `OpenAICompatibleLLMClient.chatCompletion` (wire-shaped, snake_case) and `DefaultStreamingTaskHandler`'s structural `LLMClient.createCompletion` (camelCase). The TS ADK does not yet ship this bridge built-in - the Go ADK plumbs it internally via `OpenAICompatibleAgent.RunWithStream`. The adapter is identical to the one in [`examples/ai-powered/`](../ai-powered/).
-- Drive it all from a plain `fetch`-based client that decodes the SSE frames and CloudEvents envelopes inline. `A2AClient` does not yet expose a `streamMessage` helper (deferred to a later release).
+- Drive it all from a plain `fetch`-based client that decodes the SSE frames and their JSON-RPC `StreamResponse` envelopes inline. `A2AClient` does not yet expose a `streamMessage` helper (deferred to a later release).
 
 ## Layout
 
@@ -104,22 +104,19 @@ The Inference Gateway is the recommended way to mediate access: it normalizes pr
 
 ## Expected event order
 
-`SendStreamingMessage` opens an SSE response whose body is a sequence of CloudEvents v1.0 envelopes. For a single user prompt that triggers one tool call before the final answer, the wire stream looks like this (UUIDs and timestamps will differ):
+`SendStreamingMessage` opens an SSE response whose events are JSON-RPC responses carrying an A2A `StreamResponse` (spec 9.4.2). For a single user prompt the wire stream looks like this (UUIDs and timestamps will differ):
 
-1. `adk.agent.task.status.changed` - `state=TASK_STATE_WORKING`, `final=false`. Marks the transition from `PENDING` and is the first frame the client sees.
-2. Zero or more periodic `adk.agent.task.status.changed` keep-alive frames at `STREAMING_STATUS_UPDATE_INTERVAL` (default `1s`), `final=false`. Suppressed in the example client output after the first one.
-3. `adk.agent.delta` - first assistant token batch, if the model emits text before the tool call. May be absent if the model jumps straight to a tool call.
-4. `adk.agent.tool.started` - the model requested `get_weather`. Payload includes the JSON-stringified `arguments`.
-5. `adk.agent.tool.completed` - the tool finished. (`adk.agent.tool.failed` is emitted instead when the tool throws.)
-6. `adk.agent.tool.result` - payload includes the raw string the tool returned (the JSON body fed back into the LLM conversation). `isError` distinguishes the two outcomes.
-7. `adk.agent.iteration.completed` - closes iteration 1.
-8. `adk.agent.delta` - the model's final natural-language answer, emitted as one or more delta frames depending on the provider's streaming granularity.
-9. `adk.agent.iteration.completed` - closes the final iteration.
-10. `adk.agent.task.status.changed` - `state=TASK_STATE_COMPLETED`, `final=true`. Last frame; the stream closes immediately after.
+1. `task` - the task as created, `state=TASK_STATE_SUBMITTED`. Always the first frame.
+2. `statusUpdate` - `state=TASK_STATE_WORKING`. Marks the transition from `PENDING`.
+3. Zero or more periodic `statusUpdate` keep-alive frames at `STREAMING_STATUS_UPDATE_INTERVAL` (default `1s`).
+4. `statusUpdate` frames with `state=TASK_STATE_WORKING` and a `status.message` - the model's answer, emitted as one or more deltas depending on the provider's streaming granularity.
+5. `statusUpdate` - `state=TASK_STATE_COMPLETED`. Last frame; the stream closes immediately after.
+
+Tool calls and iterations run inside the agent; they have no `StreamResponse` form, so they are not sent to the client.
 
 Other terminal states are possible:
 
-- `state=TASK_STATE_INPUT_REQUIRED` if the LLM invokes the reserved `input_required` tool. An `adk.agent.input.required` frame carrying the prompt precedes the terminal status frame. The task remains in storage so a subsequent `SendStreamingMessage` or `SendMessage` on the same `contextId` can resume it.
+- `state=TASK_STATE_INPUT_REQUIRED` if the LLM invokes the reserved `input_required` tool. The status carries the prompt in `status.message`. The task remains in storage so a subsequent `SendStreamingMessage` or `SendMessage` on the same `contextId` can resume it.
 - `state=TASK_STATE_CANCELED` if the client disconnects, the server shuts down, or `CancelTask` fires during the run.
 - `state=TASK_STATE_FAILED` if the iteration cap is hit or the executor throws. The terminal frame embeds the error text in `status.message`.
 
@@ -127,16 +124,12 @@ Other terminal states are possible:
 
 ```text
 POST http://127.0.0.1:8080/  SendStreamingMessage  "What's the weather in New York? Suggest a few activities that would suit it."
-[task <task-id>] status=IN_PROGRESS final=false
+[task <task-id>] status=TASK_STATE_SUBMITTED
 ---
-
-[tool get_weather started] args={"location":"New York"}
-[tool get_weather completed]
-[tool get_weather -> ok] {"location":"New York","temperature":"22°C","condition":"sunny","humidity":"65%"}
 It's currently 22°C and sunny in New York with 65% humidity - ideal for a walk in Central Park, an outdoor picnic, or visiting the rooftop bars in Brooklyn.
 ---
-[task <task-id>] status=TASK_STATE_COMPLETED final=true
-stream complete: 6 delta event(s), 2 iteration(s), 1 tool call(s)
+[task <task-id>] status=TASK_STATE_COMPLETED
+stream complete: 6 delta event(s)
 assembled text: "It's currently 22°C and sunny in New York with 65% humidity - ideal for a walk in Central Park, an outdoor picnic, or visiting the rooftop bars in Brooklyn."
 final status: { ... }
 ```
@@ -149,7 +142,7 @@ The exact wording, the number of delta frames, and which tools are called all va
 2. `DefaultToolBox` - registry of tools the LLM can invoke. Auto-registers the reserved `input_required` tool so the model can pause for user input; the handler intercepts that call before dispatching.
 3. `DefaultStreamingTaskHandler` - drives the chat-completion loop. Per iteration: build the conversation from `task.messages`, advertise the toolbox, call the LLM, yield `delta` for the assistant text, dispatch any tool calls (yielding `toolStarted` + `toolResult` + `toolCompleted` / `toolFailed`), and finally yield `iterationCompleted`. Terminates the task in `COMPLETED` (no tool calls), `INPUT_REQUIRED` (reserved tool called), or `FAILED` (iteration cap / error).
 4. **Adapter (`adaptLLMClient`)** - converts between the wire-shaped `chatCompletion` API and the structural `createCompletion` interface the handler depends on. Reusable as-is in your own code until the TS ADK ships the bridge built-in.
-5. `createMessageStreamHandler` - the streaming pipeline. Validates params, creates/resumes the task in storage, transitions it to `IN_PROGRESS`, runs the executor returned by `handler.asHandler()`, translates each `StreamingTaskEvent` into a CloudEvents v1.0 frame, and emits the terminal status frame when the executor finishes or is cancelled.
+5. `createMessageStreamHandler` - the streaming pipeline. Validates params, creates/resumes the task in storage, transitions it to `IN_PROGRESS`, runs the executor returned by `handler.asHandler()`, translates each `StreamingTaskEvent` into a `StreamResponse` frame, and emits the terminal status frame when the executor finishes or is cancelled.
 
 ## Troubleshooting
 
@@ -163,4 +156,4 @@ The exact wording, the number of delta frames, and which tools are called all va
 
 - Try [`examples/streaming/`](../streaming/) for the same SSE pipeline with a hand-written mock executor (no LLM).
 - Try [`examples/ai-powered/`](../ai-powered/) for the non-streaming `SendMessage` variant of the same agent.
-- Try [`examples/input-required/`](../input-required/) for the pause / client-driven resume flow - the LLM-side version is what fires when the model calls the reserved `input_required` tool, surfaced through this example as an `adk.agent.input.required` frame.
+- Try [`examples/input-required/`](../input-required/) for the pause / client-driven resume flow - the LLM-side version is what fires when the model calls the reserved `input_required` tool, surfaced through this example as an `INPUT_REQUIRED` status update carrying the prompt.

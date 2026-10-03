@@ -54,6 +54,28 @@ describe('JSON-RPC envelope builders', () => {
     });
     expect(res.error.data).toEqual({ cause: 'boom' });
   });
+
+  it.each([
+    [JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR, 'TASK_NOT_FOUND'],
+    [JSONRPC_ERROR_CODES.TASK_NOT_CANCELABLE_ERROR, 'TASK_NOT_CANCELABLE'],
+    [JSONRPC_ERROR_CODES.UNSUPPORTED_OPERATION_ERROR, 'UNSUPPORTED_OPERATION'],
+    [
+      JSONRPC_ERROR_CODES.AUTHENTICATED_EXTENDED_CARD_NOT_CONFIGURED_ERROR,
+      'EXTENDED_AGENT_CARD_NOT_CONFIGURED',
+    ],
+    [JSONRPC_ERROR_CODES.VERSION_NOT_SUPPORTED_ERROR, 'VERSION_NOT_SUPPORTED'],
+  ])(
+    'createErrorResponse carries a google.rpc.ErrorInfo for A2A code %i',
+    (code, reason) => {
+      expect(createErrorResponse(1, code, 'a2a error').error.data).toEqual([
+        {
+          '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+          reason,
+          domain: 'a2a-protocol.org',
+        },
+      ]);
+    }
+  );
 });
 
 describe('dispatch parse + envelope validation', () => {

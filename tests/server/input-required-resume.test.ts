@@ -6,7 +6,6 @@ import {
 } from '../../src/agent/task.js';
 import {
   A2AServer,
-  AGENT_EVENT_TYPE,
   DefaultBackgroundTaskHandler,
   DefaultStreamingTaskHandler,
   DefaultToolBox,
@@ -30,11 +29,7 @@ import {
 } from '../../src/server/index.js';
 import { InMemoryTaskStorage } from '../../src/storage/index.js';
 import type { AgentCard } from '../../src/types/generated/a2a.js';
-import type {
-  Message,
-  Task,
-  TaskStatusUpdateEvent,
-} from '../../src/types/index.js';
+import type { Message, StreamResponse, Task } from '../../src/types/index.js';
 
 const decoder = new TextDecoder();
 
@@ -80,7 +75,7 @@ async function postJSON(baseUrl: string, body: unknown): Promise<Response> {
 
 interface Frame {
   readonly raw: string;
-  readonly json: { type: string; data: unknown; id?: string };
+  readonly result: StreamResponse;
 }
 
 async function readFrames(res: Response): Promise<Frame[]> {
@@ -105,14 +100,10 @@ async function readFrames(res: Response): Promise<Frame[]> {
         const raw = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 2);
         if (raw.startsWith('data: ')) {
-          frames.push({
-            raw,
-            json: JSON.parse(raw.slice('data: '.length)) as {
-              type: string;
-              data: unknown;
-              id?: string;
-            },
-          });
+          const envelope = JSON.parse(raw.slice('data: '.length)) as {
+            result: StreamResponse;
+          };
+          frames.push({ raw, result: envelope.result });
         }
       }
     }
@@ -190,7 +181,7 @@ describe('SendMessage resume flow (background)', () => {
       storage,
       idGenerator: sequentialIdGenerator(),
     });
-    const result = handler(
+    const { task: result } = handler(
       {
         message: {
           messageId: 'm-3',
@@ -200,7 +191,7 @@ describe('SendMessage resume flow (background)', () => {
         },
       },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.id).toBe('task-1');
     expect(result.contextId).toBe('ctx-resume');
@@ -222,7 +213,7 @@ describe('SendMessage resume flow (background)', () => {
       idGenerator: sequentialIdGenerator(),
     });
 
-    const result = handler(
+    const { task: result } = handler(
       {
         message: {
           messageId: 'm-1',
@@ -232,7 +223,7 @@ describe('SendMessage resume flow (background)', () => {
         },
       },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.id).toBe('id-1');
     expect(result.contextId).toBe('ctx-fresh');
@@ -252,7 +243,7 @@ describe('SendMessage resume flow (background)', () => {
       storage,
       idGenerator: sequentialIdGenerator(),
     });
-    const result = handler(
+    const { task: result } = handler(
       {
         message: {
           messageId: 'm-x',
@@ -262,7 +253,7 @@ describe('SendMessage resume flow (background)', () => {
         },
       },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.id).toBe('id-1');
     expect(result.id).not.toBe('other');
@@ -284,7 +275,7 @@ describe('SendMessage resume flow (background)', () => {
       storage,
       idGenerator: sequentialIdGenerator(),
     });
-    const result = handler(
+    const { task: result } = handler(
       {
         message: {
           messageId: 'm-1',
@@ -294,7 +285,7 @@ describe('SendMessage resume flow (background)', () => {
         },
       },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.id).toBe('id-1');
     expect(result.status.state).toBe(TASK_STATE.PENDING);
@@ -422,9 +413,9 @@ describe('SendMessage JSON-RPC pause + resume', () => {
         },
       },
     });
-    const firstBody = (await firstRes.json()) as { result: Task };
-    expect(firstBody.result.status.state).toBe(TASK_STATE.PENDING);
-    const taskId = firstBody.result.id;
+    const firstBody = (await firstRes.json()) as { result: { task: Task } };
+    expect(firstBody.result.task.status.state).toBe(TASK_STATE.PENDING);
+    const taskId = firstBody.result.task.id;
 
     // 2. Drive the background handler manually (no worker in this test).
     const dequeued = await storage.dequeue();
@@ -450,10 +441,10 @@ describe('SendMessage JSON-RPC pause + resume', () => {
         },
       },
     });
-    const secondBody = (await secondRes.json()) as { result: Task };
-    expect(secondBody.result.id).toBe(taskId);
-    expect(secondBody.result.contextId).toBe('ctx-resume');
-    expect(secondBody.result.status.state).toBe(TASK_STATE.IN_PROGRESS);
+    const secondBody = (await secondRes.json()) as { result: { task: Task } };
+    expect(secondBody.result.task.id).toBe(taskId);
+    expect(secondBody.result.task.contextId).toBe('ctx-resume');
+    expect(secondBody.result.task.status.state).toBe(TASK_STATE.IN_PROGRESS);
 
     // 4. Process the resumed task.
     const resumed = await storage.dequeue();
@@ -478,7 +469,7 @@ describe('SendStreamingMessage JSON-RPC pause + resume', () => {
     }
   });
 
-  it('first stream pauses with adk.agent.input.required + INPUT_REQUIRED status, second stream on same contextId resumes', async () => {
+  it('first stream pauses with an INPUT_REQUIRED status, second stream on same contextId resumes', async () => {
     const storage = new InMemoryTaskStorage();
     const { client } = scriptedClient([
       assistantToolCalls([
@@ -535,18 +526,11 @@ describe('SendStreamingMessage JSON-RPC pause + resume', () => {
     expect(firstRes.headers.get('content-type')).toMatch(/^text\/event-stream/);
 
     const firstFrames = await readFrames(firstRes);
-    const firstTypes = firstFrames.map((f) => f.json.type);
 
-    // Must include the adk.agent.input.required event.
-    expect(firstTypes).toContain(AGENT_EVENT_TYPE.INPUT_REQUIRED);
-    // Stream ends on an INPUT_REQUIRED status (final: false).
-    const lastFirst = firstFrames[firstFrames.length - 1];
-    expect(lastFirst?.json.type).toBe(AGENT_EVENT_TYPE.TASK_STATUS_CHANGED);
-    const lastFirstData = lastFirst?.json.data as TaskStatusUpdateEvent;
-    expect(lastFirstData.status.state).toBe(TASK_STATE.INPUT_REQUIRED);
-    expect(lastFirstData.status.state).not.toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
+    // Stream ends on an INPUT_REQUIRED status carrying the prompt.
+    const lastFirst = firstFrames[firstFrames.length - 1]?.result.statusUpdate;
+    expect(lastFirst?.status.state).toBe(TASK_STATE.INPUT_REQUIRED);
+    expect(lastFirst?.status.message?.parts[0]?.text).toBe('Which city?');
 
     // Paused task must still be discoverable in the active store for resume.
     const paused = storage.getActive('id-1');
@@ -576,31 +560,24 @@ describe('SendStreamingMessage JSON-RPC pause + resume', () => {
     expect(secondRes.status).toBe(200);
 
     const secondFrames = await readFrames(secondRes);
-    const secondTypes = secondFrames.map((f) => f.json.type);
 
-    // First status frame on the resumed stream should be IN_PROGRESS.
-    expect(secondFrames[0]?.json.type).toBe(
-      AGENT_EVENT_TYPE.TASK_STATUS_CHANGED
-    );
-    const firstResumed = secondFrames[0]?.json.data as TaskStatusUpdateEvent;
-    expect(firstResumed.status.state).toBe(TASK_STATE.IN_PROGRESS);
-    expect(firstResumed.taskId).toBe('id-1');
+    // The resumed stream starts with the same task, back IN_PROGRESS.
+    const resumedTask = secondFrames[0]?.result.task;
+    expect(resumedTask?.id).toBe('id-1');
+    expect(resumedTask?.status.state).toBe(TASK_STATE.IN_PROGRESS);
 
     // Stream should reach a terminal COMPLETED.
-    const lastSecond = secondFrames[secondFrames.length - 1];
-    expect(lastSecond?.json.type).toBe(AGENT_EVENT_TYPE.TASK_STATUS_CHANGED);
-    const lastSecondData = lastSecond?.json.data as TaskStatusUpdateEvent;
-    expect(lastSecondData.status.state).toBe(TASK_STATE.COMPLETED);
-    expect(lastSecondData.status.state).toMatch(
-      /TASK_STATE_(COMPLETED|FAILED|CANCELED)$/
-    );
+    const lastSecond = secondFrames[secondFrames.length - 1]?.result;
+    expect(lastSecond?.statusUpdate?.status.state).toBe(TASK_STATE.COMPLETED);
 
-    // Final delta should carry the agent's resumed response.
-    const deltaTypes = secondTypes.filter((t) => t === AGENT_EVENT_TYPE.DELTA);
-    expect(deltaTypes.length).toBeGreaterThanOrEqual(1);
+    // A delta should carry the agent's resumed response.
+    const deltaTexts = secondFrames.map(
+      (f) => f.result.statusUpdate?.status.message?.parts[0]?.text
+    );
+    expect(deltaTexts).toContain('72F and sunny.');
   });
 
-  it('emits adk.agent.input.required ahead of the INPUT_REQUIRED status', async () => {
+  it('ends the stream with an INPUT_REQUIRED status carrying the prompt', async () => {
     const storage = new InMemoryTaskStorage();
     const executor: StreamingTaskExecutor = async function* (
       ctx: StreamingExecutorContext
@@ -652,25 +629,14 @@ describe('SendStreamingMessage JSON-RPC pause + resume', () => {
     });
 
     const frames = await readFrames(res);
-    const types = frames.map((f) => f.json.type);
 
-    // Expected order: IN_PROGRESS status → input.required → INPUT_REQUIRED status.
-    const inputRequiredIdx = types.indexOf(AGENT_EVENT_TYPE.INPUT_REQUIRED);
-    const inputRequiredStatusIdx = types.findIndex(
-      (t, idx) =>
-        t === AGENT_EVENT_TYPE.TASK_STATUS_CHANGED &&
-        (frames[idx]?.json.data as TaskStatusUpdateEvent).status.state ===
-          TASK_STATE.INPUT_REQUIRED
-    );
-
-    expect(inputRequiredIdx).toBeGreaterThanOrEqual(0);
-    expect(inputRequiredStatusIdx).toBeGreaterThan(inputRequiredIdx);
-
-    // The adk.agent.input.required payload carries the prompt as the
-    // message data field.
-    const irFrame = frames[inputRequiredIdx];
-    const payload = irFrame?.json.data as Message;
-    expect(payload.parts[0]?.text).toBe('need more info');
+    expect(frames.map((f) => f.result.statusUpdate?.status.state)).toEqual([
+      undefined,
+      TASK_STATE.IN_PROGRESS,
+      TASK_STATE.INPUT_REQUIRED,
+    ]);
+    const prompt = frames[2]?.result.statusUpdate?.status.message;
+    expect(prompt?.parts[0]?.text).toBe('need more info');
   });
 });
 

@@ -274,13 +274,13 @@ describe('createTaskGetHandler', () => {
       throw new Error('expected JSONRPCError to be thrown');
     });
 
-    it('throws -32602 when the task id is unknown', () => {
+    it('throws -32001 when the task id is unknown', () => {
       try {
         handler({ id: 'does-not-exist' } as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
-          JSONRPC_ERROR_CODES.INVALID_PARAMS
+          JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR
         );
         expect((err as JSONRPCError).message).toBe('task not found');
         return;
@@ -331,7 +331,7 @@ describe('GetTask JSON-RPC conformance', () => {
     expect(body.result.history).toEqual([makeMessage('m-1', 'hello')]);
   });
 
-  it('returns -32602 with "task not found" when the task id is unknown', async () => {
+  it('returns -32001 with "task not found" when the task id is unknown', async () => {
     const storage = new InMemoryTaskStorage();
     const server = createA2AServer({ card: makeCard() });
     server.registerMethod(TASK_GET_METHOD, createTaskGetHandler({ storage }));
@@ -351,7 +351,7 @@ describe('GetTask JSON-RPC conformance', () => {
       error: { code: number; message: string };
     };
     expect(body.id).toBe(2);
-    expect(body.error.code).toBe(JSONRPC_ERROR_CODES.INVALID_PARAMS);
+    expect(body.error.code).toBe(JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR);
     expect(body.error.message).toBe('task not found');
   });
 

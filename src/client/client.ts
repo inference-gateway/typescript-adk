@@ -6,9 +6,11 @@ import type {
   JSONRPCErrorResponse,
   JSONRPCSuccessResponse,
   SendMessageRequest,
+  SendMessageResponse,
   Struct,
   Task,
 } from '../types/generated/a2a.js';
+import { A2A_PROTOCOL_VERSION } from '../types/index.js';
 import {
   A2AAbortError,
   A2AClientError,
@@ -81,8 +83,9 @@ export interface A2AClientConfig {
    */
   readonly timeoutMs?: number;
   /**
-   * Static headers attached to every outbound request. `Content-Type` and
-   * `User-Agent` are set automatically and may be overridden via this map.
+   * Static headers attached to every outbound request. `Content-Type`,
+   * `User-Agent` and `A2A-Version` are set automatically and may be
+   * overridden via this map.
    */
   readonly headers?: Readonly<Record<string, string>>;
   /**
@@ -256,14 +259,18 @@ export class A2AClient {
   }
 
   /**
-   * Invoke the JSON-RPC `SendMessage` method. Returns the wire-format `Task`
-   * the server creates and enqueues.
+   * Invoke the JSON-RPC `SendMessage` method. Returns the server's
+   * `SendMessageResponse`: the `task` it created, or a direct `message`.
    */
   async sendMessage(
     params: SendMessageRequest,
     opts: RequestOptions = {}
-  ): Promise<Task> {
-    return await this.executeJSONRPC<Task>('SendMessage', params, opts.signal);
+  ): Promise<SendMessageResponse> {
+    return await this.executeJSONRPC<SendMessageResponse>(
+      'SendMessage',
+      params,
+      opts.signal
+    );
   }
 
   /**
@@ -366,6 +373,7 @@ export class A2AClient {
   ): Promise<Response> {
     const headers = new Headers();
     headers.set('User-Agent', this.userAgent);
+    headers.set('A2A-Version', A2A_PROTOCOL_VERSION);
     for (const [k, v] of Object.entries(this.headers)) {
       headers.set(k, v);
     }

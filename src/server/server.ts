@@ -21,6 +21,7 @@ import {
   type TelemetryProvider,
 } from '../telemetry/index.js';
 import type { AgentCard } from '../types/generated/a2a.js';
+import { A2A_PROTOCOL_VERSION } from '../types/index.js';
 import {
   GET_AUTHENTICATED_EXTENDED_CARD_METHOD,
   createGetAuthenticatedExtendedCardHandler,
@@ -180,7 +181,7 @@ type NodeServer = Server;
  * - `GET /.well-known/agent-card.json` - unauthenticated card discovery
  * - `GET /health` - liveness probe
  * - `POST <jsonRpcPath>` - JSON-RPC 2.0 endpoint dispatched via the
- *   per-instance {@link MethodRegistry}
+ *   per-instance {@link MethodRegistry}; a trailing slash is accepted
  *
  * Deliberately decoupled from the LLM agent - a server with no methods
  * registered still serves discovery and health.
@@ -250,7 +251,7 @@ export class A2AServer {
   }
 
   private buildApp(): Hono {
-    const app = new Hono();
+    const app = new Hono({ strict: false });
 
     if (this.logger !== NOOP_LOGGER) {
       app.use(
@@ -288,6 +289,17 @@ export class A2AServer {
     app.post(this.jsonRpcPath, async (c) => {
       const body = await c.req.text();
       const signal = c.req.raw.signal;
+
+      const version = c.req.header('A2A-Version');
+      if (!isSupportedA2AVersion(version)) {
+        return jsonResponse(
+          createErrorResponse(
+            peekRequestId(body),
+            JSONRPC_ERROR_CODES.VERSION_NOT_SUPPORTED_ERROR,
+            `a2a version ${version} is not supported`
+          )
+        );
+      }
 
       const streamingResponse = this.tryDispatchStreaming(body, signal);
       if (streamingResponse !== null) {
@@ -430,7 +442,7 @@ export class A2AServer {
     const id = extractStreamingId(reqObj);
     const params = 'params' in reqObj ? reqObj['params'] : undefined;
     try {
-      const { readable } = handler(params, { signal });
+      const { readable } = handler(params, { signal, requestId: id });
       return new Response(readable, {
         status: 200,
         headers: { ...SSE_HEADERS },
@@ -521,6 +533,27 @@ function extractStreamingId(reqObj: Record<string, unknown>): JSONRPCId {
     return raw;
   }
   return null;
+}
+
+// ponytail: a missing A2A-Version header is accepted so pre-1.0 clients keep
+// working, although spec 3.6 assumes 0.3 for it; reject it once they are gone.
+function isSupportedA2AVersion(version: string | undefined): boolean {
+  return (
+    version === undefined || version === '' || version === A2A_PROTOCOL_VERSION
+  );
+}
+
+function peekRequestId(rawBody: string): JSONRPCId {
+  try {
+    const parsed: unknown = JSON.parse(rawBody);
+    return parsed !== null &&
+      typeof parsed === 'object' &&
+      !Array.isArray(parsed)
+      ? extractStreamingId(parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function jsonResponse(body: JSONRPCResponse): Response {

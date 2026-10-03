@@ -51,8 +51,8 @@ export interface TaskCancelHandlerOptions {
  *    observes the cancellation and exits), transition the task to
  *    `CANCELLED`, move it to the dead-letter store.
  *  - terminal (`COMPLETED` / `FAILED` / `CANCELLED`): return a JSON-RPC
- *    `-32602` error - terminal tasks cannot be cancelled.
- *  - unknown task id: return a JSON-RPC `-32602` "task not found".
+ *    `-32002` (TaskNotCancelable) error.
+ *  - unknown task id: return a JSON-RPC `-32001` (TaskNotFound) error.
  *
  * On success the handler returns the wire-format `Task` reflecting the
  * post-cancellation state. The state transition is synchronous - the call
@@ -72,13 +72,13 @@ export function createTaskCancelHandler(
     const task = storage.getTask(validated.id);
     if (task === undefined) {
       throw new JSONRPCError(
-        JSONRPC_ERROR_CODES.INVALID_PARAMS,
+        JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR,
         'task not found'
       );
     }
     if (isTerminal(task.state)) {
       throw new JSONRPCError(
-        JSONRPC_ERROR_CODES.INVALID_PARAMS,
+        JSONRPC_ERROR_CODES.TASK_NOT_CANCELABLE_ERROR,
         `task cannot be cancelled in state ${task.state}`
       );
     }

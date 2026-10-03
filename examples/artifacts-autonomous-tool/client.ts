@@ -32,7 +32,8 @@ for (let i = 0; i < PROMPTS.length; i++) {
     parts: [{ text: prompt }],
   };
 
-  const created = await client.sendMessage({ message });
+  const { task: created } = await client.sendMessage({ message });
+  if (created === undefined) throw new Error('SendMessage returned no task');
   console.log(`task ${created.id} created (state=${created.status.state})`);
 
   const final = await pollUntilTerminal(created.id);

@@ -19,7 +19,11 @@ import {
   type TaskHandler,
   type TaskHandlerContext,
 } from '../../src/server/index.js';
-import type { AgentCard, Message } from '../../src/types/index.js';
+import type {
+  AgentCard,
+  Message,
+  StreamResponse,
+} from '../../src/types/index.js';
 
 function backgroundCard(overrides: Partial<AgentCard> = {}): AgentCard {
   return {
@@ -256,16 +260,26 @@ describe('A2AServerBuilder.withStreamableTaskHandler', () => {
     expect(server.hasMethod(MESSAGE_STREAM_METHOD)).toBe(true);
   });
 
-  it('end-to-end: yields a custom CloudEvent that is forwarded to the SSE stream', async () => {
+  it('end-to-end: forwards yielded A2A CloudEvents to the SSE stream and drops custom ones', async () => {
     const customEvent = createCloudEvent({
       type: 'example.custom.event',
       data: { hello: 'world' },
+      subject: 'demo',
+    });
+    const artifactEvent = createCloudEvent({
+      type: AGENT_EVENT_TYPE.TASK_ARTIFACT_UPDATED,
+      data: {
+        taskId: 'demo',
+        contextId: 'demo',
+        artifact: { artifactId: 'a-1', parts: [{ text: 'hi' }] },
+      },
       subject: 'demo',
     });
 
     class EmitHandler extends BaseStreamableTaskHandler {
       async *handleStreamingTask(): AsyncIterable<CloudEvent> {
         yield customEvent;
+        yield artifactEvent;
       }
     }
 
@@ -297,16 +311,15 @@ describe('A2AServerBuilder.withStreamableTaskHandler', () => {
     const frames = await drainFrames(res.body as ReadableStream<Uint8Array>);
     await server.close();
 
-    const types = frames.map((f) => f['type']);
-    // Pipeline emits the initial IN_PROGRESS status frame, our custom CE, then
-    // the terminal COMPLETED status frame.
-    expect(types).toContain('example.custom.event');
-    expect(types[0]).toBe(AGENT_EVENT_TYPE.TASK_STATUS_CHANGED);
-    expect(types.at(-1)).toBe(AGENT_EVENT_TYPE.TASK_STATUS_CHANGED);
-    const customFrame = frames.find(
-      (f) => f['type'] === 'example.custom.event'
-    );
-    expect(customFrame?.['data']).toEqual({ hello: 'world' });
+    const results = frames.map((f) => f['result'] as StreamResponse);
+    expect(results.map((r) => Object.keys(r)[0])).toEqual([
+      'task',
+      'statusUpdate',
+      'artifactUpdate',
+      'statusUpdate',
+    ]);
+    expect(results[2]?.artifactUpdate?.artifact.artifactId).toBe('a-1');
+    expect(results[3]?.statusUpdate?.status.state).toBe(TASK_STATE.COMPLETED);
   });
 
   it('observes the AbortSignal in the handler context', async () => {

@@ -10,7 +10,7 @@ import type {
   A2AMethod,
   Message,
   SendMessageRequest,
-  Task,
+  SendMessageResponse,
 } from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
 import type { MethodHandler } from './method-registry.js';
@@ -41,8 +41,9 @@ export interface MessageSendHandlerOptions {
  * Build a handler for the A2A `SendMessage` JSON-RPC method.
  *
  * The handler is synchronous from the caller's perspective: it creates a
- * `PENDING` task, persists and enqueues it, then returns the task object
- * without waiting for any background worker to pick it up.
+ * `PENDING` task, persists and enqueues it, then returns it as a
+ * `SendMessageResponse` (`{ task }`, spec 9.4.1) without waiting for any
+ * background worker to pick it up.
  *
  * Validation failures surface as JSON-RPC `-32602` (Invalid Params) via
  * {@link JSONRPCError} so the dispatcher emits a structured error envelope.
@@ -52,13 +53,14 @@ export interface MessageSendHandlerOptions {
  */
 export function createMessageSendHandler(
   options: MessageSendHandlerOptions
-): MethodHandler<unknown, Task> {
+): MethodHandler<unknown, SendMessageResponse> {
   const { storage } = options;
   const newId = options.idGenerator ?? (() => crypto.randomUUID());
   const clock = options.now ?? defaultNow;
 
-  return (params: unknown): Task => {
+  return (params: unknown): SendMessageResponse => {
     const validated = validateMessageSendParams(params);
+    assertReferencedTaskExists(storage, validated.message);
     const inboundContextId =
       typeof validated.message.contextId === 'string' &&
       validated.message.contextId.length > 0
@@ -75,7 +77,7 @@ export function createMessageSendHandler(
         );
         const resumed = appendAndResume(paused, enrichedMessage, clock);
         storage.enqueue(resumed);
-        return toWireTask(resumed);
+        return { task: toWireTask(resumed) };
       }
     }
 
@@ -91,7 +93,7 @@ export function createMessageSendHandler(
 
     storage.enqueue(task);
 
-    return toWireTask(task);
+    return { task: toWireTask(task) };
   };
 }
 
@@ -141,7 +143,24 @@ function appendAndResume(
   return transitionTask(withMessage, TASK_STATE.IN_PROGRESS, { now: clock });
 }
 
-export { appendAndResume, findResumableTask };
+/**
+ * Reject a message that names a `taskId` the storage does not know with
+ * TaskNotFound (`-32001`), instead of silently starting a new task.
+ */
+function assertReferencedTaskExists(
+  storage: TaskStorage,
+  message: Message
+): void {
+  const { taskId } = message;
+  if (taskId !== undefined && storage.getTask(taskId) === undefined) {
+    throw new JSONRPCError(
+      JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR,
+      'task not found'
+    );
+  }
+}
+
+export { appendAndResume, assertReferencedTaskExists, findResumableTask };
 
 function validateMessageSendParams(params: unknown): SendMessageRequest {
   if (params === null || typeof params !== 'object' || Array.isArray(params)) {
