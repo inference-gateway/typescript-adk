@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -284,7 +285,9 @@ export class MCPClient implements MCPToolProvider {
           delayMs: delay,
           error: message,
         });
-        await sleep(delay, this.stopController.signal);
+        await sleep(delay, undefined, {
+          signal: this.stopController.signal,
+        }).catch(() => undefined);
         delay = Math.min(delay * 2, retryMaxIntervalMs);
       }
     }
@@ -342,24 +345,6 @@ export function joinEndpoint(baseUrl: string, endpoint: string): string {
   const base = baseUrl.slice(0, end);
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return `${base}${path}`;
-}
-
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    if (signal.aborted) {
-      resolve();
-      return;
-    }
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort);
-      resolve();
-    }, ms);
-    const onAbort = (): void => {
-      clearTimeout(timer);
-      resolve();
-    };
-    signal.addEventListener('abort', onAbort, { once: true });
-  });
 }
 
 /**

@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import {
   A2AAbortError,
   A2AHTTPError,
@@ -67,31 +68,10 @@ export async function withRetry<T>(
         config.initialDelayMs * 2 ** attempt,
         config.maxDelayMs
       );
-      await sleepRespectingSignal(delay, signal);
+      await sleep(delay, undefined, { signal }).catch(() => {
+        throw new A2AAbortError();
+      });
     }
   }
   throw lastErr;
-}
-
-function sleepRespectingSignal(
-  ms: number,
-  signal: AbortSignal | undefined
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted === true) {
-      reject(new A2AAbortError());
-      return;
-    }
-    const timer = setTimeout(() => {
-      if (signal !== undefined) signal.removeEventListener('abort', onAbort);
-      resolve();
-    }, ms);
-    const onAbort = (): void => {
-      clearTimeout(timer);
-      reject(new A2AAbortError());
-    };
-    if (signal !== undefined) {
-      signal.addEventListener('abort', onAbort, { once: true });
-    }
-  });
 }
