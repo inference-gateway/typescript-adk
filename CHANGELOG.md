@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.19.0](https://github.com/inference-gateway/typescript-adk/compare/v0.18.1...v0.19.0) (2026-10-03)
+
+### ✨ Features
+
+* **server:** pass the a2a v1.0.1 json-rpc tck ([#250](https://github.com/inference-gateway/typescript-adk/issues/250)) ([9f5e814](https://github.com/inference-gateway/typescript-adk/commit/9f5e814e908fb3fb4faa206e7be4837adeef8960))
+
+### ♻️ Improvements
+
+* **auth:** single oidcDiscoveryUrl for discovery URL ([#255](https://github.com/inference-gateway/typescript-adk/issues/255)) ([e118967](https://github.com/inference-gateway/typescript-adk/commit/e118967d170d907794320b1d666d243ab3375cbc))
+* **server:** share send param validator and enricher ([#256](https://github.com/inference-gateway/typescript-adk/issues/256)) ([08efbcc](https://github.com/inference-gateway/typescript-adk/commit/08efbccfb9f4983c66ef4c88a79ca124c83a0e28))
+* single parseEnvBool helper for env flags ([#257](https://github.com/inference-gateway/typescript-adk/issues/257)) ([6d4796c](https://github.com/inference-gateway/typescript-adk/commit/6d4796ca6286a5bc083b8c5840748b5c09cfafe9))
+* use node:timers/promises for abortable sleeps ([#258](https://github.com/inference-gateway/typescript-adk/issues/258)) ([6ba6077](https://github.com/inference-gateway/typescript-adk/commit/6ba6077270337a52fa34caa17e282973362bd54f))
+
+### 🐛 Bug Fixes
+
+* **server:** accept proto field names in json-rpc params ([#246](https://github.com/inference-gateway/typescript-adk/issues/246)) ([756d11f](https://github.com/inference-gateway/typescript-adk/commit/756d11ffa22782fdeac37a03898a8369eee50c4c))
+* **server:** return -32003 when push notifications off ([#248](https://github.com/inference-gateway/typescript-adk/issues/248)) ([b7ba049](https://github.com/inference-gateway/typescript-adk/commit/b7ba0497da1e0418110501c52527fcc8eafa92cf))
+* **server:** treat proto3 defaults as unset in ListTasks ([#247](https://github.com/inference-gateway/typescript-adk/issues/247)) ([8517165](https://github.com/inference-gateway/typescript-adk/commit/85171657ba3df31475eb7fc25ce7bc19ddd294fb))
+
 ## [0.18.1](https://github.com/inference-gateway/typescript-adk/compare/v0.18.0...v0.18.1) (2026-10-03)
 
 ### 🐛 Bug Fixes
