@@ -159,7 +159,7 @@ describe('InMemoryArtifactStorage', () => {
     expect(storage.list().map((m) => m.filename)).toEqual(['new.txt']);
   });
 
-  it('cleanupOldest with maxCount <= 0 wipes the store', async () => {
+  it('cleanupOldest with maxCount <= 0 is unlimited and removes nothing', async () => {
     const storage = new InMemoryArtifactStorage();
     await storage.store(
       'a',
@@ -174,34 +174,33 @@ describe('InMemoryArtifactStorage', () => {
       'application/octet-stream'
     );
 
-    const removed = await storage.cleanupOldest(0);
-    expect(removed).toBe(2);
-    expect(storage.list()).toHaveLength(0);
+    expect(await storage.cleanupOldest(0)).toBe(0);
+    expect(await storage.cleanupOldest(-1)).toBe(0);
+    expect(storage.list()).toHaveLength(2);
   });
 
-  it('cleanupOldest keeps maxCount most recent files per artifactId', async () => {
+  it('cleanupOldest keeps maxCount most recent artifacts, all their files', async () => {
     let now = new Date('2026-01-01T00:00:00Z');
     const storage = new InMemoryArtifactStorage({ now: () => now });
-    for (const i of [1, 2, 3]) {
-      now = new Date(now.getTime() + 1000);
-      await storage.store(
-        'shared',
-        `f-${i}.txt`,
-        new Uint8Array(),
-        'text/plain'
-      );
+    for (const id of ['a1', 'a2', 'a3']) {
+      for (const i of [1, 2]) {
+        now = new Date(now.getTime() + 1000);
+        await storage.store(id, `f-${i}.txt`, new Uint8Array(), 'text/plain');
+      }
     }
 
-    now = new Date(now.getTime() + 1000);
-    await storage.store('other', 'o.txt', new Uint8Array(), 'text/plain');
-
-    const removed = await storage.cleanupOldest(1);
+    const removed = await storage.cleanupOldest(2);
     expect(removed).toBe(2);
     const keys = storage
       .list()
       .map((m) => `${m.artifactId}/${m.filename}`)
       .sort();
-    expect(keys).toEqual(['other/o.txt', 'shared/f-3.txt']);
+    expect(keys).toEqual([
+      'a2/f-1.txt',
+      'a2/f-2.txt',
+      'a3/f-1.txt',
+      'a3/f-2.txt',
+    ]);
   });
 
   it('close clears the store and blocks subsequent operations', async () => {

@@ -428,7 +428,7 @@ describe('MinioArtifactStorage', () => {
     expect(await storage.exists('abc', 'new.txt')).toBe(true);
   });
 
-  it('cleanupOldest with maxCount <= 0 wipes everything under prefix', async () => {
+  it('cleanupOldest with maxCount <= 0 is unlimited and removes nothing', async () => {
     const storage = makeStorage(fake);
     await storage.store(
       'abc',
@@ -442,34 +442,31 @@ describe('MinioArtifactStorage', () => {
       new Uint8Array(),
       'application/octet-stream'
     );
-    const removed = await storage.cleanupOldest(0);
-    expect(removed).toBe(2);
-    expect(fake.objects.size).toBe(0);
+    expect(await storage.cleanupOldest(0)).toBe(0);
+    expect(await storage.cleanupOldest(-1)).toBe(0);
+    expect(fake.objects.size).toBe(2);
   });
 
-  it('cleanupOldest keeps maxCount most recent files per artifactId', async () => {
+  it('cleanupOldest keeps maxCount most recent artifacts, all their files', async () => {
     let now = new Date('2026-01-01T00:00:00Z');
     fake = new FakeS3Client(() => now);
     const storage = makeStorage(fake, { now: () => now });
 
-    for (const i of [1, 2, 3]) {
-      now = new Date(now.getTime() + 1000);
-      await storage.store(
-        'shared',
-        `f-${i}.txt`,
-        new Uint8Array(),
-        'text/plain'
-      );
+    for (const id of ['a1', 'a2', 'a3']) {
+      for (const i of [1, 2]) {
+        now = new Date(now.getTime() + 1000);
+        await storage.store(id, `f-${i}.txt`, new Uint8Array(), 'text/plain');
+      }
     }
-    now = new Date(now.getTime() + 1000);
-    await storage.store('other', 'o.txt', new Uint8Array(), 'text/plain');
 
-    const removed = await storage.cleanupOldest(1);
+    const removed = await storage.cleanupOldest(2);
     expect(removed).toBe(2);
-    expect(await storage.exists('shared', 'f-3.txt')).toBe(true);
-    expect(await storage.exists('shared', 'f-1.txt')).toBe(false);
-    expect(await storage.exists('shared', 'f-2.txt')).toBe(false);
-    expect(await storage.exists('other', 'o.txt')).toBe(true);
+    expect(await storage.exists('a1', 'f-1.txt')).toBe(false);
+    expect(await storage.exists('a1', 'f-2.txt')).toBe(false);
+    expect(await storage.exists('a2', 'f-1.txt')).toBe(true);
+    expect(await storage.exists('a2', 'f-2.txt')).toBe(true);
+    expect(await storage.exists('a3', 'f-1.txt')).toBe(true);
+    expect(await storage.exists('a3', 'f-2.txt')).toBe(true);
   });
 
   it('cleanup skips object keys whose artifactId segment does not match the pattern', async () => {
@@ -492,7 +489,7 @@ describe('MinioArtifactStorage', () => {
     );
 
     now = new Date(now.getTime() + 10_000);
-    const removed = await storage.cleanupOldest(0);
+    const removed = await storage.cleanupExpired(1_000);
     expect(removed).toBe(1);
     expect(fake.objects.has('bkt::has space/rogue')).toBe(true);
   });

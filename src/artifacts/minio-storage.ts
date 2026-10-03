@@ -11,6 +11,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ArtifactStorageError } from './artifact-service.js';
+import { selectEntriesOverArtifactCap } from './artifact-storage.js';
 import type {
   ArtifactMetadata,
   ArtifactStorageProvider,
@@ -367,6 +368,9 @@ export class MinioArtifactStorage implements ArtifactStorageProvider {
   async cleanupOldest(maxCount: number, signal?: AbortSignal): Promise<number> {
     this.ensureOpen();
     this.assertNotAborted(signal);
+    if (maxCount <= 0) {
+      return 0;
+    }
     const entries: Array<{
       key: string;
       artifactId: string;
@@ -375,32 +379,12 @@ export class MinioArtifactStorage implements ArtifactStorageProvider {
     for await (const entry of this.iterate(signal)) {
       entries.push(entry);
     }
-    if (maxCount <= 0) {
-      for (const entry of entries) {
-        this.assertNotAborted(signal);
-        await this.deleteKey(entry.key, signal);
-      }
-      return entries.length;
+    const stale = selectEntriesOverArtifactCap(entries, maxCount);
+    for (const entry of stale) {
+      this.assertNotAborted(signal);
+      await this.deleteKey(entry.key, signal);
     }
-    const byArtifact = new Map<
-      string,
-      Array<{ key: string; uploadedAt: number }>
-    >();
-    for (const entry of entries) {
-      const list = byArtifact.get(entry.artifactId) ?? [];
-      list.push({ key: entry.key, uploadedAt: entry.uploadedAt });
-      byArtifact.set(entry.artifactId, list);
-    }
-    let removed = 0;
-    for (const list of byArtifact.values()) {
-      list.sort((a, b) => b.uploadedAt - a.uploadedAt);
-      for (const stale of list.slice(maxCount)) {
-        this.assertNotAborted(signal);
-        await this.deleteKey(stale.key, signal);
-        removed += 1;
-      }
-    }
-    return removed;
+    return stale.length;
   }
 
   async close(): Promise<void> {

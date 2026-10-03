@@ -274,10 +274,12 @@ export interface ArtifactService {
   cleanupExpired(maxAgeMs: number, signal?: AbortSignal): Promise<number>;
 
   /**
-   * For each artifact id in storage, keep only the `maxCount` most-recent
-   * files and delete the rest. Returns the number of files removed.
+   * Keep only the `maxCount` most-recent artifacts in storage and delete
+   * every file belonging to an older one. Returns the number of files
+   * removed. An artifact's recency is its newest file's upload time.
    *
-   * Pass `0` or a negative value to wipe the store entirely.
+   * Pass `0` or a negative value for an unlimited cap (no-op). To wipe the
+   * store, use {@link cleanupExpired} instead.
    */
   cleanupOldest(maxCount: number, signal?: AbortSignal): Promise<number>;
 

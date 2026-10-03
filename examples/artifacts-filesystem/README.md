@@ -99,7 +99,7 @@ The example does not auto-clean artifacts on shutdown — they survive process r
 rm -rf "${ARTIFACTS_ROOT:-/tmp/adk-artifacts-filesystem}"
 ```
 
-For programmatic cleanup, call `artifactService.cleanupExpired(maxAgeMs)` or `artifactService.cleanupOldest(maxCount)` — both delegate to the underlying provider.
+For programmatic cleanup, call `artifactService.cleanupExpired(maxAgeMs)` to drop artifacts older than `maxAgeMs`, or `artifactService.cleanupOldest(maxCount)` to keep only the `maxCount` most-recent artifacts (deleting every file of the older ones; `0` or less means unlimited, a no-op). Both delegate to the underlying provider.
 
 ## Related examples
 
