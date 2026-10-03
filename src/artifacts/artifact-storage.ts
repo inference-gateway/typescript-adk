@@ -146,7 +146,7 @@ export interface ArtifactStorageProvider {
  * semantics cannot drift between backends.
  */
 export function selectEntriesOverArtifactCap<
-  T extends { readonly artifactId: string; readonly uploadedAt: number }
+  T extends { readonly artifactId: string; readonly uploadedAt: number },
 >(entries: readonly T[], maxCount: number): T[] {
   if (maxCount <= 0) return [];
   const newestByArtifact = new Map<string, number>();
