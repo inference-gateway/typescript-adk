@@ -6,6 +6,7 @@ import {
 } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
+  A2AMethod,
   CancelTaskRequest,
   Struct,
   Task,
@@ -15,12 +16,12 @@ import type { MethodHandler } from './method-registry.js';
 import type { TaskCancellationRegistry } from './task-cancellation.js';
 
 /**
- * Canonical JSON-RPC method name for the A2A `tasks/cancel` operation.
+ * Canonical JSON-RPC method name for the A2A `CancelTask` operation.
  *
  * Use this rather than a string literal when registering the handler so the
  * spelling stays in lockstep with conformance tests and other consumers.
  */
-export const TASK_CANCEL_METHOD = 'tasks/cancel';
+export const TASK_CANCEL_METHOD = 'CancelTask' satisfies A2AMethod;
 
 export interface TaskCancelHandlerOptions {
   /** Storage backend to look up and mutate tasks in. */
@@ -38,7 +39,7 @@ export interface TaskCancelHandlerOptions {
 }
 
 /**
- * Build a handler for the A2A `tasks/cancel` JSON-RPC method.
+ * Build a handler for the A2A `CancelTask` JSON-RPC method.
  *
  * Behaviour by current task state (mirrors the Go ADK's `CancelTask` in
  * `adk/server/task_manager.go`):
@@ -89,7 +90,7 @@ export function createTaskCancelHandler(
 
     registry?.cancel(
       task.id,
-      new DOMException('Task cancelled via tasks/cancel', 'AbortError')
+      new DOMException('Task cancelled via CancelTask', 'AbortError')
     );
 
     const cancelled = transitionTask(task, TASK_STATE.CANCELLED, {

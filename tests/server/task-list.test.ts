@@ -506,7 +506,7 @@ describe('createTaskListHandler', () => {
   });
 });
 
-describe('tasks/list JSON-RPC conformance', () => {
+describe('ListTasks JSON-RPC conformance', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -516,7 +516,7 @@ describe('tasks/list JSON-RPC conformance', () => {
     }
   });
 
-  it('dispatches a happy-path tasks/list request and returns the tasks', async () => {
+  it('dispatches a happy-path ListTasks request and returns the tasks', async () => {
     const storage = new InMemoryTaskStorage();
     makeTask(storage, 1, { id: 'a' });
     makeTask(storage, 2, { id: 'b' });

@@ -265,7 +265,7 @@ describe('A2AClient.sendMessage', () => {
       id: number;
     };
     expect(body.jsonrpc).toBe('2.0');
-    expect(body.method).toBe('message/send');
+    expect(body.method).toBe('SendMessage');
     expect(body.id).toBe(1);
     expect(body.params.message.messageId).toBe('m-1');
 
@@ -366,7 +366,7 @@ describe('A2AClient.sendMessage', () => {
 });
 
 describe('A2AClient.getTask', () => {
-  it('POSTs tasks/get with the taskId and returns the task', async () => {
+  it('POSTs GetTask with the taskId and returns the task', async () => {
     const task = sampleTask();
     const { fetch, calls } = mockFetch({
       body: { jsonrpc: '2.0', id: 1, result: task },
@@ -383,7 +383,7 @@ describe('A2AClient.getTask', () => {
       method: string;
       params: { id: string };
     };
-    expect(body.method).toBe('tasks/get');
+    expect(body.method).toBe('GetTask');
     expect(body.params).toEqual({ id: 'task-1' });
   });
 

@@ -7,7 +7,7 @@ Mirrors the Go ADK's [`examples/queue-storage/in-memory/`](https://github.com/in
 ## What this example shows
 
 - Construct the simplest available `TaskStorage`: `new InMemoryTaskStorage()`.
-- Plug it into the standard `message/send` + `tasks/get` handler pair.
+- Plug it into the standard `SendMessage` + `GetTask` handler pair.
 - Drive a background echo worker via `storage.dequeue(signal)`.
 - Demonstrate that **the rest of the agent does not care** which backend the storage is - the worker, the handlers, the dead-lettering call are identical to the Redis variant.
 
@@ -24,7 +24,7 @@ In-memory storage has zero dependencies beyond the ADK itself. It is the right d
 ```text
 examples/queue-storage/in-memory/
 ├── README.md
-├── client.ts        # sendMessage + poll tasks/get until terminal
+├── client.ts        # sendMessage + poll GetTask until terminal
 ├── package.json     # workspace package, depends only on @inference-gateway/adk
 ├── server.ts        # A2A server + echo worker, InMemoryTaskStorage
 └── tsconfig.json
@@ -88,7 +88,7 @@ queue-storage-in-memory-agent listening on http://127.0.0.1:8080
 Client (abbreviated - UUIDs differ):
 
 ```text
-POST http://127.0.0.1:8080/  message/send  "Hello from the in-memory queue-storage example. Please echo this back."
+POST http://127.0.0.1:8080/  SendMessage  "Hello from the in-memory queue-storage example. Please echo this back."
 created task id=… state=TASK_STATE_SUBMITTED
 {
   "id": "…",

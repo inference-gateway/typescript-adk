@@ -290,7 +290,7 @@ describe('createTaskGetHandler', () => {
   });
 });
 
-describe('tasks/get JSON-RPC conformance', () => {
+describe('GetTask JSON-RPC conformance', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -300,7 +300,7 @@ describe('tasks/get JSON-RPC conformance', () => {
     }
   });
 
-  it('dispatches a happy-path tasks/get request and returns the Task', async () => {
+  it('dispatches a happy-path GetTask request and returns the Task', async () => {
     const storage = new InMemoryTaskStorage();
     seedActiveTask(storage);
     const server = createA2AServer({ card: makeCard() });

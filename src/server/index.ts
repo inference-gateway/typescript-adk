@@ -23,11 +23,8 @@ export {
 export type {
   JSONRPCErrorCode,
   JSONRPCErrorObject,
-  JSONRPCErrorResponse,
   JSONRPCId,
-  JSONRPCRequest,
   JSONRPCResponse,
-  JSONRPCSuccessResponse,
 } from './jsonrpc.js';
 export { MethodRegistry } from './method-registry.js';
 export type { MethodContext, MethodHandler } from './method-registry.js';

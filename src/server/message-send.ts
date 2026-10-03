@@ -7,6 +7,7 @@ import {
 } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
+  A2AMethod,
   Message,
   SendMessageRequest,
   Task,
@@ -15,12 +16,12 @@ import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
 import type { MethodHandler } from './method-registry.js';
 
 /**
- * Canonical JSON-RPC method name for the A2A `message/send` operation.
+ * Canonical JSON-RPC method name for the A2A `SendMessage` operation.
  *
  * Use this rather than a string literal when registering the handler so the
  * spelling stays in lockstep with conformance tests and other consumers.
  */
-export const MESSAGE_SEND_METHOD = 'message/send';
+export const MESSAGE_SEND_METHOD = 'SendMessage' satisfies A2AMethod;
 
 export interface MessageSendHandlerOptions {
   /** Storage backend used to persist and enqueue the created task. */
@@ -37,7 +38,7 @@ export interface MessageSendHandlerOptions {
 }
 
 /**
- * Build a handler for the A2A `message/send` JSON-RPC method.
+ * Build a handler for the A2A `SendMessage` JSON-RPC method.
  *
  * The handler is synchronous from the caller's perspective: it creates a
  * `PENDING` task, persists and enqueues it, then returns the task object

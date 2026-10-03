@@ -1,16 +1,16 @@
-import type { AgentCard } from '../types/generated/a2a.js';
+import type { A2AMethod, AgentCard } from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
 import type { MethodHandler } from './method-registry.js';
 
 /**
  * Canonical JSON-RPC method name for the A2A
- * `agent/getAuthenticatedExtendedCard` operation.
+ * `GetExtendedAgentCard` operation.
  *
  * Use this rather than a string literal when registering the handler so the
  * spelling stays in lockstep with conformance tests and other consumers.
  */
 export const GET_AUTHENTICATED_EXTENDED_CARD_METHOD =
-  'agent/getAuthenticatedExtendedCard';
+  'GetExtendedAgentCard' satisfies A2AMethod;
 
 export interface GetAuthenticatedExtendedCardHandlerOptions {
   /**
@@ -34,7 +34,7 @@ export interface GetAuthenticatedExtendedCardHandlerOptions {
 }
 
 /**
- * Build a handler for `agent/getAuthenticatedExtendedCard`.
+ * Build a handler for `GetExtendedAgentCard`.
  *
  * The handler trusts that authentication has already been enforced upstream
  * (by the JSON-RPC route's auth middleware) - it does not re-verify the

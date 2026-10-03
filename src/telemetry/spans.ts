@@ -26,7 +26,7 @@ export const SPAN_NAME_STREAMING_TASK = 'adk.task.streaming';
 export const SPAN_NAME_LLM_COMPLETION = 'adk.llm.completion';
 
 /**
- * Span attribute holding the JSON-RPC method name (e.g. `message/send`).
+ * Span attribute holding the JSON-RPC method name (e.g. `SendMessage`).
  * Mirrors the Go ADK's `adk.jsonrpc.method`.
  */
 export const ATTR_JSONRPC_METHOD = 'adk.jsonrpc.method';

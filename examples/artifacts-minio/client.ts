@@ -22,7 +22,7 @@ const sendMessage: Message = {
   role: 'ROLE_USER',
   parts: [{ text: PROMPT }],
 };
-console.log(`POST ${SERVER_URL}/  message/send  "${PROMPT}"`);
+console.log(`POST ${SERVER_URL}/  SendMessage  "${PROMPT}"`);
 const created = await client.sendMessage({ message: sendMessage });
 console.log(`created task id=${created.id} state=${created.status.state}`);
 

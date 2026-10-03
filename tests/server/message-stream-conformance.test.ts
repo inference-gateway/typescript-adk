@@ -106,7 +106,7 @@ async function readFrames(
   }
 }
 
-describe('message/stream JSON-RPC conformance', () => {
+describe('SendStreamingMessage JSON-RPC conformance', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {

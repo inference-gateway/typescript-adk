@@ -106,7 +106,7 @@ describe('A2AServer JSON-RPC conformance', () => {
     const res = await postJSON(baseUrl, {
       jsonrpc: '2.0',
       id: 99,
-      method: 'tasks/get',
+      method: 'GetTask',
       params: { name: 'tasks/abc' },
     });
     expect(res.status).toBe(200);

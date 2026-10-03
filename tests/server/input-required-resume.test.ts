@@ -156,7 +156,7 @@ function assistantToolCalls(toolCalls: readonly ToolCall[]): CompletionResult {
   return { message: assistant };
 }
 
-describe('message/send resume flow (background)', () => {
+describe('SendMessage resume flow (background)', () => {
   it('resumes an INPUT_REQUIRED task when a new message arrives with the same contextId', () => {
     const storage = new InMemoryTaskStorage();
 
@@ -367,7 +367,7 @@ describe('DefaultBackgroundTaskHandler pause + resume', () => {
   });
 });
 
-describe('message/send JSON-RPC pause + resume', () => {
+describe('SendMessage JSON-RPC pause + resume', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -468,7 +468,7 @@ describe('message/send JSON-RPC pause + resume', () => {
   });
 });
 
-describe('message/stream JSON-RPC pause + resume', () => {
+describe('SendStreamingMessage JSON-RPC pause + resume', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {
@@ -510,7 +510,7 @@ describe('message/stream JSON-RPC pause + resume', () => {
     close = () => server.close();
     const baseUrl = await start(server);
 
-    // 1. First message/stream - pauses on input_required.
+    // 1. First SendStreamingMessage - pauses on input_required.
     const firstRes = await fetch(`${baseUrl}/`, {
       method: 'POST',
       headers: {
@@ -552,7 +552,7 @@ describe('message/stream JSON-RPC pause + resume', () => {
     const paused = storage.getActive('id-1');
     expect(paused?.state).toBe(TASK_STATE.INPUT_REQUIRED);
 
-    // 2. Second message/stream with same contextId - resumes the same task.
+    // 2. Second SendStreamingMessage with same contextId - resumes the same task.
     const secondRes = await fetch(`${baseUrl}/`, {
       method: 'POST',
       headers: {

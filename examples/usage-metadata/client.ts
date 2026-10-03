@@ -28,7 +28,7 @@ const POLL_MAX_ATTEMPTS = 60;
 
 const client = createA2AClient({ baseURL: SERVER_URL });
 
-console.log('=== message/send (background path) ===');
+console.log('=== SendMessage (background path) ===');
 for (let i = 0; i < SEND_PROMPTS.length; i++) {
   const prompt = SEND_PROMPTS[i] as string;
   console.log(`\n--- send ${i + 1} ---`);
@@ -46,7 +46,7 @@ for (let i = 0; i < SEND_PROMPTS.length; i++) {
   console.log(JSON.stringify(final.metadata ?? null, null, 2));
 }
 
-console.log('\n=== message/stream (streaming path) ===');
+console.log('\n=== SendStreamingMessage (streaming path) ===');
 console.log(`> ${STREAM_PROMPT}`);
 const streamRequest = {
   jsonrpc: JSONRPC_VERSION,
@@ -116,10 +116,10 @@ if (finalStatus !== null) {
   console.log(JSON.stringify(finalStatus.metadata ?? null, null, 2));
 }
 
-// Confirm the same metadata is reachable via tasks/get on the persisted task.
+// Confirm the same metadata is reachable via GetTask on the persisted task.
 if (streamTaskId !== undefined) {
   const persisted = await client.getTask(streamTaskId);
-  console.log('\ntask.metadata (from tasks/get):');
+  console.log('\ntask.metadata (from GetTask):');
   console.log(JSON.stringify(persisted.metadata ?? null, null, 2));
 }
 

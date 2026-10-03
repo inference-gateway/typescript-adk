@@ -15,22 +15,22 @@ import {
 const SERVER_URL = process.env['SERVER_URL'] ?? 'http://127.0.0.1:8080';
 const SEND_PROMPT =
   process.env['SEND_PROMPT'] ??
-  'Hello via message/send - please persist this note as an artifact.';
+  'Hello via SendMessage - please persist this note as an artifact.';
 const STREAM_PROMPT =
   process.env['STREAM_PROMPT'] ??
-  'Hello via message/stream - please show me the streaming default handler stub.';
+  'Hello via SendStreamingMessage - please show me the streaming default handler stub.';
 const POLL_INTERVAL_MS = 300;
 const POLL_MAX_ATTEMPTS = 40;
 
 const client = createA2AClient({ baseURL: SERVER_URL });
 
-console.log('=== message/send (background path) ===');
+console.log('=== SendMessage (background path) ===');
 const sendMessage: Message = {
   messageId: crypto.randomUUID(),
   role: 'ROLE_USER',
   parts: [{ text: SEND_PROMPT }],
 };
-console.log(`POST ${SERVER_URL}/  message/send  "${SEND_PROMPT}"`);
+console.log(`POST ${SERVER_URL}/  SendMessage  "${SEND_PROMPT}"`);
 const created = await client.sendMessage({ message: sendMessage });
 console.log(`created task id=${created.id} state=${created.status.state}`);
 
@@ -43,7 +43,7 @@ for (const artifact of artifacts) {
   console.log(`  ${artifact.artifactId} -> ${uri ?? '(no uri)'}`);
 }
 
-console.log('\n=== message/stream (streaming default-handler stub) ===');
+console.log('\n=== SendStreamingMessage (streaming default-handler stub) ===');
 const streamRequest = {
   jsonrpc: JSONRPC_VERSION,
   id: crypto.randomUUID(),
@@ -56,7 +56,7 @@ const streamRequest = {
     } satisfies Message,
   },
 };
-console.log(`POST ${SERVER_URL}/  message/stream  "${STREAM_PROMPT}"`);
+console.log(`POST ${SERVER_URL}/  SendStreamingMessage  "${STREAM_PROMPT}"`);
 const response = await fetch(`${SERVER_URL}/`, {
   method: 'POST',
   headers: {

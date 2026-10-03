@@ -2,7 +2,7 @@
  * Process-wide map of `taskId -> AbortController`, shared between the server
  * core and any handler (background or streaming) that drives a long-running
  * task. The {@link import('./task-cancel.js').createTaskCancelHandler}
- * `tasks/cancel` handler consults this registry to abort the in-flight handler
+ * `CancelTask` handler consults this registry to abort the in-flight handler
  * that owns a task; the handler is responsible for registering its controller
  * before work starts and unregistering it once the task reaches a terminal
  * state, so the registry never leaks past task completion.

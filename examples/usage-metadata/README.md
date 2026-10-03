@@ -36,8 +36,8 @@ When the task reaches a terminal state (`COMPLETED` / `FAILED` / `CANCELLED` / `
 
 The server in this example wires both handlers with usage metadata enabled and exposes:
 
-- `message/send` — background path. Worker dequeues, runs `DefaultBackgroundTaskHandler`, attaches metadata, stores in dead-letter. The client reads it back via `tasks/get`.
-- `message/stream` — streaming path. `DefaultStreamingTaskHandler` emits a terminal `statusChanged` event with metadata attached; the streaming pipeline shallow-merges it into `task.metadata` before persisting. The client reads it from the final SSE frame _and_ via `tasks/get`.
+- `SendMessage` — background path. Worker dequeues, runs `DefaultBackgroundTaskHandler`, attaches metadata, stores in dead-letter. The client reads it back via `GetTask`.
+- `SendStreamingMessage` — streaming path. `DefaultStreamingTaskHandler` emits a terminal `statusChanged` event with metadata attached; the streaming pipeline shallow-merges it into `task.metadata` before persisting. The client reads it from the final SSE frame _and_ via `GetTask`.
 
 ## Layout
 
@@ -74,16 +74,16 @@ pnpm --filter @inference-gateway/adk-example-usage-metadata start:client
 
 ### Configuration
 
-| Environment variable    | Default                        | Description                               |
-| ----------------------- | ------------------------------ | ----------------------------------------- |
-| `A2A_AGENT_NAME`        | `usage-metadata-agent`         | Agent name advertised on the card.        |
-| `A2A_AGENT_DESCRIPTION` | (canned demo string)           | Agent description advertised on the card. |
-| `A2A_AGENT_VERSION`     | `0.0.0`                        | Agent version advertised on the card.     |
-| `A2A_SERVER_HOST`       | `127.0.0.1`                    | Bind host.                                |
-| `A2A_SERVER_PORT`       | `8080`                         | Bind port.                                |
-| `SERVER_URL`            | `http://127.0.0.1:8080`        | Client target URL.                        |
-| `SEND_PROMPTS`          | (canned 2-prompt list)         | `                                         |     | `-separated prompts for the `message/send` portion. |
-| `STREAM_PROMPT`         | `What's the weather in Tokyo?` | Prompt for the `message/stream` portion.  |
+| Environment variable    | Default                        | Description                                    |
+| ----------------------- | ------------------------------ | ---------------------------------------------- |
+| `A2A_AGENT_NAME`        | `usage-metadata-agent`         | Agent name advertised on the card.             |
+| `A2A_AGENT_DESCRIPTION` | (canned demo string)           | Agent description advertised on the card.      |
+| `A2A_AGENT_VERSION`     | `0.0.0`                        | Agent version advertised on the card.          |
+| `A2A_SERVER_HOST`       | `127.0.0.1`                    | Bind host.                                     |
+| `A2A_SERVER_PORT`       | `8080`                         | Bind port.                                     |
+| `SERVER_URL`            | `http://127.0.0.1:8080`        | Client target URL.                             |
+| `SEND_PROMPTS`          | (canned 2-prompt list)         | `                                              |     | `-separated prompts for the `SendMessage` portion. |
+| `STREAM_PROMPT`         | `What's the weather in Tokyo?` | Prompt for the `SendStreamingMessage` portion. |
 
 ## Expected output
 
@@ -114,7 +114,7 @@ task.metadata (from terminal status event):
   "usage":           { "prompt_tokens": 56, "completion_tokens": 28, "total_tokens": 84 }
 }
 
-task.metadata (from tasks/get):
+task.metadata (from GetTask):
 {
   "execution_stats": { "iterations": 2, "tool_calls": 1, "failed_tools": 0 },
   "usage":           { "prompt_tokens": 56, "completion_tokens": 28, "total_tokens": 84 }

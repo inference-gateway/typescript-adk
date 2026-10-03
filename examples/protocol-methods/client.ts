@@ -162,9 +162,11 @@ console.log('══════════════════════�
 const client = createA2AClient({ baseURL: SERVER_URL });
 
 // -----------------------------------------------------------------------
-// 1. agent/getAgentCard – unauthenticated card discovery
+// 1. GET /.well-known/agent-card.json – unauthenticated card discovery
 // -----------------------------------------------------------------------
-console.log('── 1. agent/getAgentCard ────────────────────────────────');
+console.log(
+  '── 1. GET /.well-known/agent-card.json ────────────────────────────────'
+);
 
 let agentCard: AgentCard;
 try {
@@ -197,9 +199,9 @@ try {
 }
 
 // -----------------------------------------------------------------------
-// 2. agent/getHealth – liveness probe
+// 2. GET /health – liveness probe
 // -----------------------------------------------------------------------
-console.log('\n── 2. agent/getHealth ────────────────────────────────────');
+console.log('\n── 2. GET /health ────────────────────────────────────');
 
 try {
   const health = await client.getHealth();
@@ -211,15 +213,12 @@ try {
 }
 
 // -----------------------------------------------------------------------
-// 3. agent/getAuthenticatedExtendedCard – extended card
+// 3. GetExtendedAgentCard – extended card
 // -----------------------------------------------------------------------
-console.log('\n── 3. agent/getAuthenticatedExtendedCard ─────────────────');
+console.log('\n── 3. GetExtendedAgentCard ─────────────────');
 
 try {
-  const extended = await jsonRpcCall<AgentCard>(
-    'agent/getAuthenticatedExtendedCard',
-    {}
-  );
+  const extended = await jsonRpcCall<AgentCard>('GetExtendedAgentCard', {});
   assert(typeof extended.name === 'string', 'extended card name is a string');
   assert(
     extended.name.includes('extended'),
@@ -236,9 +235,9 @@ try {
 }
 
 // -----------------------------------------------------------------------
-// 4. message/send – create a task
+// 4. SendMessage – create a task
 // -----------------------------------------------------------------------
-console.log('\n── 4. message/send ───────────────────────────────────────');
+console.log('\n── 4. SendMessage ───────────────────────────────────────');
 
 const PROMPT = process.env['PROMPT'] ?? 'Hello, protocol-methods agent!';
 
@@ -266,9 +265,9 @@ try {
 }
 
 // -----------------------------------------------------------------------
-// 5. tasks/get – retrieve the created task (initially)
+// 5. GetTask – retrieve the created task (initially)
 // -----------------------------------------------------------------------
-console.log('\n── 5. tasks/get (immediately after send) ────────────────');
+console.log('\n── 5. GetTask (immediately after send) ────────────────');
 
 try {
   const fetched = await client.getTask(createdTask.id);
@@ -281,9 +280,9 @@ try {
 }
 
 // -----------------------------------------------------------------------
-// 6. Poll tasks/get until terminal – then verify completion
+// 6. Poll GetTask until terminal – then verify completion
 // -----------------------------------------------------------------------
-console.log('\n── 6. tasks/get (poll until terminal) ───────────────────');
+console.log('\n── 6. GetTask (poll until terminal) ───────────────────');
 
 try {
   const terminal = await pollUntilTerminal(client, createdTask.id);
@@ -305,9 +304,9 @@ try {
 }
 
 // -----------------------------------------------------------------------
-// 7. tasks/get with historyLength
+// 7. GetTask with historyLength
 // -----------------------------------------------------------------------
-console.log('\n── 7. tasks/get (with historyLength=1) ──────────────────');
+console.log('\n── 7. GetTask (with historyLength=1) ──────────────────');
 
 try {
   const sliced = await client.getTask(createdTask.id, { historyLength: 1 });
@@ -321,15 +320,15 @@ try {
 }
 
 // -----------------------------------------------------------------------
-// 8. tasks/list – list tasks with state filter
+// 8. ListTasks – list tasks with state filter
 // -----------------------------------------------------------------------
-console.log('\n── 8. tasks/list ─────────────────────────────────────────');
+console.log('\n── 8. ListTasks ─────────────────────────────────────────');
 
 try {
   const { tasks: allTasks, nextPageToken } = await jsonRpcCall<{
     tasks: Task[];
     nextPageToken: string;
-  }>('tasks/list', {});
+  }>('ListTasks', {});
 
   assert(Array.isArray(allTasks), 'result.tasks is an array');
   assert(allTasks.length > 0, 'at least one task is listed');
@@ -344,18 +343,18 @@ try {
     console.log('  nextPageToken:  (none, last page)');
   }
 } catch (err) {
-  fail('tasks/list', String(err));
+  fail('ListTasks', String(err));
 }
 
 // -----------------------------------------------------------------------
-// 9. tasks/list with state filter
+// 9. ListTasks with state filter
 // -----------------------------------------------------------------------
-console.log('\n── 9. tasks/list (filtered by state=COMPLETED) ──────────');
+console.log('\n── 9. ListTasks (filtered by state=COMPLETED) ──────────');
 
 try {
   const { tasks: completedTasks } = await jsonRpcCall<{
     tasks: Task[];
-  }>('tasks/list', { state: TASK_STATE.COMPLETED });
+  }>('ListTasks', { state: TASK_STATE.COMPLETED });
 
   assert(Array.isArray(completedTasks), 'result.tasks is an array');
   assert(completedTasks.length > 0, 'at least one COMPLETED task');
@@ -367,13 +366,13 @@ try {
   }
   console.log(`  COMPLETED tasks: ${completedTasks.length}`);
 } catch (err) {
-  fail('tasks/list (filtered)', String(err));
+  fail('ListTasks (filtered)', String(err));
 }
 
 // -----------------------------------------------------------------------
-// 10. tasks/cancel – cancel a newly-created task
+// 10. CancelTask – cancel a newly-created task
 // -----------------------------------------------------------------------
-console.log('\n── 10. tasks/cancel ──────────────────────────────────────');
+console.log('\n── 10. CancelTask ──────────────────────────────────────');
 
 try {
   const cancelMessage: Message = {
@@ -387,7 +386,7 @@ try {
     `cancel-task created (PENDING; got ${cancelTask.status.state})`
   );
 
-  const cancelled = await jsonRpcCall<Task>('tasks/cancel', {
+  const cancelled = await jsonRpcCall<Task>('CancelTask', {
     id: cancelTask.id,
   });
   assert(cancelled.id === cancelTask.id, 'returned task id matches');
@@ -397,18 +396,18 @@ try {
   );
   console.log(`  cancelled task: ${cancelled.id} (${cancelled.status.state})`);
 
-  // Verify it's in the dead-letter store via tasks/get
+  // Verify it's in the dead-letter store via GetTask
   const verifyCancelled = await client.getTask(cancelTask.id);
   assert(
     verifyCancelled.status.state === TASK_STATE.CANCELLED,
-    'verify cancelled via tasks/get'
+    'verify cancelled via GetTask'
   );
 } catch (err) {
-  fail('tasks/cancel', String(err));
+  fail('CancelTask', String(err));
 }
 
 // -----------------------------------------------------------------------
-// 11. tasks/pushNotificationConfig/set + get + list + delete (CRUD)
+// 11. CreateTaskPushNotificationConfig + get + list + delete (CRUD)
 // -----------------------------------------------------------------------
 console.log('\n── 11. push notification config CRUD ─────────────────────');
 
@@ -418,7 +417,7 @@ const PUSH_TOKEN = 'test-webhook-token-abc123';
 try {
   // 11a. Set
   const setResult = await jsonRpcCall<TaskPushNotificationConfig>(
-    'tasks/pushNotificationConfig/set',
+    'CreateTaskPushNotificationConfig',
     {
       taskId: createdTask.id,
       url: PUSH_URL,
@@ -435,7 +434,7 @@ try {
 
   // 11b. Get
   const getResult = await jsonRpcCall<TaskPushNotificationConfig>(
-    'tasks/pushNotificationConfig/get',
+    'GetTaskPushNotificationConfig',
     {
       taskId: createdTask.id,
       id: configId,
@@ -448,14 +447,14 @@ try {
   // 11c. List
   const listResult = await jsonRpcCall<{
     configs: TaskPushNotificationConfig[];
-  }>('tasks/pushNotificationConfig/list', { taskId: createdTask.id });
+  }>('ListTaskPushNotificationConfigs', { taskId: createdTask.id });
   assert(Array.isArray(listResult.configs), 'list: configs is array');
   assert(listResult.configs.length >= 1, 'list: at least 1 config');
   console.log(`  list: ${listResult.configs.length} config(s)`);
 
   // 11d. Delete
   const deleteResult = await jsonRpcCall<null>(
-    'tasks/pushNotificationConfig/delete',
+    'DeleteTaskPushNotificationConfig',
     {
       taskId: createdTask.id,
       id: configId,
@@ -467,7 +466,7 @@ try {
   // Verify deletion
   try {
     await jsonRpcCall<TaskPushNotificationConfig>(
-      'tasks/pushNotificationConfig/get',
+      'GetTaskPushNotificationConfig',
       {
         taskId: createdTask.id,
         id: configId,
@@ -482,9 +481,11 @@ try {
 }
 
 // -----------------------------------------------------------------------
-// 12. message/stream – SSE streaming method
+// 12. SendStreamingMessage – SSE streaming method
 // -----------------------------------------------------------------------
-console.log('\n── 12. message/stream ────────────────────────────────────');
+console.log(
+  '\n── 12. SendStreamingMessage ────────────────────────────────────'
+);
 
 let streamTaskId: string | null = null;
 
@@ -571,13 +572,13 @@ try {
     );
   }
 } catch (err) {
-  fail('message/stream', String(err));
+  fail('SendStreamingMessage', String(err));
 }
 
 // -----------------------------------------------------------------------
-// 13. tasks/resubscribe – SSE resubscribe to completed task
+// 13. SubscribeToTask – SSE resubscribe to completed task
 // -----------------------------------------------------------------------
-console.log('\n── 13. tasks/resubscribe ─────────────────────────────────');
+console.log('\n── 13. SubscribeToTask ─────────────────────────────────');
 
 if (streamTaskId !== null) {
   try {
@@ -620,16 +621,16 @@ if (streamTaskId !== null) {
     assert(resubEvents > 0, `resubscribe: received ${resubEvents} event(s)`);
     console.log(`  resubscribe complete: ${resubEvents} event(s)`);
   } catch (err) {
-    fail('tasks/resubscribe', String(err));
+    fail('SubscribeToTask', String(err));
   }
 } else {
   console.log('  (skipped – no stream task id available)');
 }
 
 // -----------------------------------------------------------------------
-// 14. tasks/get with non-existent id (error path)
+// 14. GetTask with non-existent id (error path)
 // -----------------------------------------------------------------------
-console.log('\n── 14. tasks/get (non-existent id – error path) ─────────');
+console.log('\n── 14. GetTask (non-existent id – error path) ─────────');
 
 try {
   await client.getTask('non-existent-task-id');

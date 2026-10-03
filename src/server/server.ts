@@ -77,7 +77,7 @@ export interface A2AServerConfig {
   readonly card: AgentCard;
   /**
    * Optional extended agent card returned to authenticated callers via the
-   * `agent/getAuthenticatedExtendedCard` JSON-RPC method. The handler is
+   * `GetExtendedAgentCard` JSON-RPC method. The handler is
    * always registered regardless of this field; when omitted, the method
    * returns `-32004` (UnsupportedOperationError) if
    * {@link AgentCard.supportsExtendedAgentCard} is false/absent, or `-32007`

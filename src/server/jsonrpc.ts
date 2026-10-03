@@ -1,4 +1,17 @@
+import type {
+  JSONRPCError as JSONRPCErrorObject,
+  JSONRPCErrorResponse,
+  JSONRPCSuccessResponse,
+  Value as JSONRPCId,
+} from '../types/generated/a2a.js';
 import type { MethodRegistry } from './method-registry.js';
+
+export type {
+  JSONRPCErrorObject,
+  JSONRPCErrorResponse,
+  JSONRPCId,
+  JSONRPCSuccessResponse,
+};
 
 export const JSONRPC_VERSION = '2.0';
 
@@ -14,33 +27,6 @@ export const JSONRPC_ERROR_CODES = {
 
 export type JSONRPCErrorCode =
   (typeof JSONRPC_ERROR_CODES)[keyof typeof JSONRPC_ERROR_CODES];
-
-export type JSONRPCId = string | number | null;
-
-export interface JSONRPCRequest {
-  readonly jsonrpc: typeof JSONRPC_VERSION;
-  readonly id?: JSONRPCId;
-  readonly method: string;
-  readonly params?: unknown;
-}
-
-export interface JSONRPCErrorObject {
-  readonly code: number;
-  readonly message: string;
-  readonly data?: unknown;
-}
-
-export interface JSONRPCSuccessResponse {
-  readonly jsonrpc: typeof JSONRPC_VERSION;
-  readonly id: JSONRPCId;
-  readonly result: unknown;
-}
-
-export interface JSONRPCErrorResponse {
-  readonly jsonrpc: typeof JSONRPC_VERSION;
-  readonly id: JSONRPCId;
-  readonly error: JSONRPCErrorObject;
-}
 
 export type JSONRPCResponse = JSONRPCSuccessResponse | JSONRPCErrorResponse;
 

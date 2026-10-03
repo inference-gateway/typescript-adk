@@ -310,7 +310,7 @@ describe('createTaskResubscribeHandler', () => {
   });
 });
 
-describe('tasks/resubscribe end-to-end via A2AServer', () => {
+describe('SubscribeToTask end-to-end via A2AServer', () => {
   let close: (() => Promise<void>) | undefined;
 
   afterEach(async () => {

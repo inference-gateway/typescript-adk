@@ -105,7 +105,7 @@ async function runWorker(signal: AbortSignal): Promise<void> {
 
 async function handleWeatherTask(task: ManagedTask): Promise<void> {
   // Both first-time (`PENDING`) and resumed (`IN_PROGRESS`) tasks land here.
-  // The `message/send` handler has already transitioned a resume to
+  // The `SendMessage` handler has already transitioned a resume to
   // `IN_PROGRESS`; first-time tasks start in `PENDING` and need an explicit
   // step before reaching `INPUT_REQUIRED` or `COMPLETED`.
   const working =

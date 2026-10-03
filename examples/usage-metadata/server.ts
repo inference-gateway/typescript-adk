@@ -53,7 +53,7 @@ const card: AgentCard = {
       id: 'usage-metadata-demo',
       name: 'Usage metadata demo',
       description:
-        'Answers weather questions with a fake LLM and attaches token usage + execution stats to task.metadata on completion. Exposes both message/send and message/stream.',
+        'Answers weather questions with a fake LLM and attaches token usage + execution stats to task.metadata on completion. Exposes both SendMessage and SendStreamingMessage.',
       tags: ['usage', 'metadata', 'observability', 'demo'],
     },
   ],
@@ -152,7 +152,7 @@ async function runBackgroundWorker(signal: AbortSignal): Promise<void> {
     storage.updateActive(task);
 
     const triggering = task.messages[task.messages.length - 1] as Message;
-    console.log(`\ntask ${task.id.slice(0, 8)} dequeued (message/send path)`);
+    console.log(`\ntask ${task.id.slice(0, 8)} dequeued (SendMessage path)`);
 
     let result: ManagedTask;
     try {

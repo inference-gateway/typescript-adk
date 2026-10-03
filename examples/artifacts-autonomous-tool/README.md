@@ -39,7 +39,7 @@ The system prompt nudges the model to call it whenever the user asks for a discr
 examples/artifacts-autonomous-tool/
 ├── README.md
 ├── .env.example       # copy to .env to override defaults
-├── client.ts          # sendMessage + poll tasks/get + download each artifact
+├── client.ts          # sendMessage + poll GetTask + download each artifact
 ├── package.json       # workspace package, depends only on @inference-gateway/adk
 ├── server.ts          # createA2AServer + DefaultBackgroundTaskHandler + DefaultToolBox({ enableCreateArtifact })
 └── tsconfig.json
@@ -88,14 +88,14 @@ Server (`server.ts`):
 
 Client (`client.ts`):
 
-| Env var      | Default                        | Description                                                                                                                         |
-| ------------ | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `SERVER_URL` | `http://127.0.0.1:8080`        | Base URL of the A2A server.                                                                                                         |
-| `PROMPTS`    | (two demo prompts, see source) | Pipe (`\|\|`)-separated list of prompts. Each one is sent as its own `message/send` request and the artifacts are downloaded after. |
+| Env var      | Default                        | Description                                                                                                                        |
+| ------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `SERVER_URL` | `http://127.0.0.1:8080`        | Base URL of the A2A server.                                                                                                        |
+| `PROMPTS`    | (two demo prompts, see source) | Pipe (`\|\|`)-separated list of prompts. Each one is sent as its own `SendMessage` request and the artifacts are downloaded after. |
 
 ## Expected flow
 
-1. Client sends a `message/send` JSON-RPC request asking for a document/report/snippet.
+1. Client sends a `SendMessage` JSON-RPC request asking for a document/report/snippet.
 2. Server creates a `PENDING` task, enqueues it, replies with the wire-format task.
 3. Worker dequeues the task and hands it to `DefaultBackgroundTaskHandler.handle(...)`.
 4. The handler builds a conversation, calls the LLM, and (typically) receives an assistant message with a `create_artifact` tool call.
@@ -106,7 +106,7 @@ Client (`client.ts`):
    - Returns a JSON string `{success, message, artifact_id, url, filename}` to the LLM.
 6. The handler drains the pending-artifacts bag at the end of the iteration (or on terminal transition) and attaches every drained artifact to `task.artifacts`.
 7. The LLM produces a final assistant message referring to the artifact by filename; the handler transitions the task to `TASK_STATE_COMPLETED`.
-8. Client polls `tasks/get`, extracts `task.artifacts[].parts[].url`, and downloads each URL through the server's `/artifacts` endpoint.
+8. Client polls `GetTask`, extracts `task.artifacts[].parts[].url`, and downloads each URL through the server's `/artifacts` endpoint.
 
 ## Where artifacts land
 

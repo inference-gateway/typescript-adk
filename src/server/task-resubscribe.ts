@@ -1,6 +1,7 @@
 import { isTerminal } from '../agent/task.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
+  A2AMethod,
   SubscribeToTaskRequest,
   TaskStatus,
   TaskStatusUpdateEvent,
@@ -18,18 +19,18 @@ import type { StreamingMethodResult } from './message-stream.js';
 import type { TaskEventBusRegistry } from './task-event-bus.js';
 
 /**
- * Canonical JSON-RPC method name for the A2A `tasks/resubscribe` operation.
+ * Canonical JSON-RPC method name for the A2A `SubscribeToTask` operation.
  *
  * Use this rather than a string literal when registering the handler so the
  * spelling stays in lockstep with conformance tests and other consumers.
  */
-export const TASK_RESUBSCRIBE_METHOD = 'tasks/resubscribe';
+export const TASK_RESUBSCRIBE_METHOD = 'SubscribeToTask' satisfies A2AMethod;
 
 export interface TaskResubscribeHandlerOptions {
   /** Storage backend to look up tasks in (both active and dead-letter). */
   readonly storage: TaskStorage;
   /**
-   * Shared per-task event bus registry. The `message/stream` handler creates
+   * Shared per-task event bus registry. The `SendStreamingMessage` handler creates
    * a bus per running task; the resubscribe handler attaches an SSE
    * subscriber to it so the same stream is delivered to every caller. Without
    * a registry, resubscribers can only replay the current persisted state -
@@ -52,7 +53,7 @@ export interface TaskResubscribeHandlerOptions {
 }
 
 /**
- * Build a handler for the A2A `tasks/resubscribe` JSON-RPC method.
+ * Build a handler for the A2A `SubscribeToTask` JSON-RPC method.
  *
  * Behaviour:
  *  - Synchronous validation: `taskId` must be a non-empty string and the
@@ -65,13 +66,13 @@ export interface TaskResubscribeHandlerOptions {
  *    from the task's persisted state. When the task is still running, the
  *    handler attaches to the bus and forwards every subsequent CloudEvent
  *    verbatim until the bus closes (typically when the producing
- *    `message/stream` invocation reaches a terminal state).
- *  - Fan-out: multiple concurrent `tasks/resubscribe` callers for the same
+ *    `SendStreamingMessage` invocation reaches a terminal state).
+ *  - Fan-out: multiple concurrent `SubscribeToTask` callers for the same
  *    task each receive their own independent SSE stream, all driven by the
  *    same per-task bus. Each subscriber sees the same sequence of frames
  *    from the moment it subscribes.
  *  - Terminal task: when the task is already in a terminal state by the
- *    time `tasks/resubscribe` is called, the handler emits a single
+ *    time `SubscribeToTask` is called, the handler emits a single
  *    `task.status.changed` frame with `final: true` (reflecting the
  *    persisted state) and closes the stream immediately.
  *

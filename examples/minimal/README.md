@@ -7,7 +7,7 @@ Mirrors the Go ADK's [`examples/minimal/`](https://github.com/inference-gateway/
 ## What this example shows
 
 - Boot an `A2AServer` with a hand-written `AgentCard`.
-- Register the `message/send` and `tasks/get` JSON-RPC handlers backed by `InMemoryTaskStorage`.
+- Register the `SendMessage` and `GetTask` JSON-RPC handlers backed by `InMemoryTaskStorage`.
 - Run a background worker that dequeues each new task and walks it through `PENDING → IN_PROGRESS → COMPLETED`, attaching an `Echo: <input>` response message.
 - Drive it all with `A2AClient` from the same package - no third-party HTTP code, no LLM.
 
@@ -16,7 +16,7 @@ Mirrors the Go ADK's [`examples/minimal/`](https://github.com/inference-gateway/
 ```text
 examples/minimal/
 ├── README.md
-├── client.ts        # sendMessage + poll tasks/get until terminal
+├── client.ts        # sendMessage + poll GetTask until terminal
 ├── package.json     # workspace package, depends only on @inference-gateway/adk
 ├── server.ts        # A2A server + echo worker
 └── tsconfig.json
@@ -77,7 +77,7 @@ minimal-agent listening on http://127.0.0.1:8080
 Client (abbreviated - UUIDs and timestamps will differ):
 
 ```text
-POST http://127.0.0.1:8080/  message/send  "Hello, this is a test message. Please respond with a greeting."
+POST http://127.0.0.1:8080/  SendMessage  "Hello, this is a test message. Please respond with a greeting."
 created task id=… state=TASK_STATE_SUBMITTED
 {
   "id": "…",
@@ -104,11 +104,11 @@ created task id=… state=TASK_STATE_SUBMITTED
 
 ## How the echo worker works
 
-`message/send` is synchronous from the caller's perspective: the handler creates a `PENDING` task, enqueues it, and immediately returns. The actual work happens in `runEchoWorker` (see `server.ts`):
+`SendMessage` is synchronous from the caller's perspective: the handler creates a `PENDING` task, enqueues it, and immediately returns. The actual work happens in `runEchoWorker` (see `server.ts`):
 
 1. `await storage.dequeue(signal)` blocks until a new task arrives.
 2. `transitionTask(task, TASK_STATE.IN_PROGRESS)` + `storage.updateActive(...)` records that work has started.
 3. The worker extracts the latest user-authored text part, builds `Echo: <input>`, appends it to the task's message history, and transitions to `TASK_STATE.COMPLETED` with the response attached as `status.message`.
-4. `storage.storeDeadLetter(completed)` moves the task out of active storage so `tasks/get` can still serve it, but it no longer occupies the queue.
+4. `storage.storeDeadLetter(completed)` moves the task out of active storage so `GetTask` can still serve it, but it no longer occupies the queue.
 
 If anything throws inside step 2-4, the worker transitions the task to `TASK_STATE.FAILED` and dead-letters it instead of crashing.

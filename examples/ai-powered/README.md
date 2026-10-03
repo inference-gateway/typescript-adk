@@ -1,6 +1,6 @@
 # AI-Powered A2A Example
 
-End-to-end example of an LLM-backed A2A agent built with `@inference-gateway/adk`: a server that wires `AgentBuilder` + `OpenAICompatibleLLMClient` into `DefaultBackgroundTaskHandler`, exposes two tools (weather + time), and answers natural-language `message/send` requests; plus a client that fires three example prompts at it and prints the completions.
+End-to-end example of an LLM-backed A2A agent built with `@inference-gateway/adk`: a server that wires `AgentBuilder` + `OpenAICompatibleLLMClient` into `DefaultBackgroundTaskHandler`, exposes two tools (weather + time), and answers natural-language `SendMessage` requests; plus a client that fires three example prompts at it and prints the completions.
 
 Mirrors the Go ADK's [`examples/ai-powered/`](https://github.com/inference-gateway/adk/tree/main/examples/ai-powered).
 
@@ -10,7 +10,7 @@ Mirrors the Go ADK's [`examples/ai-powered/`](https://github.com/inference-gatew
 - Register a `DefaultToolBox` with two `createTool(...)` definitions (`get_weather`, `get_current_time`). The reserved `input_required` tool is registered automatically.
 - Drive the chat-completion loop with `DefaultBackgroundTaskHandler`, which iterates LLM calls, dispatches tool calls, accumulates token usage, and terminates the task in `COMPLETED` / `FAILED` / `INPUT_REQUIRED`.
 - Plug a tiny adapter between `OpenAICompatibleLLMClient.chatCompletion` (wire-shaped, snake_case) and `DefaultBackgroundTaskHandler`'s structural `LLMClient.createCompletion` (camelCase). The TS ADK does not yet ship this bridge built-in - the Go ADK plumbs it internally via `OpenAICompatibleAgent.RunWithStream`.
-- Run a small background worker (mirrors the other examples) that dequeues each `message/send`-created task and hands it to the handler.
+- Run a small background worker (mirrors the other examples) that dequeues each `SendMessage`-created task and hands it to the handler.
 
 ## Layout
 
@@ -18,7 +18,7 @@ Mirrors the Go ADK's [`examples/ai-powered/`](https://github.com/inference-gatew
 examples/ai-powered/
 ├── .env.example     # provider API keys + agent/model config
 ├── README.md
-├── client.ts        # send three prompts, poll tasks/get until terminal, print
+├── client.ts        # send three prompts, poll GetTask until terminal, print
 ├── package.json     # workspace package, depends only on @inference-gateway/adk
 ├── server.ts        # A2A server + LLM-driven worker + weather/time tools
 └── tsconfig.json
@@ -141,7 +141,7 @@ The exact wording will vary by model. The first request exercises the `get_weath
 3. `DefaultToolBox` - registry of tools the LLM can invoke. Auto-registers the reserved `input_required` tool so the model can pause for user input; the handler intercepts that call before dispatching.
 4. `DefaultBackgroundTaskHandler` - drives the chat-completion loop. Per iteration: build the conversation from `task.messages`, advertise the toolbox, call the LLM, dispatch any tool calls, feed results back. Terminates the task in `COMPLETED` (no tool calls), `INPUT_REQUIRED` (reserved tool called), or `FAILED` (iteration cap / error).
 5. **Adapter (`adaptLLMClient`)** - converts between the wire-shaped `chatCompletion` API and the structural `createCompletion` interface the handler depends on. Reusable as-is in your own code until the TS ADK ships the bridge built-in.
-6. **Worker loop** - `await storage.dequeue(signal)` blocks until a `message/send` enqueues a new task, then hands it to `handler.handle({ task, message, signal })`. Terminal tasks are dead-lettered so `tasks/get` can still serve them.
+6. **Worker loop** - `await storage.dequeue(signal)` blocks until a `SendMessage` enqueues a new task, then hands it to `handler.handle({ task, message, signal })`. Terminal tasks are dead-lettered so `GetTask` can still serve them.
 
 ## Troubleshooting
 
@@ -153,5 +153,5 @@ The exact wording will vary by model. The first request exercises the `get_weath
 ## Next steps
 
 - Try [`examples/minimal/`](../minimal/) for the smallest end-to-end A2A loop with no LLM.
-- Try [`examples/streaming/`](../streaming/) for the SSE-based `message/stream` flow.
+- Try [`examples/streaming/`](../streaming/) for the SSE-based `SendStreamingMessage` flow.
 - Try [`examples/input-required/`](../input-required/) for the pause / client-driven resume flow - the LLM-side version is what fires when the model calls the reserved `input_required` tool.

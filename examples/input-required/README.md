@@ -7,10 +7,10 @@ Mirrors the Go ADK's [`examples/input-required/`](https://github.com/inference-g
 ## What this example shows
 
 - Boot an `A2AServer` with a hand-written `AgentCard`.
-- Register the `message/send` and `tasks/get` JSON-RPC handlers backed by `InMemoryTaskStorage`.
-- A background worker walks each task through the lifecycle and **pauses** it in `INPUT_REQUIRED` when the user's question is missing information (here: a city for a weather query). `storage.updateActive` keeps the paused task discoverable so a follow-up `message/send` on the same `contextId` can resume it.
-- The same `message/send` handler **resumes** the paused task transparently when the client sends a follow-up message carrying the original `contextId` - see `findResumableTask`/`appendAndResume` in `src/server/message-send.ts`.
-- A client drives the loop end-to-end: `sendMessage` → poll `tasks/get` → detect `INPUT_REQUIRED` → `sendMessage` again with the same `contextId` → poll until `COMPLETED`.
+- Register the `SendMessage` and `GetTask` JSON-RPC handlers backed by `InMemoryTaskStorage`.
+- A background worker walks each task through the lifecycle and **pauses** it in `INPUT_REQUIRED` when the user's question is missing information (here: a city for a weather query). `storage.updateActive` keeps the paused task discoverable so a follow-up `SendMessage` on the same `contextId` can resume it.
+- The same `SendMessage` handler **resumes** the paused task transparently when the client sends a follow-up message carrying the original `contextId` - see `findResumableTask`/`appendAndResume` in `src/server/message-send.ts`.
+- A client drives the loop end-to-end: `sendMessage` → poll `GetTask` → detect `INPUT_REQUIRED` → `sendMessage` again with the same `contextId` → poll until `COMPLETED`.
 
 > The reserved `input_required` tool (`INPUT_REQUIRED_TOOL` in `src/server/default-background-task-handler.ts`) drives the same pause/resume protocol on the LLM side: when an `OpenAICompatibleAgent` calls that tool, the handler transitions the task to `INPUT_REQUIRED` and the resume path described above takes over verbatim. This example exercises the server-side mechanics directly so it stays runnable without an LLM.
 
@@ -83,11 +83,11 @@ task <task-id> completed: "The weather in Berlin is sunny and 72°F. (demo respo
 Client (abbreviated):
 
 ```text
-POST http://127.0.0.1:8080/  message/send  "What's the weather?"
+POST http://127.0.0.1:8080/  SendMessage  "What's the weather?"
 created task id=<task-id> state=TASK_STATE_SUBMITTED
 polled task state=TASK_STATE_INPUT_REQUIRED
 agent asked: "I can check the weather for you. Which city would you like the forecast for?"
-POST http://127.0.0.1:8080/  message/send  "Berlin" (resume, contextId=<context-id>)
+POST http://127.0.0.1:8080/  SendMessage  "Berlin" (resume, contextId=<context-id>)
 resumed task id=<task-id> state=TASK_STATE_WORKING
 {
   "id": "<task-id>",
@@ -120,9 +120,9 @@ resumed task id=<task-id> state=TASK_STATE_WORKING
 
 `runWorker` in `server.ts` dequeues every task and dispatches it to `handleWeatherTask`. The worker has two relevant lifecycle entry points:
 
-1. **First dispatch (`task.state === TASK_STATE_SUBMITTED`).** A freshly created task arrives via `message/send` → `storage.enqueue`. The worker transitions it to `TASK_STATE_WORKING`, inspects the user's question, and either:
+1. **First dispatch (`task.state === TASK_STATE_SUBMITTED`).** A freshly created task arrives via `SendMessage` → `storage.enqueue`. The worker transitions it to `TASK_STATE_WORKING`, inspects the user's question, and either:
    - pauses to `TASK_STATE_INPUT_REQUIRED` with an agent message asking for the city (`storage.updateActive` keeps the task discoverable by the resume path), or
    - completes immediately when the question already mentions a location or isn't a weather query at all.
-2. **Resume dispatch (`task.state === TASK_STATE_WORKING`).** The `message/send` handler has found the paused task via `findResumableTask`, appended the follow-up message, transitioned the task back to `TASK_STATE_WORKING`, and re-enqueued it. By the time the worker dequeues, the resume is already reflected in `task.messages` - the worker treats any task that arrives with more than one user message as the resume case and completes it with the canned response.
+2. **Resume dispatch (`task.state === TASK_STATE_WORKING`).** The `SendMessage` handler has found the paused task via `findResumableTask`, appended the follow-up message, transitioned the task back to `TASK_STATE_WORKING`, and re-enqueued it. By the time the worker dequeues, the resume is already reflected in `task.messages` - the worker treats any task that arrives with more than one user message as the resume case and completes it with the canned response.
 
-The pause/resume path is _driven entirely by the framework's `message/send` handler_ - the worker only ever calls `transitionTask` plus `storage.updateActive` / `storage.storeDeadLetter`. The same code path is what backs the LLM-driven flow when an agent calls the reserved `input_required` tool.
+The pause/resume path is _driven entirely by the framework's `SendMessage` handler_ - the worker only ever calls `transitionTask` plus `storage.updateActive` / `storage.storeDeadLetter`. The same code path is what backs the LLM-driven flow when an agent calls the reserved `input_required` tool.

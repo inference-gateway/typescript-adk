@@ -88,7 +88,7 @@ export interface BackgroundTaskContext {
 }
 
 /**
- * Background task handler - invoked by a worker after a `message/send` task
+ * Background task handler - invoked by a worker after a `SendMessage` task
  * is dequeued. Returns the updated task (typically in a terminal state).
  *
  * The actual worker that dequeues tasks and invokes handlers is not yet wired
@@ -361,7 +361,7 @@ export class A2AServerBuilder<
    *
    * When the `authConfig` is also supplied (via {@link withAuthConfig}), the
    * builder additionally produces an extended agent card decorated with the
-   * OIDC security scheme and registers `agent/getAuthenticatedExtendedCard`
+   * OIDC security scheme and registers `GetExtendedAgentCard`
    * so authenticated callers can retrieve it. The public well-known card is
    * left undecorated (no auth schemes) and gets `supportsExtendedAgentCard:
    * true` to signal availability.
@@ -374,7 +374,7 @@ export class A2AServerBuilder<
   /**
    * Provide the auth configuration the {@link withAuthenticator} above was
    * built from. Used at `build()` time to produce the extended agent card
-   * served via `agent/getAuthenticatedExtendedCard`. The public well-known
+   * served via `GetExtendedAgentCard`. The public well-known
    * card is left undecorated; auth schemes appear only on the extended card.
    * If omitted, no extended card is produced and the method is not
    * registered.

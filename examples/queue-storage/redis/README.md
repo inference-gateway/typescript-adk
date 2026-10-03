@@ -10,7 +10,7 @@ Mirrors the Go ADK's [`examples/queue-storage/redis/`](https://github.com/infere
   1. Opens two `ioredis` connections (one for commands, one for the blocking `BRPOP` loop).
   2. PINGs the server and throws `TaskStorageError` if it cannot reach Redis.
   3. Hydrates the in-memory mirror from any pre-existing keys under `keyPrefix`.
-- Reuse the **same** `message/send` + `tasks/get` handler pair and the **same** background echo worker as the [`in-memory/`](../in-memory/) variant.
+- Reuse the **same** `SendMessage` + `GetTask` handler pair and the **same** background echo worker as the [`in-memory/`](../in-memory/) variant.
 - Disconnect cleanly on `SIGINT` / `SIGTERM` with `await storage.disconnect()`.
 
 ## When to use the Redis backend
@@ -27,7 +27,7 @@ Per the [`RedisTaskStorage` class docs](../../../src/storage/redis.ts), the shar
 examples/queue-storage/redis/
 ├── README.md
 ├── .env.example       # template environment file
-├── client.ts          # sendMessage + poll tasks/get until terminal
+├── client.ts          # sendMessage + poll GetTask until terminal
 ├── docker-compose.yml # local Redis 7 with persistence enabled
 ├── package.json       # workspace package, depends on @inference-gateway/adk + ioredis
 ├── server.ts          # A2A server + echo worker, RedisTaskStorage
@@ -108,7 +108,7 @@ queue-storage-redis-agent listening on http://127.0.0.1:8080
 Client (abbreviated - UUIDs differ):
 
 ```text
-POST http://127.0.0.1:8080/  message/send  "Hello from the redis queue-storage example. Please echo this back."
+POST http://127.0.0.1:8080/  SendMessage  "Hello from the redis queue-storage example. Please echo this back."
 created task id=… state=TASK_STATE_SUBMITTED
 {
   "id": "…",
@@ -132,7 +132,7 @@ Unlike the [`in-memory/`](../in-memory/) variant, tasks persist across restarts:
 1. Submit a message with the client.
 2. Stop the server with `Ctrl+C`.
 3. Restart the server.
-4. Call `tasks/get` for the original task id - the dead-letter record is still there because `RedisTaskStorage.connect` hydrates the in-memory mirror from the persisted Redis keys.
+4. Call `GetTask` for the original task id - the dead-letter record is still there because `RedisTaskStorage.connect` hydrates the in-memory mirror from the persisted Redis keys.
 
 Tear down the docker-compose volume (`pnpm --filter ... redis:down`) to wipe state and start fresh.
 
