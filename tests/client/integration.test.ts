@@ -161,7 +161,7 @@ describe('A2AClient ↔ A2AServer integration', () => {
       throw new Error('expected throw');
     } catch (err) {
       expect(err).toBeInstanceOf(A2AJSONRPCError);
-      expect((err as A2AJSONRPCError).code).toBe(-32602);
+      expect((err as A2AJSONRPCError).code).toBe(-32001);
       expect((err as A2AJSONRPCError).message).toBe('task not found');
     }
   });

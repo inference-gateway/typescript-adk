@@ -191,7 +191,7 @@ describe('createTaskResubscribeHandler', () => {
       }
     });
 
-    it('throws JSONRPCError(-32602) when the task is not found in storage', () => {
+    it('throws JSONRPCError(-32001) when the task is not found in storage', () => {
       const storage = new InMemoryTaskStorage();
       const handler = createTaskResubscribeHandler({ storage });
       try {
@@ -200,7 +200,7 @@ describe('createTaskResubscribeHandler', () => {
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
-          JSONRPC_ERROR_CODES.INVALID_PARAMS
+          JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR
         );
         expect((err as JSONRPCError).message).toBe('task not found');
       }
@@ -320,7 +320,7 @@ describe('SubscribeToTask end-to-end via A2AServer', () => {
     }
   });
 
-  it('returns a JSON-RPC -32602 error (no SSE stream) when the task is unknown', async () => {
+  it('returns a JSON-RPC -32001 error (no SSE stream) when the task is unknown', async () => {
     const storage = new InMemoryTaskStorage();
     const registry = new TaskEventBusRegistry();
 
@@ -350,7 +350,7 @@ describe('SubscribeToTask end-to-end via A2AServer', () => {
       error: { code: number; message: string };
     };
     expect(body.id).toBe(1);
-    expect(body.error.code).toBe(JSONRPC_ERROR_CODES.INVALID_PARAMS);
+    expect(body.error.code).toBe(JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR);
     expect(body.error.message).toBe('task not found');
   });
 

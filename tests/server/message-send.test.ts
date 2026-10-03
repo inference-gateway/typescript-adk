@@ -316,6 +316,18 @@ describe('createMessageSendHandler', () => {
       throw new Error('expected JSONRPCError to be thrown');
     });
 
+    it('throws -32001 when message.taskId names an unknown task', () => {
+      try {
+        handler({ message: makeMessage({ taskId: 'missing' }) }, ctx);
+      } catch (err) {
+        expect((err as JSONRPCError).code).toBe(
+          JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR
+        );
+        return;
+      }
+      throw new Error('expected JSONRPCError to be thrown');
+    });
+
     it('does not enqueue a task when validation fails', () => {
       const localStorage = new InMemoryTaskStorage();
       const localHandler = createMessageSendHandler({

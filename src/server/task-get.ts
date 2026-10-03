@@ -29,13 +29,9 @@ export interface TaskGetHandlerOptions {
  * `Task`. When `historyLength` is supplied, the returned `history` is sliced
  * to the last N messages.
  *
- * Errors surface as JSON-RPC `-32602` (Invalid Params) via {@link JSONRPCError}:
- *  - missing/non-string `taskId`
- *  - `historyLength` present but not a non-negative integer
- *  - task not found
- *
- * The "not found" case using `-32602` (rather than a custom code) mirrors the
- * Go ADK's choice in `adk/server/task_handler.go:HandleTaskGet`.
+ * Errors surface via {@link JSONRPCError}: `-32602` (Invalid Params) for a
+ * missing/non-string `taskId` or a `historyLength` that is not a non-negative
+ * integer, and `-32001` (TaskNotFound) for an unknown task.
  *
  * Register on an {@link A2AServer} via
  * `server.registerMethod(TASK_GET_METHOD, createTaskGetHandler({ storage }))`.
@@ -50,7 +46,7 @@ export function createTaskGetHandler(
     const task = storage.getTask(validated.id);
     if (task === undefined) {
       throw new JSONRPCError(
-        JSONRPC_ERROR_CODES.INVALID_PARAMS,
+        JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR,
         'task not found'
       );
     }

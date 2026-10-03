@@ -326,13 +326,13 @@ describe('createTaskCancelHandler', () => {
       throw new Error('expected JSONRPCError to be thrown');
     });
 
-    it('throws -32602 with "task not found" for an unknown task id', () => {
+    it('throws -32001 with "task not found" for an unknown task id', () => {
       try {
         handler({ id: 'unknown' } as unknown, ctx);
       } catch (err) {
         expect(err).toBeInstanceOf(JSONRPCError);
         expect((err as JSONRPCError).code).toBe(
-          JSONRPC_ERROR_CODES.INVALID_PARAMS
+          JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR
         );
         expect((err as JSONRPCError).message).toBe('task not found');
         return;
@@ -349,7 +349,7 @@ describe('createTaskCancelHandler', () => {
     ] as const;
 
     for (const finalState of finalStates) {
-      it(`throws -32602 when the task is already in ${finalState}`, () => {
+      it(`throws -32002 when the task is already in ${finalState}`, () => {
         const storage = new InMemoryTaskStorage();
         seedTerminalTask(storage, finalState);
         const handler = createTaskCancelHandler({ storage });
@@ -359,7 +359,7 @@ describe('createTaskCancelHandler', () => {
         } catch (err) {
           expect(err).toBeInstanceOf(JSONRPCError);
           expect((err as JSONRPCError).code).toBe(
-            JSONRPC_ERROR_CODES.INVALID_PARAMS
+            JSONRPC_ERROR_CODES.TASK_NOT_CANCELABLE_ERROR
           );
           expect((err as JSONRPCError).message).toContain(
             'cannot be cancelled'
@@ -448,7 +448,7 @@ describe('CancelTask JSON-RPC conformance', () => {
     expect(registry.has('task-1')).toBe(false);
   });
 
-  it('returns -32602 "task not found" for an unknown task id', async () => {
+  it('returns -32001 "task not found" for an unknown task id', async () => {
     const storage = new InMemoryTaskStorage();
     const server = createA2AServer({ card: makeCard() });
     server.registerMethod(
@@ -471,11 +471,11 @@ describe('CancelTask JSON-RPC conformance', () => {
       error: { code: number; message: string };
     };
     expect(body.id).toBe(3);
-    expect(body.error.code).toBe(JSONRPC_ERROR_CODES.INVALID_PARAMS);
+    expect(body.error.code).toBe(JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR);
     expect(body.error.message).toBe('task not found');
   });
 
-  it('returns -32602 when the task is already in a terminal state', async () => {
+  it('returns -32002 when the task is already in a terminal state', async () => {
     const storage = new InMemoryTaskStorage();
     seedTerminalTask(storage, TASK_STATE.COMPLETED);
     const server = createA2AServer({ card: makeCard() });
@@ -497,7 +497,7 @@ describe('CancelTask JSON-RPC conformance', () => {
     const body = (await res.json()) as {
       error: { code: number; message: string };
     };
-    expect(body.error.code).toBe(JSONRPC_ERROR_CODES.INVALID_PARAMS);
+    expect(body.error.code).toBe(JSONRPC_ERROR_CODES.TASK_NOT_CANCELABLE_ERROR);
     expect(body.error.message).toContain('cannot be cancelled');
   });
 

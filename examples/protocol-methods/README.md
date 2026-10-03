@@ -611,8 +611,15 @@ Calling `GetTask` with a task id that doesn't exist returns a JSON-RPC error res
   "jsonrpc": "2.0",
   "id": "<uuid>",
   "error": {
-    "code": -32602,
-    "message": "task not found"
+    "code": -32001,
+    "message": "task not found",
+    "data": [
+      {
+        "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+        "reason": "TASK_NOT_FOUND",
+        "domain": "a2a-protocol.org"
+      }
+    ]
   }
 }
 ```

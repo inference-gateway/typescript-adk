@@ -56,10 +56,10 @@ export interface TaskResubscribeHandlerOptions {
  * Build a handler for the A2A `SubscribeToTask` JSON-RPC method.
  *
  * Behaviour:
- *  - Synchronous validation: `taskId` must be a non-empty string and the
- *    task must exist in storage. Failures throw {@link JSONRPCError}
- *    (`-32602`) which the server converts to a regular JSON-RPC error
- *    response without ever opening the SSE stream.
+ *  - Synchronous validation: `taskId` must be a non-empty string (`-32602`)
+ *    and the task must exist in storage (`-32001` TaskNotFound). Failures
+ *    throw {@link JSONRPCError}, which the server converts to a regular
+ *    JSON-RPC error response without ever opening the SSE stream.
  *  - Replay-then-live: the handler opens an SSE response and emits the most
  *    recent `task.status.changed` CloudEvent as the first frame - taken from
  *    the per-task bus's replay buffer when available, otherwise synthesized
@@ -95,7 +95,7 @@ export function createTaskResubscribeHandler(
     const task = storage.getTask(validated.id);
     if (task === undefined) {
       throw new JSONRPCError(
-        JSONRPC_ERROR_CODES.INVALID_PARAMS,
+        JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR,
         'task not found'
       );
     }

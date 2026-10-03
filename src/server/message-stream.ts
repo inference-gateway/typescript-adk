@@ -28,7 +28,11 @@ import {
   type CloudEvent,
 } from './cloudevents.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
-import { appendAndResume, findResumableTask } from './message-send.js';
+import {
+  appendAndResume,
+  assertReferencedTaskExists,
+  findResumableTask,
+} from './message-send.js';
 import type { MethodContext } from './method-registry.js';
 import { SSEStreamWriter } from './sse.js';
 import type { TaskCancellationRegistry } from './task-cancellation.js';
@@ -308,6 +312,7 @@ export function createMessageStreamHandler(
 
   return (params: unknown, context: MethodContext): StreamingMethodResult => {
     const validated = validateMessageStreamParams(params);
+    assertReferencedTaskExists(storage, validated.message);
     const inboundContextId =
       typeof validated.message.contextId === 'string' &&
       validated.message.contextId.length > 0

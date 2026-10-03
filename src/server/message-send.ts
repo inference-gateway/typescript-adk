@@ -59,6 +59,7 @@ export function createMessageSendHandler(
 
   return (params: unknown): Task => {
     const validated = validateMessageSendParams(params);
+    assertReferencedTaskExists(storage, validated.message);
     const inboundContextId =
       typeof validated.message.contextId === 'string' &&
       validated.message.contextId.length > 0
@@ -141,7 +142,24 @@ function appendAndResume(
   return transitionTask(withMessage, TASK_STATE.IN_PROGRESS, { now: clock });
 }
 
-export { appendAndResume, findResumableTask };
+/**
+ * Reject a message that names a `taskId` the storage does not know with
+ * TaskNotFound (`-32001`), instead of silently starting a new task.
+ */
+function assertReferencedTaskExists(
+  storage: TaskStorage,
+  message: Message
+): void {
+  const { taskId } = message;
+  if (taskId !== undefined && storage.getTask(taskId) === undefined) {
+    throw new JSONRPCError(
+      JSONRPC_ERROR_CODES.TASK_NOT_FOUND_ERROR,
+      'task not found'
+    );
+  }
+}
+
+export { appendAndResume, assertReferencedTaskExists, findResumableTask };
 
 function validateMessageSendParams(params: unknown): SendMessageRequest {
   if (params === null || typeof params !== 'object' || Array.isArray(params)) {
