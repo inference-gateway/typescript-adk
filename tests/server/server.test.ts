@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { AgentCardValidationError } from '../../src/agent/card.js';
 import {
   A2AServer,
   AGENT_CARD_PATH,
@@ -141,6 +142,31 @@ describe('A2AServer agent card discovery', () => {
 
     const res = await fetch(`${baseUrl}${AGENT_CARD_PATH}`, { method: 'POST' });
     expect(res.status).toBe(404);
+  });
+
+  it.each([
+    ['agent card', (card: AgentCard) => ({ card })],
+    [
+      'extended agent card',
+      (card: AgentCard) => ({ card: makeCard(), extendedCard: card }),
+    ],
+  ])('refuses an %s whose interface url carries credentials', (_, config) => {
+    const card = makeCard({
+      supportedInterfaces: [
+        {
+          url: 'https://user:s3cret@agent.example.com/a2a',
+          protocolBinding: 'JSONRPC',
+          protocolVersion: '1.0',
+        },
+      ],
+    });
+    expect(() => createA2AServer(config(card))).toThrow(
+      expect.objectContaining({
+        name: AgentCardValidationError.name,
+        field: 'supportedInterfaces[0].url',
+        message: expect.not.stringContaining('s3cret'),
+      })
+    );
   });
 
   it('round-trips a card containing skills and capabilities verbatim', async () => {

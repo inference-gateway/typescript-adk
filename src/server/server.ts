@@ -4,8 +4,10 @@ import { etag } from 'hono/etag';
 import type { Server } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
+import { AgentCardValidationError } from '../agent/card.js';
 import type { ArtifactStorageProvider } from '../artifacts/artifact-storage.js';
 import type { Authenticator } from '../auth/index.js';
+import { hasCredentials } from '../internal/url.js';
 import { buildServerTLSOptions, type ServerTLSConfig } from '../tls/index.js';
 import {
   NOOP_LOGGER,
@@ -207,6 +209,10 @@ export class A2AServer {
   private readonly httpServer: NodeServer;
 
   constructor(config: A2AServerConfig) {
+    assertNoInterfaceCredentials(config.card, 'agent card');
+    if (config.extendedCard !== undefined) {
+      assertNoInterfaceCredentials(config.extendedCard, 'extended agent card');
+    }
     this.card = config.card;
     this.cacheControl = config.cacheControl ?? DEFAULT_AGENT_CARD_CACHE_CONTROL;
     this.jsonRpcPath = config.jsonRpcPath ?? DEFAULT_JSONRPC_PATH;
@@ -527,6 +533,22 @@ export class A2AServer {
  */
 export function createA2AServer(config: A2AServerConfig): A2AServer {
   return new A2AServer(config);
+}
+
+/**
+ * Refuse a card whose interface URL carries userinfo: the well-known card is
+ * public (A2A section 14.3), and the error names the field, not the URL.
+ */
+function assertNoInterfaceCredentials(card: AgentCard, label: string): void {
+  (card.supportedInterfaces ?? []).forEach((agentInterface, i) => {
+    if (hasCredentials(agentInterface.url)) {
+      const field = `supportedInterfaces[${i}].url`;
+      throw new AgentCardValidationError(
+        `${label} ${field} must not include credentials`,
+        field
+      );
+    }
+  });
 }
 
 function extractStreamingId(reqObj: Record<string, unknown>): JSONRPCId {

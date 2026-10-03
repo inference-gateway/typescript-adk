@@ -36,6 +36,21 @@ describe('createMCPClientFromEnv', () => {
     ).toBeUndefined();
   });
 
+  it('refuses a server url carrying credentials without echoing them', () => {
+    expect(() =>
+      createMCPClientFromEnv({
+        env: {
+          A2A_MCP_ENABLED: 'true',
+          A2A_MCP_SERVERS: 'http://a:8080,http://user:s3cret@b:8080',
+        },
+      })
+    ).toThrow(
+      expect.objectContaining({
+        message: expect.not.stringContaining('s3cret'),
+      })
+    );
+  });
+
   it('returns a client when enabled with servers', () => {
     const client = createMCPClientFromEnv({
       env: { A2A_MCP_ENABLED: 'true', A2A_MCP_SERVERS: 'http://a:8080' },

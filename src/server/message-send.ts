@@ -9,6 +9,7 @@ import {
   type ManagedTask,
   type ManagedTaskState,
 } from '../agent/task.js';
+import { hasCredentials } from '../internal/url.js';
 import type { TaskStorage } from '../storage/task-storage.js';
 import type {
   A2AMethod,
@@ -311,7 +312,15 @@ function validateMessageSendParams(params: unknown): SendMessageRequest {
       'invalid params: message.parts must be a non-empty array'
     );
   }
-  return params as SendMessageRequest;
+  const request = params as SendMessageRequest;
+  const pushUrl = request.configuration?.taskPushNotificationConfig?.url;
+  if (typeof pushUrl === 'string' && hasCredentials(pushUrl)) {
+    throw new JSONRPCError(
+      JSONRPC_ERROR_CODES.INVALID_PARAMS,
+      'invalid params: configuration.taskPushNotificationConfig.url must not include credentials'
+    );
+  }
+  return request;
 }
 
 function enrichMessage(

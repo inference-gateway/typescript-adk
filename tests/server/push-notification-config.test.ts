@@ -160,6 +160,20 @@ describe('createTaskPushNotificationConfigSetHandler', () => {
       expectInvalidParams({ taskId: 'task-1' }, 'url');
     });
 
+    it('throws when url carries credentials, without echoing them', () => {
+      expect(() =>
+        handler(
+          { taskId: 'task-1', url: 'https://user:s3cret@example.com/hook' },
+          ctx
+        )
+      ).toThrow(
+        expect.objectContaining({
+          code: JSONRPC_ERROR_CODES.INVALID_PARAMS,
+          message: expect.not.stringContaining('s3cret'),
+        })
+      );
+    });
+
     it('throws when pushNotificationConfig.id is the empty string', () => {
       expectInvalidParams(
         {

@@ -126,6 +126,17 @@ describe('A2AClient construction', () => {
     expect(() => new A2AClient({ baseURL: '' })).toThrow(A2AClientError);
   });
 
+  it('refuses a baseURL carrying credentials without echoing them', () => {
+    expect(
+      () => new A2AClient({ baseURL: 'http://user:s3cret@agent.test' })
+    ).toThrow(
+      expect.objectContaining({
+        name: A2AClientError.name,
+        message: expect.not.stringContaining('s3cret'),
+      })
+    );
+  });
+
   it('strips trailing slash from baseURL', () => {
     const { fetch } = mockFetch({ body: sampleAgentCard() });
     const client = new A2AClient({ baseURL: 'http://x/', fetch });
