@@ -260,7 +260,7 @@ describe('A2AClient.sendMessage', () => {
   it('POSTs a JSON-RPC envelope to the configured path and returns result', async () => {
     const task = sampleTask();
     const { fetch, calls } = mockFetch({
-      body: { jsonrpc: '2.0', id: 1, result: task },
+      body: { jsonrpc: '2.0', id: 1, result: { task } },
     });
     const client = new A2AClient({
       baseURL: 'http://agent.test',
@@ -270,7 +270,7 @@ describe('A2AClient.sendMessage', () => {
 
     const result = await client.sendMessage({ message: sampleMessage() });
 
-    expect(result).toEqual(task);
+    expect(result).toEqual({ task });
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toBe('http://agent.test/');
     expect(calls[0]?.init.method).toBe('POST');

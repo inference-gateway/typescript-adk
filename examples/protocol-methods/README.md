@@ -206,19 +206,21 @@ Creates a new task from a user message. The server enqueues it as `PENDING` and 
 
 ```json
 {
-  "id": "<task-uuid>",
-  "contextId": "<context-uuid>",
-  "status": {
-    "state": "TASK_STATE_SUBMITTED",
-    "timestamp": "..."
-  },
-  "history": [
-    {
-      "messageId": "<uuid>",
-      "role": "ROLE_USER",
-      "parts": [{ "text": "Hello, protocol-methods agent!" }]
-    }
-  ]
+  "task": {
+    "id": "<task-uuid>",
+    "contextId": "<context-uuid>",
+    "status": {
+      "state": "TASK_STATE_SUBMITTED",
+      "timestamp": "..."
+    },
+    "history": [
+      {
+        "messageId": "<uuid>",
+        "role": "ROLE_USER",
+        "parts": [{ "text": "Hello, protocol-methods agent!" }]
+      }
+    ]
+  }
 }
 ```
 

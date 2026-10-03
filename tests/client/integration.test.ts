@@ -81,7 +81,7 @@ describe('A2AClient ↔ A2AServer integration', () => {
     close = () => server.close();
 
     const client = new A2AClient({ baseURL, retry: false });
-    const task = await client.sendMessage({
+    const { task } = await client.sendMessage({
       message: {
         messageId: 'm-1',
         role: 'ROLE_USER',
@@ -90,10 +90,10 @@ describe('A2AClient ↔ A2AServer integration', () => {
       },
     });
 
-    expect(task.id).toBeTypeOf('string');
-    expect(task.contextId).toBe('ctx-1');
-    expect(task.status.state).toBe('TASK_STATE_SUBMITTED');
-    expect(task.history?.[0]?.messageId).toBe('m-1');
+    expect(task?.id).toBeTypeOf('string');
+    expect(task?.contextId).toBe('ctx-1');
+    expect(task?.status.state).toBe('TASK_STATE_SUBMITTED');
+    expect(task?.history?.[0]?.messageId).toBe('m-1');
   });
 
   it('getTask round-trips a task created via sendMessage', async () => {
@@ -108,7 +108,7 @@ describe('A2AClient ↔ A2AServer integration', () => {
     close = () => server.close();
 
     const client = new A2AClient({ baseURL, retry: false });
-    const created = await client.sendMessage({
+    const { task: created } = await client.sendMessage({
       message: {
         messageId: 'm-1',
         role: 'ROLE_USER',
@@ -117,10 +117,10 @@ describe('A2AClient ↔ A2AServer integration', () => {
       },
     });
 
-    const fetched = await client.getTask(created.id);
-    expect(fetched.id).toBe(created.id);
-    expect(fetched.contextId).toBe(created.contextId);
-    expect(fetched.status.state).toBe(created.status.state);
+    const fetched = await client.getTask(created?.id ?? '');
+    expect(fetched.id).toBe(created?.id);
+    expect(fetched.contextId).toBe(created?.contextId);
+    expect(fetched.status.state).toBe(created?.status.state);
   });
 
   it('getTask truncates history when historyLength is supplied', async () => {
@@ -135,7 +135,7 @@ describe('A2AClient ↔ A2AServer integration', () => {
     close = () => server.close();
 
     const client = new A2AClient({ baseURL, retry: false });
-    const created = await client.sendMessage({
+    const { task: created } = await client.sendMessage({
       message: {
         messageId: 'm-only',
         role: 'ROLE_USER',
@@ -144,7 +144,9 @@ describe('A2AClient ↔ A2AServer integration', () => {
       },
     });
 
-    const fetched = await client.getTask(created.id, { historyLength: 0 });
+    const fetched = await client.getTask(created?.id ?? '', {
+      historyLength: 0,
+    });
     expect(fetched.history).toEqual([]);
   });
 

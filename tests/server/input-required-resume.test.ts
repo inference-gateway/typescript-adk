@@ -190,7 +190,7 @@ describe('SendMessage resume flow (background)', () => {
       storage,
       idGenerator: sequentialIdGenerator(),
     });
-    const result = handler(
+    const { task: result } = handler(
       {
         message: {
           messageId: 'm-3',
@@ -200,7 +200,7 @@ describe('SendMessage resume flow (background)', () => {
         },
       },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.id).toBe('task-1');
     expect(result.contextId).toBe('ctx-resume');
@@ -222,7 +222,7 @@ describe('SendMessage resume flow (background)', () => {
       idGenerator: sequentialIdGenerator(),
     });
 
-    const result = handler(
+    const { task: result } = handler(
       {
         message: {
           messageId: 'm-1',
@@ -232,7 +232,7 @@ describe('SendMessage resume flow (background)', () => {
         },
       },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.id).toBe('id-1');
     expect(result.contextId).toBe('ctx-fresh');
@@ -252,7 +252,7 @@ describe('SendMessage resume flow (background)', () => {
       storage,
       idGenerator: sequentialIdGenerator(),
     });
-    const result = handler(
+    const { task: result } = handler(
       {
         message: {
           messageId: 'm-x',
@@ -262,7 +262,7 @@ describe('SendMessage resume flow (background)', () => {
         },
       },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.id).toBe('id-1');
     expect(result.id).not.toBe('other');
@@ -284,7 +284,7 @@ describe('SendMessage resume flow (background)', () => {
       storage,
       idGenerator: sequentialIdGenerator(),
     });
-    const result = handler(
+    const { task: result } = handler(
       {
         message: {
           messageId: 'm-1',
@@ -294,7 +294,7 @@ describe('SendMessage resume flow (background)', () => {
         },
       },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.id).toBe('id-1');
     expect(result.status.state).toBe(TASK_STATE.PENDING);
@@ -422,9 +422,9 @@ describe('SendMessage JSON-RPC pause + resume', () => {
         },
       },
     });
-    const firstBody = (await firstRes.json()) as { result: Task };
-    expect(firstBody.result.status.state).toBe(TASK_STATE.PENDING);
-    const taskId = firstBody.result.id;
+    const firstBody = (await firstRes.json()) as { result: { task: Task } };
+    expect(firstBody.result.task.status.state).toBe(TASK_STATE.PENDING);
+    const taskId = firstBody.result.task.id;
 
     // 2. Drive the background handler manually (no worker in this test).
     const dequeued = await storage.dequeue();
@@ -450,10 +450,10 @@ describe('SendMessage JSON-RPC pause + resume', () => {
         },
       },
     });
-    const secondBody = (await secondRes.json()) as { result: Task };
-    expect(secondBody.result.id).toBe(taskId);
-    expect(secondBody.result.contextId).toBe('ctx-resume');
-    expect(secondBody.result.status.state).toBe(TASK_STATE.IN_PROGRESS);
+    const secondBody = (await secondRes.json()) as { result: { task: Task } };
+    expect(secondBody.result.task.id).toBe(taskId);
+    expect(secondBody.result.task.contextId).toBe('ctx-resume');
+    expect(secondBody.result.task.status.state).toBe(TASK_STATE.IN_PROGRESS);
 
     // 4. Process the resumed task.
     const resumed = await storage.dequeue();

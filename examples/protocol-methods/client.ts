@@ -248,7 +248,9 @@ try {
     role: 'ROLE_USER',
     parts: [{ text: PROMPT }],
   };
-  createdTask = await client.sendMessage({ message });
+  const { task } = await client.sendMessage({ message });
+  if (task === undefined) throw new Error('SendMessage returned no task');
+  createdTask = task;
   assert(typeof createdTask.id === 'string', 'task.id is a string');
   assert(createdTask.id.length > 0, 'task.id is non-empty');
   assert(
@@ -380,7 +382,10 @@ try {
     role: 'ROLE_USER',
     parts: [{ text: 'This task will be cancelled.' }],
   };
-  const cancelTask = await client.sendMessage({ message: cancelMessage });
+  const { task: cancelTask } = await client.sendMessage({
+    message: cancelMessage,
+  });
+  if (cancelTask === undefined) throw new Error('SendMessage returned no task');
   assert(
     cancelTask.status.state === TASK_STATE.PENDING,
     `cancel-task created (PENDING; got ${cancelTask.status.state})`

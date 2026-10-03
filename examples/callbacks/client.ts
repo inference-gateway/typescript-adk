@@ -39,7 +39,8 @@ for (let i = 0; i < PROMPTS.length; i++) {
     parts: [{ text: prompt }],
   };
 
-  const created = await client.sendMessage({ message });
+  const { task: created } = await client.sendMessage({ message });
+  if (created === undefined) throw new Error('SendMessage returned no task');
   const final = await pollUntilTerminal(created.id);
   if (final.status.state === TASK_STATE.COMPLETED) {
     console.log(`response: ${extractText(final.status.message)}`);

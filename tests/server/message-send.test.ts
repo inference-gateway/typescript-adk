@@ -75,12 +75,12 @@ describe('createMessageSendHandler', () => {
       now: fixedNow('2026-05-26T12:00:00.000Z'),
     });
 
-    const result = handler(
+    const { task: result } = handler(
       {
         message: makeMessage({ contextId: 'ctx-existing', messageId: 'm-1' }),
       },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.id).toBe('id-1');
     expect(result.contextId).toBe('ctx-existing');
@@ -111,10 +111,10 @@ describe('createMessageSendHandler', () => {
       idGenerator: sequentialIdGenerator(),
     });
 
-    const result = handler(
+    const { task: result } = handler(
       { message: makeMessage({ contextId: 'ctx-from-client' }) },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.contextId).toBe('ctx-from-client');
     expect(result.id).toBe('id-1');
@@ -134,10 +134,10 @@ describe('createMessageSendHandler', () => {
       },
     });
 
-    const result = handler(
+    const { task: result } = handler(
       { message: makeMessage() },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.id).toBe('task-uuid');
     expect(result.contextId).toBe('ctx-uuid');
@@ -160,10 +160,10 @@ describe('createMessageSendHandler', () => {
 
     const message = makeMessage({ contextId: 'ctx-keep' });
     const looseMessage = { ...message, messageId: '' };
-    const result = handler(
+    const { task: result } = handler(
       { message: looseMessage as unknown as Message },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.history?.[0]?.messageId).toBe('msg-uuid');
   });
@@ -175,7 +175,7 @@ describe('createMessageSendHandler', () => {
       idGenerator: sequentialIdGenerator(),
     });
 
-    const result = handler(
+    const { task: result } = handler(
       {
         message: makeMessage({
           messageId: 'client-msg-id',
@@ -183,7 +183,7 @@ describe('createMessageSendHandler', () => {
         }),
       },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     expect(result.history?.[0]?.messageId).toBe('client-msg-id');
   });
@@ -192,10 +192,10 @@ describe('createMessageSendHandler', () => {
     const storage = new InMemoryTaskStorage();
     const handler = createMessageSendHandler({ storage });
 
-    const result = handler(
+    const { task: result } = handler(
       { message: makeMessage() },
       { signal: new AbortController().signal }
-    ) as Task;
+    ) as { task: Task };
 
     // UUID v4 format
     const uuidRegex =
@@ -387,16 +387,16 @@ describe('SendMessage JSON-RPC conformance', () => {
     const body = (await res.json()) as {
       jsonrpc: string;
       id: number;
-      result: Task;
+      result: { task: Task };
     };
     expect(body.jsonrpc).toBe(JSONRPC_VERSION);
     expect(body.id).toBe(1);
-    expect(body.result.id).toBe('id-1');
-    expect(body.result.contextId).toBe('ctx-1');
-    expect(body.result.status.state).toBe(
+    expect(body.result.task.id).toBe('id-1');
+    expect(body.result.task.contextId).toBe('ctx-1');
+    expect(body.result.task.status.state).toBe(
       'TASK_STATE_SUBMITTED' satisfies TaskState
     );
-    expect(body.result.history).toEqual([
+    expect(body.result.task.history).toEqual([
       {
         messageId: 'client-msg',
         role: 'ROLE_USER',
@@ -520,8 +520,8 @@ describe('SendMessage JSON-RPC conformance', () => {
     });
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as { result: Task };
-    expect(body.result.id).toBe('task-id-x');
-    expect(body.result.contextId).toBe('ctx-id-y');
+    const body = (await res.json()) as { result: { task: Task } };
+    expect(body.result.task.id).toBe('task-id-x');
+    expect(body.result.task.contextId).toBe('ctx-id-y');
   });
 });

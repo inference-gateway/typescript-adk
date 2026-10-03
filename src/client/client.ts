@@ -6,6 +6,7 @@ import type {
   JSONRPCErrorResponse,
   JSONRPCSuccessResponse,
   SendMessageRequest,
+  SendMessageResponse,
   Struct,
   Task,
 } from '../types/generated/a2a.js';
@@ -258,14 +259,18 @@ export class A2AClient {
   }
 
   /**
-   * Invoke the JSON-RPC `SendMessage` method. Returns the wire-format `Task`
-   * the server creates and enqueues.
+   * Invoke the JSON-RPC `SendMessage` method. Returns the server's
+   * `SendMessageResponse`: the `task` it created, or a direct `message`.
    */
   async sendMessage(
     params: SendMessageRequest,
     opts: RequestOptions = {}
-  ): Promise<Task> {
-    return await this.executeJSONRPC<Task>('SendMessage', params, opts.signal);
+  ): Promise<SendMessageResponse> {
+    return await this.executeJSONRPC<SendMessageResponse>(
+      'SendMessage',
+      params,
+      opts.signal
+    );
   }
 
   /**

@@ -156,13 +156,14 @@ import {
 
 const client = createA2AClient({ baseURL: 'http://127.0.0.1:8080' });
 
-let task = await client.sendMessage({
+let { task } = await client.sendMessage({
   message: {
     messageId: crypto.randomUUID(),
     role: 'ROLE_USER',
     parts: [{ text: 'hello, agent' }],
   },
 });
+if (task === undefined) throw new Error('the agent replied with a message');
 
 while (!isTerminal(task.status.state as ManagedTaskState)) {
   await new Promise((r) => setTimeout(r, 200));
@@ -237,7 +238,7 @@ JSON-RPC methods are registered on a per-server `MethodRegistry`. Call `server.r
 
 #### Built-in handlers
 
-- **`createMessageSendHandler({ storage })`** registers as `MESSAGE_SEND_METHOD` (`SendMessage`). It accepts a JSON-RPC `SendMessage` request, creates a `SUBMITTED` task, enqueues it on the supplied `TaskStorage`, and returns the wire `Task` immediately. Your worker code dequeues and progresses the task.
+- **`createMessageSendHandler({ storage })`** registers as `MESSAGE_SEND_METHOD` (`SendMessage`). It accepts a JSON-RPC `SendMessage` request, creates a `SUBMITTED` task, enqueues it on the supplied `TaskStorage`, and returns it immediately as a `SendMessageResponse` (`{ task }`). Your worker code dequeues and progresses the task.
 - **`createTaskGetHandler({ storage })`** registers as `TASK_GET_METHOD` (`GetTask`). It looks up the requested task across active and dead-letter storage and returns whatever it finds.
 - **`createTaskListHandler({ storage })`** registers as `TASK_LIST_METHOD` (`ListTasks`). It returns tasks filtered by optional `status` / `contextId`, paginated with an opaque `pageToken` and a `pageSize` clamped to `maxLimit` (default `100`). The response shape is the A2A `ListTasksResponse` (`{ tasks, pageSize, totalSize, nextPageToken }`); `nextPageToken` is empty on the final page. Pagination is stable under concurrent inserts and deletes because the cursor is keyset-encoded on `(createdAt, id)`.
 
@@ -418,8 +419,8 @@ A typed client for calling A2A servers:
 ```ts
 const client = createA2AClient({ baseURL: 'http://localhost:8080' });
 
-const task = await client.sendMessage({ message });
-const refresh = await client.getTask(task.id, { historyLength: 10 });
+const { task } = await client.sendMessage({ message }); // { task } or { message }
+const refresh = await client.getTask(task?.id ?? '', { historyLength: 10 });
 const card = await client.getAgentCard();
 const health = await client.getHealth();
 ```
