@@ -285,7 +285,6 @@ export class MCPClient implements MCPToolProvider {
           delayMs: delay,
           error: message,
         });
-        // Abort only ends the wait; the loop re-checks the stop signal.
         await sleep(delay, undefined, {
           signal: this.stopController.signal,
         }).catch(() => undefined);
