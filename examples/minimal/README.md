@@ -10,6 +10,7 @@ Mirrors the Go ADK's [`examples/minimal/`](https://github.com/inference-gateway/
 - Register the `SendMessage` and `GetTask` JSON-RPC handlers backed by `InMemoryTaskStorage`.
 - Run a background worker that dequeues each new task and walks it through `PENDING → IN_PROGRESS → COMPLETED`, attaching an `Echo: <input>` response message.
 - Drive it all with `A2AClient` from the same package - no third-party HTTP code, no LLM.
+- Send with `configuration.returnImmediately: true` and poll `GetTask`, instead of letting `SendMessage` block until the task settles.
 
 ## Layout
 
@@ -104,7 +105,7 @@ created task id=… state=TASK_STATE_SUBMITTED
 
 ## How the echo worker works
 
-`SendMessage` is synchronous from the caller's perspective: the handler creates a `PENDING` task, enqueues it, and immediately returns. The actual work happens in `runEchoWorker` (see `server.ts`):
+Because the client sends `configuration.returnImmediately: true`, the handler creates a `PENDING` task, enqueues it, and returns straight away - the client polls `GetTask` for the result. Without that flag `SendMessage` blocks until the task reaches a terminal or `INPUT_REQUIRED` state. The actual work happens in `runEchoWorker` (see `server.ts`):
 
 1. `await storage.dequeue(signal)` blocks until a new task arrives.
 2. `transitionTask(task, TASK_STATE.IN_PROGRESS)` + `storage.updateActive(...)` records that work has started.
