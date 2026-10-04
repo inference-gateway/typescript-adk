@@ -1,5 +1,9 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import pkg from '../../package.json' with { type: 'json' };
+import {
+  USAGE_EXTENSION_URI,
+  withoutExtension,
+} from '../agent/usage-extension.js';
 import type {
   AuthenticationInfo,
   StreamResponse,
@@ -230,7 +234,9 @@ export class HTTPPushNotificationSender implements PushNotificationSender {
     task: Task,
     options: SendTaskUpdateOptions = {}
   ): Promise<void> {
-    const payload: StreamResponse = { task };
+    const payload: StreamResponse = {
+      task: withoutExtension(task, USAGE_EXTENSION_URI),
+    };
     const body = JSON.stringify(payload);
     const headers = this.buildHeaders(config);
     const maxRetries = this.retryConfig?.maxRetries ?? 0;

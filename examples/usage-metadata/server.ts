@@ -14,6 +14,7 @@ import {
   createTool,
   isTerminal,
   transitionTask,
+  withUsageExtension,
   type AgentCard,
   type ChatMessage,
   type CompletionResult,
@@ -101,7 +102,7 @@ const streamingHandler = new DefaultStreamingTaskHandler({
 streamingHandler.setEnableUsageMetadata(true);
 
 const storage = new InMemoryTaskStorage();
-const server = createA2AServer({ card });
+const server = createA2AServer({ card: withUsageExtension(card) });
 
 server.registerMethod(
   MESSAGE_SEND_METHOD,

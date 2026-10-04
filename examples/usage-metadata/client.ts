@@ -2,6 +2,7 @@ import {
   JSONRPC_VERSION,
   MESSAGE_STREAM_METHOD,
   TASK_STATE,
+  USAGE_EXTENSION_URI,
   createA2AClient,
   isTerminal,
   type ManagedTaskState,
@@ -25,7 +26,10 @@ const STREAM_PROMPT =
 const POLL_INTERVAL_MS = 250;
 const POLL_MAX_ATTEMPTS = 60;
 
-const client = createA2AClient({ baseURL: SERVER_URL });
+const client = createA2AClient({
+  baseURL: SERVER_URL,
+  headers: { 'A2A-Extensions': USAGE_EXTENSION_URI },
+});
 
 console.log('=== SendMessage (background path) ===');
 for (let i = 0; i < SEND_PROMPTS.length; i++) {
@@ -69,6 +73,7 @@ const response = await fetch(`${SERVER_URL}/`, {
   headers: {
     'Content-Type': 'application/json',
     Accept: 'text/event-stream',
+    'A2A-Extensions': USAGE_EXTENSION_URI,
   },
   body: JSON.stringify(streamRequest),
 });

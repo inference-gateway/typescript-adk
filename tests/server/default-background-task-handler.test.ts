@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CallbackContext, Callbacks } from '../../src/agent/callbacks.js';
 import { createTask, TASK_STATE } from '../../src/agent/task.js';
 import {
+  EXECUTION_STATS_METADATA_KEY,
+  USAGE_METADATA_KEY,
+} from '../../src/agent/usage-extension.js';
+import {
   DEFAULT_MAX_CHAT_COMPLETION_ITERATIONS,
   DEFAULT_MAX_CONVERSATION_HISTORY,
   DefaultBackgroundTaskHandler,
@@ -511,12 +515,12 @@ describe('DefaultBackgroundTaskHandler usage metadata', () => {
     expect(result.state).toBe(TASK_STATE.COMPLETED);
     const metadata = result.metadata as Record<string, unknown> | undefined;
     expect(metadata).toBeDefined();
-    expect(metadata?.['usage']).toEqual({
+    expect(metadata?.[USAGE_METADATA_KEY]).toEqual({
       prompt_tokens: 8,
       completion_tokens: 13,
       total_tokens: 21,
     });
-    expect(metadata?.['execution_stats']).toEqual({
+    expect(metadata?.[EXECUTION_STATS_METADATA_KEY]).toEqual({
       iterations: 2,
       tool_calls: 1,
       failed_tools: 0,
@@ -542,7 +546,7 @@ describe('DefaultBackgroundTaskHandler usage metadata', () => {
 
     const result = await handler.handle(buildContext());
     const metadata = result.metadata as Record<string, unknown> | undefined;
-    expect(metadata?.['execution_stats']).toEqual({
+    expect(metadata?.[EXECUTION_STATS_METADATA_KEY]).toEqual({
       iterations: 2,
       tool_calls: 1,
       failed_tools: 1,
@@ -782,12 +786,12 @@ describe('UsageTracker', () => {
 
     tracker.addUsage({ promptTokens: 4, completionTokens: 6 });
     const metadata = tracker.getMetadata();
-    expect(metadata['usage']).toEqual({
+    expect(metadata[USAGE_METADATA_KEY]).toEqual({
       prompt_tokens: 4,
       completion_tokens: 6,
       total_tokens: 10,
     });
-    expect(metadata['execution_stats']).toEqual({
+    expect(metadata[EXECUTION_STATS_METADATA_KEY]).toEqual({
       iterations: 1,
       tool_calls: 0,
       failed_tools: 0,
@@ -801,7 +805,7 @@ describe('UsageTracker', () => {
       completionTokens: 2,
       totalTokens: 99,
     });
-    expect(tracker.getMetadata()['usage']).toEqual({
+    expect(tracker.getMetadata()[USAGE_METADATA_KEY]).toEqual({
       prompt_tokens: 1,
       completion_tokens: 2,
       total_tokens: 99,

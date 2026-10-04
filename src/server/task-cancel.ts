@@ -12,7 +12,10 @@ import type {
   Task,
 } from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
-import type { MethodHandler } from './method-registry.js';
+import {
+  withoutInactiveExtensions,
+  type MethodHandler,
+} from './method-registry.js';
 import type { TaskCancellationRegistry } from './task-cancellation.js';
 
 /**
@@ -67,7 +70,7 @@ export function createTaskCancelHandler(
   const { storage, registry } = options;
   const clock = options.now ?? defaultNow;
 
-  return (params: unknown): Task => {
+  return (params, context): Task => {
     const validated = validateTaskCancelParams(params);
     const task = storage.getTask(validated.id);
     if (task === undefined) {
@@ -98,7 +101,7 @@ export function createTaskCancelHandler(
     });
     storage.storeDeadLetter(cancelled);
 
-    return toWireTask(cancelled);
+    return withoutInactiveExtensions(toWireTask(cancelled), context);
   };
 }
 

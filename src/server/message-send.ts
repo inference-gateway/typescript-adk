@@ -19,7 +19,11 @@ import type {
   SendMessageResponse,
 } from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
-import type { MethodContext, MethodHandler } from './method-registry.js';
+import {
+  withoutInactiveExtensions,
+  type MethodContext,
+  type MethodHandler,
+} from './method-registry.js';
 
 /**
  * Canonical JSON-RPC method name for the A2A `SendMessage` operation.
@@ -107,7 +111,12 @@ export function createMessageSendHandler(
             isTerminalOrInterrupted,
             context.signal
           );
-    return { task: toWireTask(settled, config?.historyLength) };
+    return {
+      task: withoutInactiveExtensions(
+        toWireTask(settled, config?.historyLength),
+        context
+      ),
+    };
   };
 }
 

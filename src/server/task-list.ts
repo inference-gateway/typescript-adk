@@ -7,7 +7,10 @@ import type {
   TaskState,
 } from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
-import type { MethodHandler } from './method-registry.js';
+import {
+  withoutInactiveExtensions,
+  type MethodHandler,
+} from './method-registry.js';
 
 /**
  * Canonical JSON-RPC method name for the A2A `ListTasks` operation.
@@ -88,7 +91,7 @@ export function createTaskListHandler(
   }
   const defaultLimit = Math.min(rawDefault, maxLimit);
 
-  return (params: unknown): ListTasksResponse => {
+  return (params, context): ListTasksResponse => {
     const validated = validateTaskListParams(params);
 
     const limit =
@@ -113,7 +116,9 @@ export function createTaskListHandler(
         : 0;
 
     const page = all.slice(startIndex, startIndex + limit);
-    const wireTasks = page.map((task) => toWireTask(task));
+    const wireTasks = page.map((task) =>
+      withoutInactiveExtensions(toWireTask(task), context)
+    );
 
     const result = {
       tasks: wireTasks,

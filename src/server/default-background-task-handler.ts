@@ -14,6 +14,10 @@ import {
   transitionTask,
   type ManagedTask,
 } from '../agent/task.js';
+import {
+  EXECUTION_STATS_METADATA_KEY,
+  USAGE_METADATA_KEY,
+} from '../agent/usage-extension.js';
 import type {
   Artifact,
   Message,
@@ -180,14 +184,14 @@ export class UsageTracker {
 
   getMetadata(): Record<string, unknown> {
     const metadata: Record<string, unknown> = {
-      execution_stats: {
+      [EXECUTION_STATS_METADATA_KEY]: {
         iterations: this.iterations,
         tool_calls: this.toolCalls,
         failed_tools: this.failedTools,
       },
     };
     if (this.llmCalls > 0) {
-      metadata['usage'] = {
+      metadata[USAGE_METADATA_KEY] = {
         prompt_tokens: this.promptTokens,
         completion_tokens: this.completionTokens,
         total_tokens: this.totalTokens,

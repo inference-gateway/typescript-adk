@@ -2,6 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CallbackContext, Callbacks } from '../../src/agent/callbacks.js';
 import { createTask, TASK_STATE } from '../../src/agent/task.js';
 import {
+  EXECUTION_STATS_METADATA_KEY,
+  USAGE_METADATA_KEY,
+} from '../../src/agent/usage-extension.js';
+import {
   DEFAULT_MAX_CHAT_COMPLETION_ITERATIONS,
   DEFAULT_MAX_CONVERSATION_HISTORY,
   DefaultStreamingTaskHandler,
@@ -610,12 +614,12 @@ describe('DefaultStreamingTaskHandler usage metadata', () => {
     expect(status.state).toBe(TASK_STATE.COMPLETED);
     const metadata = status.metadata as Record<string, unknown> | undefined;
     expect(metadata).toBeDefined();
-    expect(metadata?.['usage']).toEqual({
+    expect(metadata?.[USAGE_METADATA_KEY]).toEqual({
       prompt_tokens: 5,
       completion_tokens: 7,
       total_tokens: 12,
     });
-    expect(metadata?.['execution_stats']).toEqual({
+    expect(metadata?.[EXECUTION_STATS_METADATA_KEY]).toEqual({
       iterations: 1,
       tool_calls: 0,
       failed_tools: 0,
@@ -643,12 +647,12 @@ describe('DefaultStreamingTaskHandler usage metadata', () => {
     expect(inputRequired).toBeDefined();
     const metadata = inputRequired?.metadata as
       Record<string, unknown> | undefined;
-    expect(metadata?.['usage']).toEqual({
+    expect(metadata?.[USAGE_METADATA_KEY]).toEqual({
       prompt_tokens: 4,
       completion_tokens: 2,
       total_tokens: 6,
     });
-    expect(metadata?.['execution_stats']).toEqual({
+    expect(metadata?.[EXECUTION_STATS_METADATA_KEY]).toEqual({
       iterations: 1,
       tool_calls: 0,
       failed_tools: 0,
@@ -677,7 +681,7 @@ describe('DefaultStreamingTaskHandler usage metadata', () => {
       Extract<StreamingTaskEvent, { type: 'statusChanged' }> | undefined;
     expect(status?.state).toBe(TASK_STATE.FAILED);
     const metadata = status?.metadata as Record<string, unknown> | undefined;
-    expect(metadata?.['execution_stats']).toEqual({
+    expect(metadata?.[EXECUTION_STATS_METADATA_KEY]).toEqual({
       iterations: 1,
       tool_calls: 1,
       failed_tools: 0,
@@ -699,8 +703,8 @@ describe('DefaultStreamingTaskHandler usage metadata', () => {
       { type: 'statusChanged' }
     >;
     const metadata = status.metadata as Record<string, unknown> | undefined;
-    expect(metadata?.['execution_stats']).toBeDefined();
-    expect(metadata?.['usage']).toBeUndefined();
+    expect(metadata?.[EXECUTION_STATS_METADATA_KEY]).toBeDefined();
+    expect(metadata?.[USAGE_METADATA_KEY]).toBeUndefined();
   });
 });
 

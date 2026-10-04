@@ -35,6 +35,16 @@ export type {
 } from './task.js';
 
 export {
+  EXECUTION_STATS_METADATA_KEY,
+  USAGE_EXTENSION,
+  USAGE_EXTENSION_URI,
+  USAGE_METADATA_KEY,
+  activatedExtensions,
+  withUsageExtension,
+  withoutExtension,
+} from './usage-extension.js';
+
+export {
   DEFAULT_AGENT_SYSTEM_PROMPT,
   OpenAICompatibleAgentImpl,
 } from './agent.js';
