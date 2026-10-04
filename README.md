@@ -39,6 +39,7 @@
   - [Configuration](#configuration)
     - [Build-Time Agent Metadata](#build-time-agent-metadata)
     - [Agent-card `${VAR}` placeholders](#agent-card-var-placeholders)
+    - [Environment variable reference](#environment-variable-reference)
 - [🔧 Advanced Usage](#-advanced-usage)
 - [🌐 A2A Ecosystem](#-a2a-ecosystem)
 - [📋 Requirements](#-requirements)
@@ -210,7 +211,7 @@ Each example ships its own README with setup instructions.
 - 🛡️ **Strict TypeScript** - `verbatimModuleSyntax`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `isolatedModules`
 - 📚 **Generated A2A Types** - Types generated from the canonical [`inference-gateway/schemas`](https://github.com/inference-gateway/schemas) at a pinned release tag, with a drift check enforced in CI
 - 🧪 **Well Tested** - Vitest suite covering the public surface; a dedicated drift test guards the generated A2A types
-- 🪶 **Minimal Dependencies** - Only `hono` + `@hono/node-server` at runtime
+- 🪶 **Focused Dependencies** - `hono` + `@hono/node-server` carry the HTTP core; the rest of the runtime dependencies back opt-in subsystems (OpenTelemetry for telemetry, `pino` for logging, `prom-client` for metrics, `jose` for auth, `ajv` for schema validation, the MCP SDK, the AWS S3 SDK for artifacts, the Inference Gateway SDK for LLM calls)
 
 ### Status & Roadmap
 
@@ -497,7 +498,7 @@ const evt = createCloudEvent({
 
 ### Configuration
 
-Most of the ADK is configured **programmatically** - via `A2AServerConfig`, `A2AClientConfig`, the handler option objects (`MessageSendHandlerOptions`, `TaskGetHandlerOptions`), and `LoadAgentCardOptions`. The only environment variables the library itself reads are the three build-metadata variables, plus the `${VAR}` placeholders inside agent-card JSON.
+Most of the ADK is configured **programmatically** - via `A2AServerConfig`, `A2AClientConfig`, the handler option objects (`MessageSendHandlerOptions`, `TaskGetHandlerOptions`), and `LoadAgentCardOptions`. On top of that, several subsystems fall back to environment variables when no explicit config is passed: build metadata, auth, MCP, metrics, telemetry, logging, TLS, Redis storage, task retention and a few handler knobs. Every one of those `loadXFromEnv` helpers accepts an explicit `env` map, so `process.env` is only the default - see [Environment variable reference](#environment-variable-reference) for the full list.
 
 #### Build-Time Agent Metadata
 
@@ -590,6 +591,81 @@ Inside an agent-card JSON file passed to `loadAgentCardFromFile` / `loadAgentCar
 ```
 
 For everything else - port, host, JSON-RPC path, agent-card cache-control, handler options, client retry / timeout / fetch - pass values directly to `createA2AServer`, `createA2AClient`, and the handler factories.
+
+#### Environment variable reference
+
+Variables documented elsewhere in this README: `TLS_*` (see [Server: HTTPS termination](#server-https-termination)), `REDIS_*` (see [`RedisTaskStorage`](#redistaskstorage)) and `TELEMETRY_ENABLED` / `OTEL_*` (see [Telemetry & metrics exporters](#telemetry--metrics-exporters)). The rest are listed below. Boolean variables accept `true`, `1`, `yes`, `on` as truthy; duration variables accept a plain millisecond integer or a value with a `ms` / `s` / `m` suffix.
+
+**Authentication** (`loadAuthConfigFromEnv`) - when `AUTH_ENABLED` is truthy and any of the other three is empty, the authenticator factory throws so the server fails closed:
+
+| Variable             | Default   | Purpose                                       |
+| -------------------- | --------- | --------------------------------------------- |
+| `AUTH_ENABLED`       | `false`   | Enables OIDC bearer-token verification        |
+| `AUTH_ISSUER_URL`    | _(empty)_ | OIDC issuer URL used for discovery and JWKS   |
+| `AUTH_CLIENT_ID`     | _(empty)_ | OAuth2 client id, also the expected JWT `aud` |
+| `AUTH_CLIENT_SECRET` | _(empty)_ | OAuth2 client secret                          |
+
+**MCP** (`loadMCPConfigFromEnv`):
+
+| Variable                     | Default  | Purpose                                       |
+| ---------------------------- | -------- | --------------------------------------------- |
+| `A2A_MCP_ENABLED`            | `false`  | Enables the MCP tool bridge                   |
+| `A2A_MCP_SERVERS`            | _(none)_ | Comma-separated MCP server URLs               |
+| `A2A_MCP_ENDPOINT`           | `/mcp`   | Path the agent serves its own MCP endpoint on |
+| `A2A_MCP_REFRESH_INTERVAL`   | `5m`     | How often the remote tool list is refreshed   |
+| `A2A_MCP_DIAL_TIMEOUT`       | `30s`    | Connection timeout per MCP server             |
+| `A2A_MCP_CALL_TIMEOUT`       | `30s`    | Per-tool-call timeout                         |
+| `A2A_MCP_MAX_RETRIES`        | `0`      | Connection retries before giving up           |
+| `A2A_MCP_RETRY_INTERVAL`     | `2s`     | Initial retry backoff                         |
+| `A2A_MCP_RETRY_MAX_INTERVAL` | `30s`    | Backoff ceiling                               |
+
+**Metrics server** (`loadMetricsConfigFromEnv`) - this is the `prom-client` HTTP server, separate from the OpenTelemetry Prometheus exporter:
+
+| Variable                   | Default    | Purpose                                                              |
+| -------------------------- | ---------- | -------------------------------------------------------------------- |
+| `METRICS_ENABLED`          | `false`    | Starts the metrics server; takes precedence over `TELEMETRY_ENABLED` |
+| `TELEMETRY_ENABLED`        | `false`    | Fallback toggle used when `METRICS_ENABLED` is unset                 |
+| `METRICS_HOST`             | `0.0.0.0`  | Bind host                                                            |
+| `METRICS_PORT`             | `9090`     | Bind port (`0` picks an ephemeral port)                              |
+| `METRICS_PATH`             | `/metrics` | Exposition path                                                      |
+| `METRICS_READ_TIMEOUT_MS`  | `5000`     | Request read timeout                                                 |
+| `METRICS_WRITE_TIMEOUT_MS` | `10000`    | Response write timeout                                               |
+| `METRICS_IDLE_TIMEOUT_MS`  | `60000`    | Keep-alive idle timeout                                              |
+
+**Logging:**
+
+| Variable                         | Default   | Purpose                                                                            |
+| -------------------------------- | --------- | ---------------------------------------------------------------------------------- |
+| `DEBUG`                          | _(unset)_ | Any value other than empty / `false` / `0` sets the default log level to `debug`   |
+| `NODE_ENV`                       | _(unset)_ | `production` switches the default output from pretty to JSON                       |
+| `SERVER_DISABLE_HEALTHCHECK_LOG` | `true`    | Suppresses health-check request logs; set `false` / `0` / `no` / `off` to log them |
+
+**Task retention and cleanup** (`loadCleanupOptionsFromEnv`):
+
+| Variable                       | Default  | Purpose                                            |
+| ------------------------------ | -------- | -------------------------------------------------- |
+| `MAX_RETAINED_COMPLETED_TASKS` | `100`    | Completed tasks kept before the oldest are evicted |
+| `MAX_RETAINED_FAILED_TASKS`    | `50`     | Failed tasks kept before the oldest are evicted    |
+| `CLEANUP_INTERVAL_MS`          | `300000` | How often the cleanup sweep runs                   |
+
+**Handler and tool knobs:**
+
+| Variable                             | Default | Purpose                                                                 |
+| ------------------------------------ | ------- | ----------------------------------------------------------------------- |
+| `MAX_CHAT_COMPLETION_ITERATIONS`     | `50`    | Tool-calling loop ceiling in `DefaultBackgroundTaskHandler`             |
+| `STREAMING_STATUS_UPDATE_INTERVAL`   | `1000`  | Throttle between streaming status updates (`0` disables throttling)     |
+| `AGENT_CLIENT_TOOLS_CREATE_ARTIFACT` | `false` | Auto-registers the reserved `create_artifact` tool (`true` or `1` only) |
+
+**Outbound client TLS** (`loadClientTLSConfigFromEnv`, returns `undefined` when none of these is set):
+
+| Variable                          | Default   | Purpose                                                      |
+| --------------------------------- | --------- | ------------------------------------------------------------ |
+| `CLIENT_TLS_CA_PATH`              | _(unset)_ | CA bundle to trust for self-signed / private-CA peers        |
+| `CLIENT_TLS_CERT_PATH`            | _(unset)_ | Client certificate for mTLS (set with `CLIENT_TLS_KEY_PATH`) |
+| `CLIENT_TLS_KEY_PATH`             | _(unset)_ | Client private key for mTLS                                  |
+| `CLIENT_TLS_PASSPHRASE`           | _(unset)_ | Unlocks an encrypted client private key                      |
+| `CLIENT_TLS_INSECURE_SKIP_VERIFY` | `false`   | **Dev only.** Disables peer cert verification                |
+| `CLIENT_TLS_SERVERNAME`           | _(unset)_ | Overrides the SNI hostname                                   |
 
 ## 🔧 Advanced Usage
 
@@ -810,7 +886,7 @@ This ADK is the TypeScript implementation of the Agent-to-Agent (A2A) protocol w
 
 - **Node.js**: 24 LTS or later
 - **pnpm**: 10.0 or later (10.18.0 is pinned via `package.json#packageManager`)
-- **Dependencies**: see [`package.json`](./package.json) - runtime depends only on `hono` and `@hono/node-server`
+- **Dependencies**: see [`package.json`](./package.json) - 22 runtime dependencies. `hono` and `@hono/node-server` are the HTTP core; the others back opt-in subsystems (the OpenTelemetry SDK and exporters, `pino`, `prom-client`, `jose`, `ajv`, `@modelcontextprotocol/sdk`, the AWS S3 SDK, `@inference-gateway/sdk`)
 
 ## 📦 Container Image
 
