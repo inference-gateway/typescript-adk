@@ -23,7 +23,10 @@ const sendMessage: Message = {
   parts: [{ text: PROMPT }],
 };
 console.log(`POST ${SERVER_URL}/  SendMessage  "${PROMPT}"`);
-const { task: created } = await client.sendMessage({ message: sendMessage });
+const { task: created } = await client.sendMessage({
+  message: sendMessage,
+  configuration: { returnImmediately: true },
+});
 if (created === undefined) throw new Error('SendMessage returned no task');
 console.log(`created task id=${created.id} state=${created.status.state}`);
 

@@ -183,7 +183,7 @@ The server exposes an extended agent card via the `GetExtendedAgentCard` JSON-RP
 
 ### 4. `SendMessage` (create a task)
 
-Creates a new task from a user message. The server enqueues it as `PENDING` and returns immediately with a task whose `status.state` is `TASK_STATE_SUBMITTED` (the wire form of `PENDING`). A background worker picks it up asynchronously after `WORKER_DELAY_MS`.
+Creates a new task from a user message. Because this example sends `configuration.returnImmediately: true`, the server enqueues the task as `PENDING` and returns straight away with a `status.state` of `TASK_STATE_SUBMITTED` (the wire form of `PENDING`), leaving the client to poll `GetTask`. Without that flag `SendMessage` blocks until the task reaches a terminal or `INPUT_REQUIRED` state. A background worker picks the task up asynchronously after `WORKER_DELAY_MS`.
 
 **JSON-RPC request:**
 
