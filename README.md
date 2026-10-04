@@ -271,7 +271,7 @@ The included `InMemoryTaskStorage` is suitable for tests, local development, and
 - `storeDeadLetter(task)` - move a terminal task out of the active map
 - `getTask(id)` / `listTasks(filter?)` - read across active + dead-letter
 - `getStats()` - snapshot of storage health (counts by state, queue length, etc.)
-- `cleanupCompleted()`, `deleteContext(id)` - cleanup helpers
+- `cleanupCompleted()`, `cleanupTasksWithRetention(policy)`, `deleteContext(id)` - cleanup helpers
 
 To plug in a different backend (Postgres, S3-backed, ...), implement `TaskStorage` and pass your implementation to the message-send and task-get handlers. A Redis-backed implementation ships out of the box - see below.
 
@@ -301,9 +301,10 @@ Configuration is read from `REDIS_URL` (preferred) or `REDIS_HOST` / `REDIS_PORT
 ```ts
 import type {
   ManagedTask,
-  PushNotificationConfig,
   StoredPushNotificationConfig,
   TaskListFilter,
+  TaskPushNotificationConfig,
+  TaskRetentionPolicy,
   TaskStorage,
   TaskStorageStats,
 } from '@inference-gateway/adk';
@@ -339,7 +340,7 @@ export class MyTaskStorage implements TaskStorage {
     /* read across active + dead-letter */
   }
   listTasks(filter?: TaskListFilter): ManagedTask[] {
-    /* FIFO-ordered by createdAt, pageToken pagination */
+    /* FIFO-ordered by createdAt, offset/limit pagination */
   }
 
   getContexts(): string[] {
@@ -351,6 +352,9 @@ export class MyTaskStorage implements TaskStorage {
   cleanupCompleted(): number {
     /* drop terminal dead-letter tasks; return count */
   }
+  cleanupTasksWithRetention(policy: TaskRetentionPolicy): number {
+    /* prune oldest terminal tasks beyond each per-state cap; return count */
+  }
 
   getStats(): TaskStorageStats {
     /* counts grouped by state, queue length, context stats */
@@ -358,7 +362,7 @@ export class MyTaskStorage implements TaskStorage {
 
   setPushConfig(
     taskId: string,
-    config: PushNotificationConfig
+    config: TaskPushNotificationConfig
   ): StoredPushNotificationConfig {
     /* persist; mint UUID when caller omits config.id */
   }
@@ -448,7 +452,15 @@ import {
 
 const card = loadAgentCardFromFile('./agent.json', {
   env: process.env,
-  overrides: { url: 'https://prod.example.com' },
+  overrides: {
+    supportedInterfaces: [
+      {
+        url: 'https://prod.example.com',
+        protocolBinding: 'JSONRPC',
+        protocolVersion: '1.0',
+      },
+    ],
+  },
 });
 ```
 
@@ -562,12 +574,11 @@ Inside an agent-card JSON file passed to `loadAgentCardFromFile` / `loadAgentCar
   "version": "0.1.0",
   "supportedInterfaces": [
     {
-      "url": "http://127.0.0.1:8080",
+      "url": "${A2A_AGENT_URL}",
       "protocolBinding": "JSONRPC",
       "protocolVersion": "1.0"
     }
   ],
-  "url": "${A2A_AGENT_URL}",
   "defaultInputModes": ["text/plain"],
   "defaultOutputModes": ["text/plain"],
   "capabilities": {
