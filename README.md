@@ -145,7 +145,7 @@ async function runWorker(): Promise<void> {
 }
 ```
 
-**`client.ts`** - send a message and poll `GetTask` until the task reaches a terminal state:
+**`client.ts`** - send a message with `returnImmediately` and poll `GetTask` until the task reaches a terminal state. Without `configuration.returnImmediately`, `sendMessage` already blocks until the task settles and the poll loop below is unnecessary:
 
 ```ts
 import {
@@ -162,6 +162,7 @@ let { task } = await client.sendMessage({
     role: 'ROLE_USER',
     parts: [{ text: 'hello, agent' }],
   },
+  configuration: { returnImmediately: true },
 });
 if (task === undefined) throw new Error('the agent replied with a message');
 
@@ -222,7 +223,7 @@ The TypeScript ADK currently focuses on the core A2A protocol surface: `SendMess
 
 #### `A2AServer` / `createA2AServer`
 
-The main HTTP server. Exposes the JSON-RPC endpoint at `DEFAULT_JSONRPC_PATH` (`POST /`), an AgentCard discovery endpoint at `AGENT_CARD_PATH` (`/.well-known/agent-card.json`), and a liveness probe at `HEALTH_PATH` (`/health`). The endpoint mount points and the agent-card `Cache-Control` header (`DEFAULT_AGENT_CARD_CACHE_CONTROL`) are configurable via `A2AServerConfig`.
+The main HTTP server. Exposes the JSON-RPC endpoint at `DEFAULT_JSONRPC_PATH` (`POST /`), an AgentCard discovery endpoint at `AGENT_CARD_PATH` (`/.well-known/agent-card.json`), and a liveness probe at `HEALTH_PATH` (`/health`). `A2AServerConfig` configures the `jsonRpcPath` and `artifactsPath` mount points and the agent-card `Cache-Control` header (`DEFAULT_AGENT_CARD_CACHE_CONTROL`); the discovery and health paths are fixed constants.
 
 ```ts
 const server = createA2AServer({ card });
@@ -239,11 +240,14 @@ JSON-RPC methods are registered on a per-server `MethodRegistry`. Call `server.r
 
 #### Built-in handlers
 
-- **`createMessageSendHandler({ storage })`** registers as `MESSAGE_SEND_METHOD` (`SendMessage`). It accepts a JSON-RPC `SendMessage` request, creates a `SUBMITTED` task, enqueues it on the supplied `TaskStorage`, and returns it immediately as a `SendMessageResponse` (`{ task }`). Your worker code dequeues and progresses the task.
+- **`createMessageSendHandler({ storage })`** registers as `MESSAGE_SEND_METHOD` (`SendMessage`). It accepts a JSON-RPC `SendMessage` request, starts a task, enqueues it on the supplied `TaskStorage` for your worker code to dequeue and progress, and returns it as a `SendMessageResponse` (`{ task }`). Specifically:
+  - **Blocking by default.** The handler polls storage until a worker moves the task to a terminal or `INPUT_REQUIRED` state, so the returned task is already settled. Pass `configuration.returnImmediately: true` in the request to get the freshly enqueued `TASK_STATE_SUBMITTED` task back right away and poll `GetTask` yourself.
+  - **Resumes paused tasks.** If the message names a paused (`INPUT_REQUIRED`) task by `taskId` - or, failing that, carries a `contextId` with a paused task on it - the message is appended to that task and it transitions back to `IN_PROGRESS` instead of a new task being created. A message naming an unknown task is rejected with `-32001`, a terminal one with `-32004`, and a mismatched `contextId` with `-32602`.
+  - **Optional direct replies.** The `respondToMessage` hook on `MessageSendHandlerOptions` is called with the incoming message first; returning a `Message` makes the handler reply with `{ message }` and create no task, while returning `undefined` continues with the task flow.
 - **`createTaskGetHandler({ storage })`** registers as `TASK_GET_METHOD` (`GetTask`). It looks up the requested task across active and dead-letter storage and returns whatever it finds.
 - **`createTaskListHandler({ storage })`** registers as `TASK_LIST_METHOD` (`ListTasks`). It returns tasks filtered by optional `status` / `contextId`, paginated with an opaque `pageToken` and a `pageSize` clamped to `maxLimit` (default `100`). The response shape is the A2A `ListTasksResponse` (`{ tasks, pageSize, totalSize, nextPageToken }`); `nextPageToken` is empty on the final page. Per the proto3 JSON mapping, default-valued params count as unset: `pageToken: ''` returns the first page, `pageSize: 0` uses the default page size, and empty `status` / `contextId` apply no filter. Pagination is stable under concurrent inserts and deletes because the cursor is keyset-encoded on `(createdAt, id)`.
 
-These handlers are pure adapters between the JSON-RPC surface and a `TaskStorage` - no business logic lives in them.
+These handlers are thin adapters between the JSON-RPC surface and a `TaskStorage` - the agent's own logic lives in the worker that drains the queue.
 
 #### Task lifecycle
 
@@ -477,7 +481,7 @@ const evt = createCloudEvent({
 });
 ```
 
-`AGENT_EVENT_TYPE` is the canonical set of streaming event-type constants (`DELTA`, `ITERATION_COMPLETED`, `TOOL_STARTED`/`COMPLETED`/`FAILED`/`RESULT`, `INPUT_REQUIRED`, `TASK_STATUS_CHANGED`, `TASK_INTERRUPTED`, `STREAM_FAILED`) - identical to the Go ADK's `Event*` constants so a TS publisher and a Go consumer can interoperate without translation. Produces a [CloudEvents v1.0](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md)-compliant envelope (`CLOUDEVENTS_SPEC_VERSION = '1.0'`, served as `CLOUDEVENTS_CONTENT_TYPE`) - useful for forwarding agent events to event buses or webhook subscribers.
+`AGENT_EVENT_TYPE` is the canonical set of streaming event-type constants (`DELTA`, `ITERATION_COMPLETED`, `TOOL_STARTED`/`COMPLETED`/`FAILED`/`RESULT`, `INPUT_REQUIRED`, `TASK_STATUS_CHANGED`, `TASK_ARTIFACT_UPDATED`, `TASK_INTERRUPTED`, `STREAM_FAILED`) - identical to the Go ADK's `Event*` constants so a TS publisher and a Go consumer can interoperate without translation. Produces a [CloudEvents v1.0](https://github.com/cloudevents/spec/blob/v1.0.2/cloudevents/spec.md)-compliant envelope (`CLOUDEVENTS_SPEC_VERSION = '1.0'`, served as `CLOUDEVENTS_CONTENT_TYPE`) - useful for forwarding agent events to event buses or webhook subscribers.
 
 #### SSE streaming writer
 
