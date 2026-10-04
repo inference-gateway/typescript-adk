@@ -23,7 +23,10 @@ const initial: Message = {
 };
 
 console.log(`POST ${SERVER_URL}/  SendMessage  "${PROMPT}"`);
-const { task: created } = await client.sendMessage({ message: initial });
+const { task: created } = await client.sendMessage({
+  message: initial,
+  configuration: { returnImmediately: true },
+});
 if (created === undefined) throw new Error('SendMessage returned no task');
 console.log(`created task id=${created.id} state=${created.status.state}`);
 
@@ -51,6 +54,7 @@ if (paused.status.state === TASK_STATE.INPUT_REQUIRED) {
   );
   const { task: resumed } = await client.sendMessage({
     message: resumeMessage,
+    configuration: { returnImmediately: true },
   });
   if (resumed === undefined) throw new Error('SendMessage returned no task');
   console.log(`resumed task id=${resumed.id} state=${resumed.status.state}`);

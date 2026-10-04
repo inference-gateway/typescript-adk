@@ -37,7 +37,10 @@ for (let i = 0; i < SEND_PROMPTS.length; i++) {
     role: 'ROLE_USER',
     parts: [{ text: prompt }],
   };
-  const { task: created } = await client.sendMessage({ message });
+  const { task: created } = await client.sendMessage({
+    message,
+    configuration: { returnImmediately: true },
+  });
   if (created === undefined) throw new Error('SendMessage returned no task');
   const final = await pollUntilTerminal(created.id);
   console.log(`final state: ${final.status.state}`);
