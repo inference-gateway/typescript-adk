@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.20.0](https://github.com/inference-gateway/typescript-adk/compare/v0.19.2...v0.20.0) (2026-10-04)
+
+### ✨ Features
+
+* **server:** publish task usage as an A2A extension ([#275](https://github.com/inference-gateway/typescript-adk/issues/275)) ([371aef6](https://github.com/inference-gateway/typescript-adk/commit/371aef6d0825f26364d0cce022628c86755d289d)), references [inference-gateway/cli#1526](https://github.com/inference-gateway/cli/issues/1526)
+
+### 📚 Documentation
+
+* **agents:** add code readability guidelines ([#267](https://github.com/inference-gateway/typescript-adk/issues/267)) ([8045cd9](https://github.com/inference-gateway/typescript-adk/commit/8045cd94c2b4347ae78bdc9eeea5418cb1bcc11a))
+* correct dependency and env var claims in readme ([#272](https://github.com/inference-gateway/typescript-adk/issues/272)) ([11f3e4b](https://github.com/inference-gateway/typescript-adk/commit/11f3e4ba298c624234f96af712b316fae0a7213d))
+* correct SendMessage blocking, paths and event types ([#270](https://github.com/inference-gateway/typescript-adk/issues/270)) ([b0aeb8d](https://github.com/inference-gateway/typescript-adk/commit/b0aeb8d2e50b04fdc3e931310d868ea9d4290403))
+* correct status section to list shipped features ([#269](https://github.com/inference-gateway/typescript-adk/issues/269)) ([2ed0207](https://github.com/inference-gateway/typescript-adk/commit/2ed0207a51f3869f42447e4d08e627d597736ebd))
+* **examples:** send returnImmediately before GetTask polls ([#274](https://github.com/inference-gateway/typescript-adk/issues/274)) ([62cb3f8](https://github.com/inference-gateway/typescript-adk/commit/62cb3f8767b0795a537d09245ac3eec10cc9b767))
+* fix storage and agent-card readme snippets ([#271](https://github.com/inference-gateway/typescript-adk/issues/271)) ([709fc92](https://github.com/inference-gateway/typescript-adk/commit/709fc92cae20aa9bb60c6e1d7828fb739269e4b6))
+
+### 🔧 Miscellaneous
+
+* sync generated types with schemas v1.2.0 ([#268](https://github.com/inference-gateway/typescript-adk/issues/268)) ([1e084c9](https://github.com/inference-gateway/typescript-adk/commit/1e084c92d264b6e0009a17fc7e4448d26e9749a2))
+
 ## [0.19.2](https://github.com/inference-gateway/typescript-adk/compare/v0.19.1...v0.19.2) (2026-10-03)
 
 ### 🐛 Bug Fixes
