@@ -5,6 +5,7 @@ import type { Server } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import type { AddressInfo } from 'node:net';
 import { AgentCardValidationError } from '../agent/card.js';
+import { activatedExtensions } from '../agent/usage-extension.js';
 import type { ArtifactStorageProvider } from '../artifacts/artifact-storage.js';
 import type { Authenticator } from '../auth/index.js';
 import { hasCredentials } from '../internal/url.js';
@@ -299,6 +300,10 @@ export class A2AServer {
     app.post(this.jsonRpcPath, async (c) => {
       const body = await c.req.text();
       const signal = c.req.raw.signal;
+      const extensions = activatedExtensions(
+        c.req.header('A2A-Extensions'),
+        this.card
+      );
 
       const version = c.req.header('A2A-Version');
       if (!isSupportedA2AVersion(version)) {
@@ -311,17 +316,25 @@ export class A2AServer {
         );
       }
 
-      const streamingResponse = this.tryDispatchStreaming(body, signal);
+      const streamingResponse = this.tryDispatchStreaming(
+        body,
+        signal,
+        extensions
+      );
       if (streamingResponse !== null) {
         return streamingResponse;
       }
 
       return this.runWithJsonRpcSpan(body, async () => {
-        const result = await dispatch(body, this.registry, signal);
+        const result = await dispatch(body, this.registry, signal, extensions);
         if (result === null) {
           return new Response(null, { status: 204 });
         }
-        return c.json(result as JSONRPCResponse | JSONRPCResponse[]);
+        return c.json(
+          result as JSONRPCResponse | JSONRPCResponse[],
+          200,
+          extensionHeaders(extensions)
+        );
       });
     });
 
@@ -419,7 +432,8 @@ export class A2AServer {
 
   private tryDispatchStreaming(
     rawBody: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    extensions: ReadonlySet<string>
   ): Response | null {
     if (this.streamingRegistry.size === 0) {
       return null;
@@ -453,10 +467,14 @@ export class A2AServer {
     const params =
       'params' in reqObj ? normalizeParams(reqObj['params']) : undefined;
     try {
-      const { readable } = handler(params, { signal, requestId: id });
+      const { readable } = handler(params, {
+        signal,
+        requestId: id,
+        activatedExtensions: extensions,
+      });
       return new Response(readable, {
         status: 200,
-        headers: { ...SSE_HEADERS },
+        headers: { ...SSE_HEADERS, ...extensionHeaders(extensions) },
       });
     } catch (err) {
       if (err instanceof JSONRPCError) {
@@ -620,4 +638,13 @@ function peekJsonRpcMethodAndId(rawBody: string): {
     id = String(idValue);
   }
   return { method, id };
+}
+
+/** The `A2A-Extensions` response header listing the extensions a request activated. */
+function extensionHeaders(
+  extensions: ReadonlySet<string>
+): Record<string, string> {
+  return extensions.size > 0
+    ? { 'A2A-Extensions': [...extensions].join(', ') }
+    : {};
 }

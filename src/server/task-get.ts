@@ -6,7 +6,10 @@ import type {
   Task,
 } from '../types/generated/a2a.js';
 import { JSONRPC_ERROR_CODES, JSONRPCError } from './jsonrpc.js';
-import type { MethodHandler } from './method-registry.js';
+import {
+  withoutInactiveExtensions,
+  type MethodHandler,
+} from './method-registry.js';
 
 /**
  * Canonical JSON-RPC method name for the A2A `GetTask` operation.
@@ -41,7 +44,7 @@ export function createTaskGetHandler(
 ): MethodHandler<unknown, Task> {
   const { storage } = options;
 
-  return (params: unknown): Task => {
+  return (params, context): Task => {
     const validated = validateTaskGetParams(params);
     const task = storage.getTask(validated.id);
     if (task === undefined) {
@@ -50,7 +53,10 @@ export function createTaskGetHandler(
         'task not found'
       );
     }
-    return toWireTask(task, validated.historyLength);
+    return withoutInactiveExtensions(
+      toWireTask(task, validated.historyLength),
+      context
+    );
   };
 }
 

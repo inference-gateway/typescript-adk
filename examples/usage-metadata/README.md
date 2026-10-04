@@ -17,22 +17,24 @@ The `UsageTracker` accumulates per-task counters across the agent loop:
 | `execution_stats.tool_calls`   | Number of tool calls dispatched.                 |
 | `execution_stats.failed_tools` | Number of tool calls that errored.               |
 
-When the task reaches a terminal state (`COMPLETED` / `FAILED` / `CANCELLED` / `INPUT_REQUIRED`), the counters are serialized into `task.metadata` like this:
+When the task reaches a terminal state (`COMPLETED` / `FAILED` / `CANCELLED` / `INPUT_REQUIRED`), the counters are serialized into `task.metadata` under keys namespaced by the [usage extension](https://github.com/inference-gateway/schemas/tree/main/a2a/extensions/usage/v1) URI (`USAGE_METADATA_KEY` and `EXECUTION_STATS_METADATA_KEY`):
 
 ```json
 {
-  "usage": {
+  "https://github.com/inference-gateway/schemas/tree/main/a2a/extensions/usage/v1/usage": {
     "prompt_tokens": 56,
     "completion_tokens": 28,
     "total_tokens": 84
   },
-  "execution_stats": {
+  "https://github.com/inference-gateway/schemas/tree/main/a2a/extensions/usage/v1/execution_stats": {
     "iterations": 2,
     "tool_calls": 1,
     "failed_tools": 0
   }
 }
 ```
+
+The extension is inactive by default. The server declares it on its card with `withUsageExtension(card)`, and returns the keys only to requests that list `USAGE_EXTENSION_URI` in the `A2A-Extensions` header. The client sends that header on every request, the SSE one included. Push notifications never carry the keys.
 
 The server in this example wires both handlers with usage metadata enabled and exposes:
 
@@ -96,8 +98,8 @@ final state: TASK_STATE_COMPLETED
 response: The weather in Paris is sunny and 22C.
 task.metadata:
 {
-  "execution_stats": { "iterations": 2, "tool_calls": 1, "failed_tools": 0 },
-  "usage":           { "prompt_tokens": 56, "completion_tokens": 28, "total_tokens": 84 }
+  "https://github.com/inference-gateway/schemas/tree/main/a2a/extensions/usage/v1/execution_stats": { "iterations": 2, "tool_calls": 1, "failed_tools": 0 },
+  "https://github.com/inference-gateway/schemas/tree/main/a2a/extensions/usage/v1/usage": { "prompt_tokens": 56, "completion_tokens": 28, "total_tokens": 84 }
 }
 ```
 
@@ -110,14 +112,14 @@ Streaming portion:
 final stream status: TASK_STATE_COMPLETED
 task.metadata (from terminal status event):
 {
-  "execution_stats": { "iterations": 2, "tool_calls": 1, "failed_tools": 0 },
-  "usage":           { "prompt_tokens": 56, "completion_tokens": 28, "total_tokens": 84 }
+  "https://github.com/inference-gateway/schemas/tree/main/a2a/extensions/usage/v1/execution_stats": { "iterations": 2, "tool_calls": 1, "failed_tools": 0 },
+  "https://github.com/inference-gateway/schemas/tree/main/a2a/extensions/usage/v1/usage": { "prompt_tokens": 56, "completion_tokens": 28, "total_tokens": 84 }
 }
 
 task.metadata (from GetTask):
 {
-  "execution_stats": { "iterations": 2, "tool_calls": 1, "failed_tools": 0 },
-  "usage":           { "prompt_tokens": 56, "completion_tokens": 28, "total_tokens": 84 }
+  "https://github.com/inference-gateway/schemas/tree/main/a2a/extensions/usage/v1/execution_stats": { "iterations": 2, "tool_calls": 1, "failed_tools": 0 },
+  "https://github.com/inference-gateway/schemas/tree/main/a2a/extensions/usage/v1/usage": { "prompt_tokens": 56, "completion_tokens": 28, "total_tokens": 84 }
 }
 ```
 
@@ -137,6 +139,23 @@ import { DefaultStreamingTaskHandler } from '@inference-gateway/adk';
 
 const streaming = new DefaultStreamingTaskHandler({ llmClient, toolBox });
 streaming.setEnableUsageMetadata(true);
+```
+
+Declare the extension on the card you serve, and have clients activate it:
+
+```ts
+import {
+  USAGE_EXTENSION_URI,
+  createA2AClient,
+  createA2AServer,
+  withUsageExtension,
+} from '@inference-gateway/adk';
+
+const server = createA2AServer({ card: withUsageExtension(card) });
+const client = createA2AClient({
+  baseURL,
+  headers: { 'A2A-Extensions': USAGE_EXTENSION_URI },
+});
 ```
 
 Both handlers expose `isUsageMetadataEnabled()` for diagnostics. The opt-in is intentionally off-by-default so existing tasks do not gain new metadata keys until you ask for them.

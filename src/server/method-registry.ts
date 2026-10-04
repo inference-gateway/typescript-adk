@@ -1,3 +1,8 @@
+import {
+  USAGE_EXTENSION_URI,
+  withoutExtension,
+} from '../agent/usage-extension.js';
+import type { Struct } from '../types/generated/a2a.js';
 import type { JSONRPCId } from './jsonrpc.js';
 
 /**
@@ -7,10 +12,26 @@ import type { JSONRPCId } from './jsonrpc.js';
  * client or when the server is shutting down. Long-running handlers should
  * propagate it to downstream calls so cancellation actually unwinds.
  * `requestId` is the JSON-RPC `id` of the request being handled.
+ * `activatedExtensions` holds the extension URIs the request activated through
+ * the `A2A-Extensions` header. Absent means none.
  */
 export interface MethodContext {
   readonly signal: AbortSignal;
   readonly requestId?: JSONRPCId;
+  readonly activatedExtensions?: ReadonlySet<string>;
+}
+
+/**
+ * The task or status update as the client may see it: without the usage
+ * extension's metadata unless the request activated it, since extensions are
+ * inactive by default.
+ */
+export function withoutInactiveExtensions<
+  T extends { readonly metadata?: Struct },
+>(value: T, context: MethodContext): T {
+  return context.activatedExtensions?.has(USAGE_EXTENSION_URI) === true
+    ? value
+    : withoutExtension(value, USAGE_EXTENSION_URI);
 }
 
 /**

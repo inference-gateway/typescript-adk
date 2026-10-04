@@ -17,7 +17,10 @@ import {
   type StreamingMethodResult,
 } from './message-stream.js';
 import { pollTask } from './message-send.js';
-import type { MethodContext } from './method-registry.js';
+import {
+  withoutInactiveExtensions,
+  type MethodContext,
+} from './method-registry.js';
 import { SSEStreamWriter } from './sse.js';
 import type { TaskEventBusRegistry } from './task-event-bus.js';
 
@@ -107,7 +110,7 @@ export function createTaskResubscribeHandler(
     const requestId = context.requestId ?? null;
     const writer = new SSEStreamWriter({
       signal: context.signal,
-      frame: streamResponseFrame(requestId, task),
+      frame: streamResponseFrame(requestId, task, context),
       ...(options.heartbeatMs !== undefined
         ? { heartbeatMs: options.heartbeatMs }
         : {}),
@@ -118,7 +121,9 @@ export function createTaskResubscribeHandler(
     const done = (async (): Promise<void> => {
       try {
         writer.send(
-          createSuccessResponse(requestId, { task: toWireTask(task) })
+          createSuccessResponse(requestId, {
+            task: withoutInactiveExtensions(toWireTask(task), context),
+          })
         );
         if (bus === undefined || bus.closed) {
           await pollTask(storage, task, isTerminal, context.signal, (latest) =>

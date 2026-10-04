@@ -1,12 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AgentCardValidationError } from '../../src/agent/card.js';
+import { createTask } from '../../src/agent/task.js';
+import {
+  USAGE_EXTENSION_URI,
+  USAGE_METADATA_KEY,
+  withUsageExtension,
+} from '../../src/agent/usage-extension.js';
 import {
   A2AServer,
   AGENT_CARD_PATH,
   DEFAULT_AGENT_CARD_CACHE_CONTROL,
   JSONRPC_ERROR_CODES,
+  TASK_GET_METHOD,
   createA2AServer,
+  createTaskGetHandler,
 } from '../../src/server/index.js';
+import { InMemoryTaskStorage } from '../../src/storage/index.js';
 import type { AgentCard } from '../../src/types/generated/a2a.js';
 
 function makeCard(overrides: Partial<AgentCard> = {}): AgentCard {
@@ -305,4 +314,66 @@ describe('A2AServer lifecycle', () => {
     await expect(fetch(url)).rejects.toThrow();
     server = undefined;
   });
+});
+
+describe('A2AServer usage extension', () => {
+  it.each([
+    ['not requested', true, undefined, false],
+    ['requested alone', true, USAGE_EXTENSION_URI, true],
+    [
+      'requested in a list',
+      true,
+      `https://example.com/ext/other/v1, ${USAGE_EXTENSION_URI}`,
+      true,
+    ],
+    ['only another extension', true, 'https://example.com/ext/other/v1', false],
+    ['requested but not declared', false, USAGE_EXTENSION_URI, false],
+  ])(
+    '%s: GetTask returns usage only when the extension is active',
+    async (_name, declared, header, active) => {
+      const storage = new InMemoryTaskStorage();
+      storage.storeDeadLetter(
+        createTask({
+          id: 'usage-task',
+          contextId: 'ctx-1',
+          metadata: { [USAGE_METADATA_KEY]: { prompt_tokens: 7 }, other: true },
+        })
+      );
+      const card = declared ? withUsageExtension(makeCard()) : makeCard();
+      const server = createA2AServer({ card });
+      server.registerMethod(TASK_GET_METHOD, createTaskGetHandler({ storage }));
+      const { baseUrl, close } = await startServer(server);
+      try {
+        const res = await fetch(`${baseUrl}/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(header !== undefined ? { 'A2A-Extensions': header } : {}),
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: TASK_GET_METHOD,
+            params: { id: 'usage-task' },
+          }),
+        });
+        const body = (await res.json()) as {
+          result: { metadata?: Record<string, unknown> };
+        };
+
+        expect(body.result.metadata?.[USAGE_METADATA_KEY] !== undefined).toBe(
+          active
+        );
+        expect(body.result.metadata?.['other']).toBe(true);
+        expect(res.headers.get('A2A-Extensions')).toBe(
+          active ? USAGE_EXTENSION_URI : null
+        );
+        expect(
+          storage.getTask('usage-task')?.metadata?.[USAGE_METADATA_KEY]
+        ).toBeDefined();
+      } finally {
+        await close();
+      }
+    }
+  );
 });

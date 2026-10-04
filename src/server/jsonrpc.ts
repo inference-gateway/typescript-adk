@@ -162,7 +162,8 @@ function extractId(reqObj: Record<string, unknown>): {
 async function dispatchSingle(
   req: unknown,
   registry: MethodRegistry,
-  signal: AbortSignal
+  signal: AbortSignal,
+  activatedExtensions: ReadonlySet<string>
 ): Promise<JSONRPCResponse | null> {
   if (!isPlainObject(req)) {
     return createErrorResponse(
@@ -214,6 +215,7 @@ async function dispatchSingle(
     const result = await handler(normalizeParams(paramsRaw), {
       signal,
       requestId: responseId,
+      activatedExtensions,
     });
     if (isNotification) {
       return null;
@@ -245,7 +247,8 @@ async function dispatchSingle(
 export async function dispatch(
   rawBody: string,
   registry: MethodRegistry,
-  signal: AbortSignal
+  signal: AbortSignal,
+  activatedExtensions: ReadonlySet<string> = new Set()
 ): Promise<JSONRPCResponse | JSONRPCResponse[] | null> {
   let parsed: unknown;
   try {
@@ -267,7 +270,9 @@ export async function dispatch(
       );
     }
     const responses = await Promise.all(
-      parsed.map((item) => dispatchSingle(item, registry, signal))
+      parsed.map((item) =>
+        dispatchSingle(item, registry, signal, activatedExtensions)
+      )
     );
     const filtered = responses.filter((r): r is JSONRPCResponse => r !== null);
     if (filtered.length === 0) {
@@ -276,5 +281,5 @@ export async function dispatch(
     return filtered;
   }
 
-  return dispatchSingle(parsed, registry, signal);
+  return dispatchSingle(parsed, registry, signal, activatedExtensions);
 }

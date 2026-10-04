@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { TASK_STATE, type ManagedTask } from '../../src/agent/task.js';
 import {
+  USAGE_EXTENSION_URI,
+  USAGE_METADATA_KEY,
+} from '../../src/agent/usage-extension.js';
+import {
   DEFAULT_STREAMING_STATUS_UPDATE_INTERVAL_MS,
   JSONRPC_ERROR_CODES,
   JSONRPCError,
@@ -377,6 +381,47 @@ describe('createMessageStreamHandler', () => {
       failed_tools: 0,
     });
   });
+
+  it.each([
+    ['not activated', new Set<string>(), false],
+    ['activated', new Set([USAGE_EXTENSION_URI]), true],
+  ])(
+    'streams the usage extension on the terminal status update only when %s',
+    async (_name, activatedExtensions, active) => {
+      const storage = new InMemoryTaskStorage();
+      const executor: StreamingTaskExecutor = async function* () {
+        yield {
+          type: 'statusChanged',
+          state: TASK_STATE.COMPLETED,
+          metadata: { [USAGE_METADATA_KEY]: { prompt_tokens: 5 } },
+        };
+      };
+      const handler = createMessageStreamHandler({
+        storage,
+        executor,
+        idGenerator: sequentialIdGenerator(),
+        env: { [STREAMING_STATUS_UPDATE_INTERVAL_ENV]: '0' },
+        heartbeatMs: 0,
+      });
+
+      const result = handler(
+        { message: makeMessage({ contextId: 'ctx-usage' }) },
+        { signal: new AbortController().signal, activatedExtensions }
+      );
+      const frames = await drainFrames(result.readable);
+      await result.done;
+
+      const streamedUsage = frames.some(
+        (frame) =>
+          frame.result.statusUpdate?.metadata?.[USAGE_METADATA_KEY] !==
+          undefined
+      );
+      expect(streamedUsage).toBe(active);
+      expect(storage.getTask('id-1')?.metadata?.[USAGE_METADATA_KEY]).toEqual({
+        prompt_tokens: 5,
+      });
+    }
+  );
 
   it('shallow-merges inputRequired.metadata into task.metadata before pausing', async () => {
     const storage = new InMemoryTaskStorage();

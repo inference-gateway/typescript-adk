@@ -41,7 +41,10 @@ import {
   registerPushConfig,
   validateMessageSendParams,
 } from './message-send.js';
-import type { MethodContext } from './method-registry.js';
+import {
+  withoutInactiveExtensions,
+  type MethodContext,
+} from './method-registry.js';
 import { SSEStreamWriter } from './sse.js';
 import type { TaskCancellationRegistry } from './task-cancellation.js';
 import type { TaskEventBus, TaskEventBusRegistry } from './task-event-bus.js';
@@ -365,7 +368,7 @@ export function createMessageStreamHandler(
     const requestId = context.requestId ?? null;
     const writer = new SSEStreamWriter({
       signal: context.signal,
-      frame: streamResponseFrame(requestId, task),
+      frame: streamResponseFrame(requestId, task, context),
       ...(options.heartbeatMs !== undefined
         ? { heartbeatMs: options.heartbeatMs }
         : {}),
@@ -380,7 +383,10 @@ export function createMessageStreamHandler(
       try {
         writer.send(
           createSuccessResponse(requestId, {
-            task: toWireTask(task, validated.configuration?.historyLength),
+            task: withoutInactiveExtensions(
+              toWireTask(task, validated.configuration?.historyLength),
+              context
+            ),
           })
         );
         if (!resumingExistingTask) {
@@ -496,10 +502,11 @@ export function createMessageStreamHandler(
  */
 export function streamResponseFrame(
   requestId: JSONRPCId,
-  task: { readonly id: string; readonly contextId: string }
+  task: { readonly id: string; readonly contextId: string },
+  context: MethodContext
 ): (event: CloudEvent) => JSONRPCSuccessResponse | undefined {
   return (event) => {
-    const result = toStreamResponse(event, task);
+    const result = toStreamResponse(event, task, context);
     return result === undefined
       ? undefined
       : createSuccessResponse(requestId, result);
@@ -508,11 +515,17 @@ export function streamResponseFrame(
 
 function toStreamResponse(
   event: CloudEvent,
-  task: { readonly id: string; readonly contextId: string }
+  task: { readonly id: string; readonly contextId: string },
+  context: MethodContext
 ): StreamResponse | undefined {
   switch (event.type) {
     case AGENT_EVENT_TYPE.TASK_STATUS_CHANGED:
-      return { statusUpdate: event.data as TaskStatusUpdateEvent };
+      return {
+        statusUpdate: withoutInactiveExtensions(
+          event.data as TaskStatusUpdateEvent,
+          context
+        ),
+      };
     case AGENT_EVENT_TYPE.TASK_ARTIFACT_UPDATED:
       return { artifactUpdate: event.data as TaskArtifactUpdateEvent };
     case AGENT_EVENT_TYPE.DELTA:
