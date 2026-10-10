@@ -1,6 +1,6 @@
 // Code generated from A2A schema. DO NOT EDIT.
 //
-// Source: https://github.com/inference-gateway/schemas/blob/v1.2.0/a2a/a2a-schema.json
+// Source: https://github.com/inference-gateway/schemas/blob/v1.2.2/a2a/a2a-schema.json
 // Regenerate with: pnpm generate:types
 
 export type A2AMethod =
