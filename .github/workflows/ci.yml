@@ -33,7 +33,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v7.0.0
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
@@ -96,7 +96,7 @@ jobs:
           run_install: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7.0.0
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: 24
           cache: 'pnpm'
@@ -108,7 +108,7 @@ jobs:
         run: pnpm build
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@v10.3.0
 
       - name: Start TCK system under test
         working-directory: examples/tck-sut
