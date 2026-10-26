@@ -68,14 +68,16 @@ export interface CreateTelemetryProviderOptions {
    * Replace the default OTLP HTTP log record processor. Mirrors
    * {@link spanProcessors} but for the logs signal.
    */
-  readonly logRecordProcessor?: NodeSDKConfig['logRecordProcessor'];
+  readonly logRecordProcessor?: NonNullable<
+    NodeSDKConfig['logRecordProcessors']
+  >[number];
   /**
    * Replace the metric reader selected by
    * {@link TelemetryConfig.metricsExporter}. Pass a no-op reader to disable
    * metric export in tests, or a Prometheus/OTLP reader to force a specific
    * pipeline regardless of env.
    */
-  readonly metricReader?: NodeSDKConfig['metricReader'];
+  readonly metricReader?: NonNullable<NodeSDKConfig['metricReaders']>[number];
   /**
    * Replace the default {@link getNodeAutoInstrumentations} bundle. Pass an
    * empty array to disable auto-instrumentation entirely (manual spans
@@ -182,13 +184,14 @@ export class TelemetryProvider {
       sdkConfig.traceExporter = new OTLPTraceExporter();
     }
 
-    sdkConfig.logRecordProcessor =
+    sdkConfig.logRecordProcessors = [
       this.options.logRecordProcessor ??
-      new SimpleLogRecordProcessor({ exporter: new OTLPLogExporter() });
+        new SimpleLogRecordProcessor({ exporter: new OTLPLogExporter() }),
+    ];
 
     const metricReader = this.options.metricReader ?? this.createMetricReader();
     if (metricReader !== undefined) {
-      sdkConfig.metricReader = metricReader;
+      sdkConfig.metricReaders = [metricReader];
     }
 
     this.sdk = new NodeSDK(sdkConfig);
@@ -207,7 +210,8 @@ export class TelemetryProvider {
    * - `'none'` - `undefined`, so no metric reader is registered and the metrics
    *   signal stays off while traces/logs keep flowing.
    */
-  private createMetricReader(): NodeSDKConfig['metricReader'] {
+  private createMetricReader():
+    NonNullable<NodeSDKConfig['metricReaders']>[number] | undefined {
     switch (this.config.metricsExporter) {
       case 'none':
         return undefined;
