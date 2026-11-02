@@ -106,7 +106,7 @@
     "@opentelemetry/sdk-logs": "3.0.0",
     "@opentelemetry/sdk-metrics": "3.0.0",
     "@opentelemetry/sdk-node": "0.300.0",
-    "@opentelemetry/semantic-conventions": "1.43.0",
+    "@opentelemetry/semantic-conventions": "1.44.0",
     "ajv": "^8.20.0",
     "hono": "^4.12.23",
     "jose": "^6.2.3",
