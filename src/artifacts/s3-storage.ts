@@ -36,6 +36,25 @@ export const DEFAULT_PRESIGN_EXPIRY_SECONDS = 300;
  */
 export const DEFAULT_S3_REGION = 'us-east-1';
 
+// O(n) walks rather than /^\/+|\/+$/, which CodeQL flags as
+// polynomial-backtracking on adversarial input.
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') {
+    end--;
+  }
+  return value.slice(0, end);
+}
+
+function trimSlashes(value: string): string {
+  const trimmed = trimTrailingSlashes(value);
+  let start = 0;
+  while (start < trimmed.length && trimmed[start] === '/') {
+    start++;
+  }
+  return trimmed.slice(start);
+}
+
 /**
  * URL-emission mode for {@link S3ArtifactStorage}.
  *
@@ -173,9 +192,9 @@ export class S3ArtifactStorage implements ArtifactStorageProvider {
       throw new ArtifactStorageError('bucket must be a non-empty string');
     }
     this.bucket = options.bucket;
-    this.prefix = (options.prefix ?? '').replace(/^\/+|\/+$/g, '');
+    this.prefix = trimSlashes(options.prefix ?? '');
     const rawBase = options.baseUrl ?? `s3://${options.bucket}`;
-    this.baseUrl = rawBase.replace(/\/+$/, '');
+    this.baseUrl = trimTrailingSlashes(rawBase);
     this.mode = options.mode ?? 'direct';
     this.presignExpirySeconds =
       options.presignExpirySeconds ?? DEFAULT_PRESIGN_EXPIRY_SECONDS;
