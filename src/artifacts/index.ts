@@ -32,9 +32,9 @@ export type { FilesystemArtifactStorageOptions } from './filesystem-storage.js';
 export {
   DEFAULT_PRESIGN_EXPIRY_SECONDS,
   DEFAULT_S3_REGION,
-  MinioArtifactStorage,
-} from './minio-storage.js';
+  S3ArtifactStorage,
+} from './s3-storage.js';
 export type {
-  MinioArtifactStorageMode,
-  MinioArtifactStorageOptions,
-} from './minio-storage.js';
+  S3ArtifactStorageMode,
+  S3ArtifactStorageOptions,
+} from './s3-storage.js';
