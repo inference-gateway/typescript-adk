@@ -35,7 +35,7 @@ export interface ArtifactStorageProvider {
    * be used to retrieve it (typically the artifact server's public URL).
    *
    * `contentType` may be used by the backend to set content-type metadata
-   * (e.g., S3/MinIO object headers) but does not affect the URL shape.
+   * (e.g., S3 object headers) but does not affect the URL shape.
    *
    * Should overwrite if `(artifactId, filename)` already exists, matching the
    * Go ADK behaviour.
@@ -127,7 +127,7 @@ export interface ArtifactStorageProvider {
   cleanupOldest(maxCount: number, signal?: AbortSignal): Promise<number>;
 
   /**
-   * Release any resources held by the provider (file handles, MinIO/S3
+   * Release any resources held by the provider (file handles, S3
    * clients, etc). After `close()`, all other methods may throw.
    */
   close(): Promise<void>;
@@ -142,7 +142,7 @@ export interface ArtifactStorageProvider {
  * since the service mints a fresh artifact id per stored artifact. `maxCount`
  * of `0` or less means unlimited: nothing is selected.
  *
- * Shared by the filesystem, MinIO, and in-memory providers so the retention
+ * Shared by the filesystem, S3, and in-memory providers so the retention
  * semantics cannot drift between backends.
  */
 export function selectEntriesOverArtifactCap<

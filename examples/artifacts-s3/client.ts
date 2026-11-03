@@ -11,7 +11,7 @@ import {
 const SERVER_URL = process.env['SERVER_URL'] ?? 'http://127.0.0.1:8080';
 const PROMPT =
   process.env['PROMPT'] ??
-  'Hello from the MinIO artifacts example - please write this note to the bucket.';
+  'Hello from the RustFS artifacts example - please write this note to the bucket.';
 const POLL_INTERVAL_MS = 300;
 const POLL_MAX_ATTEMPTS = 40;
 

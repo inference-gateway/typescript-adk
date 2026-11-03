@@ -128,5 +128,5 @@ You can also drive the toggle entirely from the environment by leaving `enableCr
 ## Related examples
 
 - [`examples/artifacts-filesystem/`](../artifacts-filesystem/) — same storage backend, but the agent attaches the artifact manually instead of via the LLM tool.
-- [`examples/artifacts-minio/`](../artifacts-minio/) — point the same flow at MinIO / S3 instead of local disk.
+- [`examples/artifacts-s3/`](../artifacts-s3/) — point the same flow at an S3-compatible store instead of local disk.
 - [`examples/artifacts-with-default-handlers/`](../artifacts-with-default-handlers/) — combine the storage wiring with the `withDefaultTaskHandlers()` builder shortcut.

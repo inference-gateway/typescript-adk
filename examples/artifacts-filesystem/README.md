@@ -103,6 +103,6 @@ For programmatic cleanup, call `artifactService.cleanupExpired(maxAgeMs)` to dro
 
 ## Related examples
 
-- [`examples/artifacts-minio/`](../artifacts-minio/) — same shape, but bytes go to S3/MinIO with presigned URLs.
+- [`examples/artifacts-s3/`](../artifacts-s3/) — same shape, but bytes go to S3/RustFS with presigned URLs.
 - [`examples/artifacts-autonomous-tool/`](../artifacts-autonomous-tool/) — let the LLM create artifacts itself via the reserved `create_artifact` tool.
 - [`examples/artifacts-with-default-handlers/`](../artifacts-with-default-handlers/) — `A2AServerBuilder.withDefaultTaskHandlers()` combined with an artifact-injecting custom handler.

@@ -1,7 +1,9 @@
 import { Readable } from 'node:stream';
 import {
+  CreateBucketCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
@@ -10,7 +12,7 @@ import {
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ArtifactStorageError,
-  MinioArtifactStorage,
+  S3ArtifactStorage,
 } from '../../src/artifacts/index.js';
 
 vi.mock('@aws-sdk/s3-request-presigner', () => ({
@@ -36,8 +38,10 @@ interface StoredObject {
 
 class FakeS3Client {
   readonly objects = new Map<string, StoredObject>();
+  readonly buckets = new Set<string>();
   destroyed = false;
   failGet = false;
+  failCreateBucket = false;
 
   constructor(private readonly now: () => Date = () => new Date()) {}
 
@@ -92,6 +96,27 @@ class FakeS3Client {
         LastModified: stored.uploadedAt,
         Metadata: { ...stored.metadata },
       };
+    }
+    if (command instanceof HeadBucketCommand) {
+      const { Bucket } = command.input;
+      if (typeof Bucket !== 'string') throw new Error('Bucket required');
+      if (!this.buckets.has(Bucket)) {
+        const err = new Error('NotFound') as Error & {
+          name: string;
+          $metadata: { httpStatusCode: number };
+        };
+        err.name = 'NotFound';
+        err.$metadata = { httpStatusCode: 404 };
+        throw err;
+      }
+      return { $metadata: { httpStatusCode: 200 } };
+    }
+    if (command instanceof CreateBucketCommand) {
+      const { Bucket } = command.input;
+      if (typeof Bucket !== 'string') throw new Error('Bucket required');
+      if (this.failCreateBucket) throw new Error('create bucket failed');
+      this.buckets.add(Bucket);
+      return { $metadata: { httpStatusCode: 200 } };
     }
     if (command instanceof DeleteObjectCommand) {
       const { Bucket, Key } = command.input;
@@ -171,21 +196,22 @@ async function streamToBytes(
 function makeStorage(
   fake: FakeS3Client,
   overrides: Partial<{
+    bucket: string;
     mode: 'direct' | 'proxy';
     baseUrl: string;
     prefix: string;
     presignExpirySeconds: number;
     now: () => Date;
   }> = {}
-): MinioArtifactStorage {
-  return new MinioArtifactStorage({
+): S3ArtifactStorage {
+  return new S3ArtifactStorage({
     bucket: 'bkt',
     client: fake as unknown as S3Client,
     ...overrides,
   });
 }
 
-describe('MinioArtifactStorage', () => {
+describe('S3ArtifactStorage', () => {
   let fake: FakeS3Client;
 
   beforeEach(() => {
@@ -195,7 +221,7 @@ describe('MinioArtifactStorage', () => {
   it('rejects construction with an empty bucket', () => {
     expect(
       () =>
-        new MinioArtifactStorage({
+        new S3ArtifactStorage({
           bucket: '',
           client: fake as unknown as S3Client,
         })
@@ -205,7 +231,7 @@ describe('MinioArtifactStorage', () => {
   it('rejects non-positive presignExpirySeconds', () => {
     expect(
       () =>
-        new MinioArtifactStorage({
+        new S3ArtifactStorage({
           bucket: 'b',
           client: fake as unknown as S3Client,
           presignExpirySeconds: 0,
@@ -495,7 +521,7 @@ describe('MinioArtifactStorage', () => {
   });
 
   it('close destroys the owned client and blocks subsequent operations', async () => {
-    const storage = new MinioArtifactStorage({
+    const storage = new S3ArtifactStorage({
       bucket: 'b',
       region: 'us-east-1',
     });
@@ -509,5 +535,20 @@ describe('MinioArtifactStorage', () => {
     const storage = makeStorage(fake);
     await storage.close();
     expect(fake.destroyed).toBe(false);
+  });
+
+  it('creates the backing bucket when missing', async () => {
+    const storage = makeStorage(fake, { bucket: 'fresh-bucket' });
+    expect(fake.buckets.size).toBe(0);
+    await storage.exists('abc', 'f');
+    expect(fake.buckets.has('fresh-bucket')).toBe(true);
+  });
+
+  it('surfaces bucket creation failures on first use', async () => {
+    fake.failCreateBucket = true;
+    const storage = makeStorage(fake);
+    await expect(storage.exists('abc', 'f')).rejects.toBeInstanceOf(
+      ArtifactStorageError
+    );
   });
 });

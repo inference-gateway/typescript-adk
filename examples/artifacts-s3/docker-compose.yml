@@ -1,0 +1,46 @@
+services:
+  # RustFS is an S3-compatible object store: https://github.com/rustfs/rustfs
+  # API on 9000, web console on 9001. The storage creates the 'artifacts'
+  # bucket on first use when it is missing, so there is no init container.
+  rustfs:
+    image: rustfs/rustfs:1.0.4
+    security_opt:
+      - 'no-new-privileges:true'
+    ports:
+      - '9000:9000' # S3 API
+      - '9001:9001' # RustFS Console
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: 'true'
+      RUSTFS_ACCESS_KEY: rustfsadmin
+      RUSTFS_SECRET_KEY: rustfsadmin
+    volumes:
+      - rustfs-data:/data
+    depends_on:
+      volume-permission-helper:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - --fail
+        - --silent
+        - http://127.0.0.1:9000/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # RustFS runs as UID/GID 10001 (10001:10001) - named volumes must be
+  # writable by that user (see the RustFS docker-compose-simple.yml reference)
+  volume-permission-helper:
+    image: alpine:3.21
+    volumes:
+      - rustfs-data:/data
+    command: sh -c "chown -R 10001:10001 /data && echo 'Volume Permissions fixed' && exit 0"
+    restart: 'no'
+
+volumes:
+  rustfs-data:

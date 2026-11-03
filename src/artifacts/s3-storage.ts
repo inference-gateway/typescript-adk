@@ -1,7 +1,9 @@
 import { Readable } from 'node:stream';
 import {
+  CreateBucketCommand,
   DeleteObjectCommand,
   GetObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   type HeadObjectCommandOutput,
   ListObjectsV2Command,
@@ -20,43 +22,62 @@ import { DEFAULT_ARTIFACT_ID_PATTERN } from './filesystem-storage.js';
 
 /**
  * Default expiry for presigned URLs emitted in `direct` mode (5 minutes).
- * Mirrors the recommendation in the Go ADK's MinIO provider — short enough
+ * Mirrors the recommendation in the Go ADK's S3 provider — short enough
  * that an intercepted URL has limited value, long enough for a normal client
  * download to start. Override via
- * {@link MinioArtifactStorageOptions.presignExpirySeconds}.
+ * {@link S3ArtifactStorageOptions.presignExpirySeconds}.
  */
 export const DEFAULT_PRESIGN_EXPIRY_SECONDS = 300;
 
 /**
- * Default region used when constructing the underlying `S3Client`. MinIO
- * ignores the region, but AWS S3 and the SDK validate it; `us-east-1` is the
- * conventional default.
+ * Default region used when constructing the underlying `S3Client`. RustFS ignores it, but
+ * AWS S3 and the SDK validate the region; `us-east-1` is the conventional
+ * default.
  */
 export const DEFAULT_S3_REGION = 'us-east-1';
 
+// O(n) walks rather than /^\/+|\/+$/, which CodeQL flags as
+// polynomial-backtracking on adversarial input.
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') {
+    end--;
+  }
+  return value.slice(0, end);
+}
+
+function trimSlashes(value: string): string {
+  const trimmed = trimTrailingSlashes(value);
+  let start = 0;
+  while (start < trimmed.length && trimmed[start] === '/') {
+    start++;
+  }
+  return trimmed.slice(start);
+}
+
 /**
- * URL-emission mode for {@link MinioArtifactStorage}.
+ * URL-emission mode for {@link S3ArtifactStorage}.
  *
- * - `'direct'`: {@link MinioArtifactStorage.store} returns a freshly-signed
+ * - `'direct'`: {@link S3ArtifactStorage.store} returns a freshly-signed
  *   presigned GET URL pointing at the object in the backing bucket. Clients
- *   talk to S3/MinIO directly with no further server involvement.
- * - `'proxy'`: {@link MinioArtifactStorage.store} returns the public URL
- *   pattern produced by {@link MinioArtifactStorage.getUrl} (typically the
+ *   talk to the store directly with no further server involvement.
+ * - `'proxy'`: {@link S3ArtifactStorage.store} returns the public URL
+ *   pattern produced by {@link S3ArtifactStorage.getUrl} (typically the
  *   gateway's `/artifacts/:id/:filename` endpoint). The server streams the
  *   object on request.
  */
-export type MinioArtifactStorageMode = 'direct' | 'proxy';
+export type S3ArtifactStorageMode = 'direct' | 'proxy';
 
 /**
- * Construction options for {@link MinioArtifactStorage}.
+ * Construction options for {@link S3ArtifactStorage}.
  */
-export interface MinioArtifactStorageOptions {
+export interface S3ArtifactStorageOptions {
   /**
-   * Target bucket. Must already exist — the storage does not auto-create.
+   * Target bucket. Created automatically when missing (mirrors the Go ADK).
    */
   readonly bucket: string;
   /**
-   * Custom endpoint URL. Required for MinIO (e.g., `http://localhost:9000`).
+   * Custom endpoint URL. Required for an S3-compatible store such as RustFS (e.g., `http://localhost:9000`).
    * Omit for native AWS S3; the SDK resolves the regional endpoint instead.
    */
   readonly endpoint?: string;
@@ -77,7 +98,7 @@ export interface MinioArtifactStorageOptions {
   /**
    * If `true`, the client uses path-style addressing
    * (`http://endpoint/bucket/key`) instead of virtual-host style
-   * (`http://bucket.endpoint/key`). Required for MinIO. Defaults to `true`
+   * (`http://bucket.endpoint/key`). Required for S3-compatible stores. Defaults to `true`
    * when `endpoint` is set, `false` otherwise.
    */
   readonly forcePathStyle?: boolean;
@@ -89,12 +110,12 @@ export interface MinioArtifactStorageOptions {
   /**
    * URL emission mode. Defaults to `'direct'`.
    */
-  readonly mode?: MinioArtifactStorageMode;
+  readonly mode?: S3ArtifactStorageMode;
   /**
-   * Public base URL used by {@link MinioArtifactStorage.getUrl} (and by
+   * Public base URL used by {@link S3ArtifactStorage.getUrl} (and by
    * `store()` in `'proxy'` mode). Trailing slashes are stripped.
    *
-   * Defaults to `'minio://<bucket>'` when omitted, which is intentionally
+   * Defaults to `'s3://<bucket>'` when omitted, which is intentionally
    * not a usable HTTP URL — production deployments should pass the gateway's
    * public origin (e.g., `https://agent.example.com/artifacts`).
    */
@@ -125,7 +146,7 @@ export interface MinioArtifactStorageOptions {
 }
 
 /**
- * Object-storage-backed {@link ArtifactStorageProvider} for MinIO and S3.
+ * Object-storage-backed {@link ArtifactStorageProvider} for any S3-compatible object store.
  *
  * Layout in the bucket:
  *
@@ -134,7 +155,7 @@ export interface MinioArtifactStorageOptions {
  * ```
  *
  * Object content type comes from the `contentType` passed to
- * {@link MinioArtifactStorage.store}. The original `uploadedAt` is stored as
+ * {@link S3ArtifactStorage.store}. The original `uploadedAt` is stored as
  * the S3 user-metadata header `x-amz-meta-uploaded-at`; on read it is
  * preferred over the object's `LastModified` so injected clocks remain
  * authoritative.
@@ -144,35 +165,36 @@ export interface MinioArtifactStorageOptions {
  *   so clients fetch from S3 directly. `getUrl()` returns the public URL
  *   pattern (typically the gateway's proxy endpoint) — use that as a stable
  *   identifier when the presigned URL is no longer needed for streaming.
- *   Call {@link MinioArtifactStorage.getPresignedUrl} for a fresh URL later.
+ *   Call {@link S3ArtifactStorage.getPresignedUrl} for a fresh URL later.
  * - `'proxy'`: `store()` returns the public URL pattern; the server is
  *   expected to mount {@link registerArtifactsRoute} on it and stream the
- *   bytes through {@link MinioArtifactStorage.retrieve}. Useful when the
+ *   bytes through {@link S3ArtifactStorage.retrieve}. Useful when the
  *   bucket is private and clients cannot speak S3.
  *
- * Mirrors the Go ADK's MinIO storage provider at
- * `adk/server/artifacts_storage_minio.go`.
+ * Mirrors the Go ADK's S3 storage provider at
+ * `adk/server/artifacts_storage_s3.go`.
  */
-export class MinioArtifactStorage implements ArtifactStorageProvider {
+export class S3ArtifactStorage implements ArtifactStorageProvider {
   private readonly client: S3Client;
   private readonly ownsClient: boolean;
   private readonly bucket: string;
   private readonly prefix: string;
   private readonly baseUrl: string;
-  private readonly mode: MinioArtifactStorageMode;
+  private readonly mode: S3ArtifactStorageMode;
   private readonly presignExpirySeconds: number;
   private readonly artifactIdPattern: RegExp;
   private readonly now: () => Date;
   private closed = false;
+  private readonly ready: Promise<void>;
 
-  constructor(options: MinioArtifactStorageOptions) {
+  constructor(options: S3ArtifactStorageOptions) {
     if (typeof options.bucket !== 'string' || options.bucket === '') {
       throw new ArtifactStorageError('bucket must be a non-empty string');
     }
     this.bucket = options.bucket;
-    this.prefix = (options.prefix ?? '').replace(/^\/+|\/+$/g, '');
-    const rawBase = options.baseUrl ?? `minio://${options.bucket}`;
-    this.baseUrl = rawBase.replace(/\/+$/, '');
+    this.prefix = trimSlashes(options.prefix ?? '');
+    const rawBase = options.baseUrl ?? `s3://${options.bucket}`;
+    this.baseUrl = trimTrailingSlashes(rawBase);
     this.mode = options.mode ?? 'direct';
     this.presignExpirySeconds =
       options.presignExpirySeconds ?? DEFAULT_PRESIGN_EXPIRY_SECONDS;
@@ -206,6 +228,8 @@ export class MinioArtifactStorage implements ArtifactStorageProvider {
       this.client = new S3Client(config);
       this.ownsClient = true;
     }
+    this.ready = this.ensureBucketExists();
+    this.ready.catch(swallowEarlyRejection);
   }
 
   async store(
@@ -215,7 +239,7 @@ export class MinioArtifactStorage implements ArtifactStorageProvider {
     contentType: string,
     signal?: AbortSignal
   ): Promise<string> {
-    this.ensureOpen();
+    await this.ensureReady();
     this.assertNotAborted(signal);
     const key = this.safeKey(artifactId, filename);
     const uploadedAt = this.now().toISOString();
@@ -251,7 +275,7 @@ export class MinioArtifactStorage implements ArtifactStorageProvider {
     filename: string,
     signal?: AbortSignal
   ): Promise<ReadableStream<Uint8Array>> {
-    this.ensureOpen();
+    await this.ensureReady();
     this.assertNotAborted(signal);
     const key = this.safeKey(artifactId, filename);
     let response;
@@ -279,7 +303,7 @@ export class MinioArtifactStorage implements ArtifactStorageProvider {
     filename: string,
     signal?: AbortSignal
   ): Promise<void> {
-    this.ensureOpen();
+    await this.ensureReady();
     this.assertNotAborted(signal);
     const key = this.safeKey(artifactId, filename);
     try {
@@ -300,7 +324,7 @@ export class MinioArtifactStorage implements ArtifactStorageProvider {
     filename: string,
     signal?: AbortSignal
   ): Promise<boolean> {
-    this.ensureOpen();
+    await this.ensureReady();
     this.assertNotAborted(signal);
     return (await this.head(artifactId, filename, signal)) !== undefined;
   }
@@ -310,7 +334,7 @@ export class MinioArtifactStorage implements ArtifactStorageProvider {
     filename: string,
     signal?: AbortSignal
   ): Promise<ArtifactMetadata | undefined> {
-    this.ensureOpen();
+    await this.ensureReady();
     this.assertNotAborted(signal);
     const head = await this.head(artifactId, filename, signal);
     if (head === undefined) return undefined;
@@ -335,14 +359,14 @@ export class MinioArtifactStorage implements ArtifactStorageProvider {
    * Issue a fresh presigned GET URL for `(artifactId, filename)`. Useful for
    * `'direct'`-mode callers that need to hand a new URL to a client after
    * the original returned by `store()` has expired. `expiresIn` overrides the
-   * configured {@link MinioArtifactStorageOptions.presignExpirySeconds}.
+   * configured {@link S3ArtifactStorageOptions.presignExpirySeconds}.
    */
   async getPresignedUrl(
     artifactId: string,
     filename: string,
     expiresIn?: number
   ): Promise<string> {
-    this.ensureOpen();
+    await this.ensureReady();
     const key = this.safeKey(artifactId, filename);
     return this.signGet(key, undefined, expiresIn);
   }
@@ -351,7 +375,7 @@ export class MinioArtifactStorage implements ArtifactStorageProvider {
     maxAgeMs: number,
     signal?: AbortSignal
   ): Promise<number> {
-    this.ensureOpen();
+    await this.ensureReady();
     this.assertNotAborted(signal);
     const cutoff = this.now().getTime() - maxAgeMs;
     let removed = 0;
@@ -366,7 +390,7 @@ export class MinioArtifactStorage implements ArtifactStorageProvider {
   }
 
   async cleanupOldest(maxCount: number, signal?: AbortSignal): Promise<number> {
-    this.ensureOpen();
+    await this.ensureReady();
     this.assertNotAborted(signal);
     if (maxCount <= 0) {
       return 0;
@@ -519,10 +543,38 @@ export class MinioArtifactStorage implements ArtifactStorageProvider {
       : `${this.prefix}/${artifactId}/${filename}`;
   }
 
-  private ensureOpen(): void {
+  private async ensureBucketExists(): Promise<void> {
+    try {
+      await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }));
+    } catch (headErr) {
+      if (!isNotFound(headErr)) {
+        throw new ArtifactStorageError(
+          `failed to check bucket ${this.bucket}`,
+          {
+            cause: headErr,
+          }
+        );
+      }
+      try {
+        await this.client.send(
+          new CreateBucketCommand({ Bucket: this.bucket })
+        );
+      } catch (cause) {
+        throw new ArtifactStorageError(
+          `failed to create bucket ${this.bucket}`,
+          {
+            cause,
+          }
+        );
+      }
+    }
+  }
+
+  private async ensureReady(): Promise<void> {
     if (this.closed) {
       throw new ArtifactStorageError('storage has been closed');
     }
+    await this.ready;
   }
 
   private assertNotAborted(signal: AbortSignal | undefined): void {
@@ -542,3 +594,10 @@ function isNotFound(err: unknown): boolean {
     ?.httpStatusCode;
   return status === 404;
 }
+
+/**
+ * Observes the constructor-issued bucket check: an instance that is never
+ * used must not crash the process with an unhandled rejection, so the check
+ * failure surfaces only on the first awaited operation.
+ */
+function swallowEarlyRejection(): void {}
