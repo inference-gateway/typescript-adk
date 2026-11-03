@@ -96,7 +96,7 @@ Client (`client.ts`):
 
 ## Where artifacts land
 
-In memory — see [`InMemoryArtifactStorage`](../../src/artifacts/in-memory-storage.ts). The bytes are held by reference inside the server process and disappear on restart. To stream them out over HTTP, swap the storage for [`FilesystemArtifactStorage`](../../src/artifacts/filesystem-storage.ts) or [`MinioArtifactStorage`](../../src/artifacts/minio-storage.ts) and use the lower-level `createA2AServer({ card, artifactStorage })` instead of the builder — see [`examples/artifacts-filesystem/`](../artifacts-filesystem/) for that pattern.
+In memory — see [`InMemoryArtifactStorage`](../../src/artifacts/in-memory-storage.ts). The bytes are held by reference inside the server process and disappear on restart. To stream them out over HTTP, swap the storage for [`FilesystemArtifactStorage`](../../src/artifacts/filesystem-storage.ts) or [`S3ArtifactStorage`](../../src/artifacts/s3-storage.ts) and use the lower-level `createA2AServer({ card, artifactStorage })` instead of the builder — see [`examples/artifacts-filesystem/`](../artifacts-filesystem/) for that pattern.
 
 > **Builder limitation:** the TS `A2AServerBuilder` does not currently propagate the configured `ArtifactService` (or any artifact-storage handle) to the HTTP `/artifacts/:artifactId/:filename` route. `withArtifactService(...)` only registers the service with the builder for future handler use; the route remains unmounted. For a fully end-to-end download flow, use one of the two storage-specific examples above. This example focuses on the **handler-side** wiring.
 
@@ -104,5 +104,5 @@ In memory — see [`InMemoryArtifactStorage`](../../src/artifacts/in-memory-stor
 
 - [`examples/default-handlers/`](../default-handlers/) — `A2AServerBuilder.withDefaultTaskHandlers()` without artifacts. Shows the canonical SendMessage + SendStreamingMessage stub behavior.
 - [`examples/artifacts-filesystem/`](../artifacts-filesystem/) — filesystem-backed artifact storage with a working `/artifacts` download endpoint.
-- [`examples/artifacts-minio/`](../artifacts-minio/) — MinIO/S3-backed artifact storage with presigned URLs.
+- [`examples/artifacts-s3/`](../artifacts-s3/) — RustFS/S3-backed artifact storage with presigned URLs.
 - [`examples/artifacts-autonomous-tool/`](../artifacts-autonomous-tool/) — LLM-driven artifact creation via the reserved `create_artifact` tool.

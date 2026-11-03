@@ -2,7 +2,7 @@ import {
   DefaultArtifactService,
   InMemoryTaskStorage,
   MESSAGE_SEND_METHOD,
-  MinioArtifactStorage,
+  S3ArtifactStorage,
   TASK_GET_METHOD,
   TASK_STATE,
   createA2AServer,
@@ -13,21 +13,21 @@ import {
   type AgentCard,
   type ManagedTask,
   type Message,
-  type MinioArtifactStorageMode,
+  type S3ArtifactStorageMode,
 } from '@inference-gateway/adk';
 
-const AGENT_NAME = process.env['A2A_AGENT_NAME'] ?? 'artifacts-minio-agent';
+const AGENT_NAME = process.env['A2A_AGENT_NAME'] ?? 'artifacts-s3-agent';
 const AGENT_DESCRIPTION =
   process.env['A2A_AGENT_DESCRIPTION'] ??
-  'A2A agent that persists each request as an object in a MinIO bucket via MinioArtifactStorage.';
+  'A2A agent that persists each request as an object in an S3 bucket via S3ArtifactStorage.';
 const AGENT_VERSION = process.env['A2A_AGENT_VERSION'] ?? '0.0.0';
 const HOST = process.env['A2A_SERVER_HOST'] ?? '127.0.0.1';
 const PORT = Number.parseInt(process.env['A2A_SERVER_PORT'] ?? '8080', 10);
-const ENDPOINT = process.env['MINIO_ENDPOINT'] ?? 'http://127.0.0.1:9000';
-const REGION = process.env['MINIO_REGION'] ?? 'us-east-1';
-const ACCESS_KEY = process.env['MINIO_ACCESS_KEY'] ?? 'minioadmin';
-const SECRET_KEY = process.env['MINIO_SECRET_KEY'] ?? 'minioadmin';
-const BUCKET = process.env['MINIO_BUCKET'] ?? 'artifacts';
+const ENDPOINT = process.env['S3_ENDPOINT'] ?? 'http://127.0.0.1:9000';
+const REGION = process.env['S3_REGION'] ?? 'us-east-1';
+const ACCESS_KEY = process.env['S3_ACCESS_KEY'] ?? 'rustfsadmin';
+const SECRET_KEY = process.env['S3_SECRET_KEY'] ?? 'rustfsadmin';
+const BUCKET = process.env['S3_BUCKET'] ?? 'artifacts';
 const MODE = parseMode(process.env['ARTIFACTS_MODE']);
 const PRESIGN_EXPIRY = Number.parseInt(
   process.env['ARTIFACTS_PRESIGN_EXPIRY'] ?? '300',
@@ -58,14 +58,14 @@ const card: AgentCard = {
       id: 'note-to-bucket',
       name: 'Note to bucket',
       description:
-        'Persists the incoming user message as a text object in the configured MinIO bucket and replies with a download URL.',
-      tags: ['artifacts', 'minio', 's3', 'demo'],
+        'Persists the incoming user message as a text object in the configured S3 bucket and replies with a download URL.',
+      tags: ['artifacts', 's3', 'rustfs', 'demo'],
     },
   ],
 };
 
 const storage = new InMemoryTaskStorage();
-const artifactStorage = new MinioArtifactStorage({
+const artifactStorage = new S3ArtifactStorage({
   bucket: BUCKET,
   endpoint: ENDPOINT,
   region: REGION,
@@ -81,7 +81,7 @@ const artifactService = new DefaultArtifactService({
 
 // In "proxy" mode the ADK server streams bytes through the storage provider on
 // GET /artifacts/:artifactId/:filename; in "direct" mode clients fetch presigned
-// URLs from MinIO directly and the proxy route is unused. We register the route
+// URLs from RustFS directly and the proxy route is unused. We register the route
 // unconditionally so both modes still serve through the same endpoint shape.
 const server = createA2AServer({ card, artifactStorage });
 
@@ -100,7 +100,7 @@ const worker = runWorker(abort.signal).catch((err) => {
 
 await server.listen(PORT, HOST);
 console.log(`${AGENT_NAME} listening on http://${HOST}:${PORT}`);
-console.log(`  minio:    ${ENDPOINT} bucket=${BUCKET} mode=${MODE}`);
+console.log(`  s3:       ${ENDPOINT} bucket=${BUCKET} mode=${MODE}`);
 console.log(`  card:     http://${HOST}:${PORT}/.well-known/agent-card.json`);
 console.log(`  health:   http://${HOST}:${PORT}/health`);
 console.log(`  rpc:      POST http://${HOST}:${PORT}/`);
@@ -148,12 +148,12 @@ async function handleNoteTask(
   const noteBody =
     userText.length > 0
       ? userText
-      : 'Hello! Send any text and I will write it to MinIO as an artifact.';
+      : 'Hello! Send any text and I will write it to the S3 bucket as an artifact.';
   const filename = `note-${inProgress.id.slice(0, 8)}.txt`;
 
   const artifact = await artifactService.createFileArtifact(
     'User note',
-    'Plain-text note persisted via MinioArtifactStorage.',
+    'Plain-text note persisted via S3ArtifactStorage.',
     filename,
     new TextEncoder().encode(noteBody),
     { signal }
@@ -207,7 +207,7 @@ function extractUserText(messages: readonly Message[]): string {
   return '';
 }
 
-function parseMode(raw: string | undefined): MinioArtifactStorageMode {
+function parseMode(raw: string | undefined): S3ArtifactStorageMode {
   if (raw === 'proxy') return 'proxy';
   return 'direct';
 }
