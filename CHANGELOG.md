@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.21.1](https://github.com/inference-gateway/typescript-adk/compare/v0.21.0...v0.21.1) (2026-11-10)
+
+### 🔧 Miscellaneous
+
+* **deps:** bump pnpm/action-setup ([#299](https://github.com/inference-gateway/typescript-adk/issues/299)) ([057ddea](https://github.com/inference-gateway/typescript-adk/commit/057ddea0342b1bad62a58170b0600e255179746e))
+* **deps:** bump the npm group with 19 updates ([#300](https://github.com/inference-gateway/typescript-adk/issues/300)) ([9c8e9ad](https://github.com/inference-gateway/typescript-adk/commit/9c8e9ad7efc0dc0eae33fccfdc9898a8a0a2b060))
+* sync generated types with schemas v1.10.0 ([#298](https://github.com/inference-gateway/typescript-adk/issues/298)) ([d72de31](https://github.com/inference-gateway/typescript-adk/commit/d72de31f90cc0759a5fadeade7ed73c465f6669a))
+* sync generated types with schemas v1.7.0 ([#297](https://github.com/inference-gateway/typescript-adk/issues/297)) ([fa8808d](https://github.com/inference-gateway/typescript-adk/commit/fa8808d457b3de70f35688fc7dfdf91730a2778b))
+
 ## [0.21.0](https://github.com/inference-gateway/typescript-adk/compare/v0.20.0...v0.21.0) (2026-11-03)
 
 ### ✨ Features
